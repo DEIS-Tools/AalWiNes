@@ -4,10 +4,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(Boost 1.66 COMPONENTS program_options REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
+include_directories(${Boost_INCLUDE_DIR} rapidxml)
 
 add_executable(mpls2pda ${HEADER_FILES} main.cpp)
-target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES})
+target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml)
 
 
 install(TARGETS mpls2pda
