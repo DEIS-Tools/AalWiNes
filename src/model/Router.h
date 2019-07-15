@@ -28,8 +28,20 @@
 #include <string>
 #include <memory>
 
-#include <ptrie/ptrie_map.h>
+#include <ptrie_map.h>
 
+#include "RoutingTable.h"
+class Interface {
+public:
+    Interface(size_t id, Router* target) : _id(id), _target(target) {};
+    Router* target() const { return _target; }
+    size_t id() const { return _id; }
+    int routing_table() const { return _table; }
+private:
+    size_t _id = std::numeric_limits<size_t>::max();
+    Router* _target = nullptr;
+    size_t _table = -1; // lets just chose the ingoing RT nondet for now.
+};
 
 class Router {
 public:
@@ -41,21 +53,15 @@ public:
     const std::string& name() const;
     bool has_config() const { return _has_config; }
     bool parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>& routers, ptrie::map<Router*>& mapping);
+    bool parse_routing(std::istream& data, std::istream& indirect);
     void print_dot(std::ostream& out);
-
-    class Interface {
-    public:
-        Interface(size_t id, Router* target) : _id(id), _target(target) {};
-        Router* target() const { return _target; }
-        size_t id() const { return _id; }
-    private:
-        size_t _id = std::numeric_limits<size_t>::max();
-        Router* _target;
-    };
+    Interface* get_interface(const std::string& iface, Router* expected = nullptr);
+    
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;
     std::vector<std::unique_ptr<Interface>> _interfaces;
+    std::vector<RoutingTable> _tables;
     ptrie::map<Interface*> _interface_map;
     size_t _inamelength = 0; // for printing
     bool _has_config = false;

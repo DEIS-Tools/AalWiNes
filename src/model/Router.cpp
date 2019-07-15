@@ -25,6 +25,7 @@
 #include <vector>
 #include <streambuf>
 #include <rapidxml.hpp>
+#include <bits/basic_string.h>
 
 Router::Router(size_t id) : _index(id)
 {
@@ -160,15 +161,9 @@ bool Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
             }
             size_t l = strlen(iname->value());
             _inamelength = std::max(_inamelength, l);
-            auto res = _interface_map.insert((unsigned char*)iname->value(), l);
-            if(!res.first && _interface_map.get_data(res.second)->target() != next)
-            {
-                std::cerr << "error: duplicate interface declaration, got " << _interface_map.get_data(res.second)->target()->name() << " new target " << next->name() << " on adjacency of " << name() << std::endl;
-                return false;
-            }
-            auto iid = _interfaces.size();
-            _interfaces.emplace_back(std::make_unique<Interface>(iid, next));
-            _interface_map.get_data(res.second) = _interfaces.back().get();
+            std::string iface = iname->value();
+            auto res = get_interface(iface, next);
+            if(res == nullptr) return false;
         } while((n = n->next_sibling("isis-adjacency")));
     }
     else
@@ -178,6 +173,157 @@ bool Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
     }
     return true;
 }
+
+Interface* Router::get_interface(const std::string& iface, Router* expected)
+{
+    auto res = _interface_map.insert((unsigned char*)iface.c_str(), iface.length());
+    if(expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected)
+    {
+        auto tgt = _interface_map.get_data(res.second)->target();
+        auto tname = tgt != nullptr ? tgt->name() : "SINK";
+        std::cerr << "error: duplicate interface declaration, got " << tname
+                << " new target " << expected->name() << " on adjacency of " << name() << std::endl;
+        return nullptr;
+    }
+    if(!res.first)
+        return _interface_map.get_data(res.second);
+    auto iid = _interfaces.size();
+    _interfaces.emplace_back(std::make_unique<Interface>(iid, expected));
+    _interface_map.get_data(res.second) = _interfaces.back().get();
+    return _interfaces.back().get();
+}
+
+
+
+bool Router::parse_routing(std::istream& data, std::istream& indirect)
+{
+    rapidxml::xml_document<> doc;
+    std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
+    buffer.push_back('\0');
+    doc.parse<0>(&buffer[0]);
+    if(!doc.first_node())
+    {
+        std::cerr << "Ill-formed XML-document for " << name() << std::endl;
+        return false;
+    }
+    auto info = doc.first_node()->first_node("forwarding-table-information");
+    if(!info)
+    {
+        std::cerr << "Missing an \"forwarding-table-information\"-tag for " << name() << std::endl;
+        return false;
+    }
+    auto n = info->first_node("route-table");    
+    if(n == nullptr)
+    {
+        std::cerr << "Found no \"route-table\"-entries" << std::endl;
+        return false;
+    }
+    else
+    {
+        ptrie::map<std::pair<std::string,std::string>> indir;
+        if(indirect.good() && indirect.peek() != EOF)
+        {
+            std::string line;
+            while(std::getline(indirect, line))
+            {
+                size_t i = 0;
+                for(; i < line.size(); ++i)
+                    if(line[i] != ' ') break;
+                size_t j = i;
+                for(; j < line.size(); ++j)
+                {
+                    if(!std::isdigit(line[j]))
+                        break;
+                }
+                // TODO: a lot of pasta here too.
+                if(j <= i) continue;
+                auto rn = line.substr(i, (j-i));
+                i = j;
+                // find type
+                for(; i < line.size(); ++i)
+                    if(line[i] != ' ') break;
+                // skip type
+                for(; i < line.size(); ++i)
+                    if(line[i] == ' ') break;
+                // find eth
+                for(; i < line.size(); ++i)
+                    if(line[i] != ' ') break;
+                j = i;
+                for(; i < line.size(); ++i)
+                    if(line[i] == ' ') break;
+                if(i <= j) {
+                    std::cerr << "warning; no iface for " << rn << std::endl;
+                    continue;
+                }            
+                auto iface = line.substr(j, (i-j));
+                for(; i < line.size(); ++i)
+                    if(line[i] != ' ') break;  
+                for(; i < line.size(); ++i)
+                    if(line[i] == ' ') break;
+                if(i == line.size())
+                {
+                    // next line
+                    if(!std::getline(indirect, line))
+                    {
+                        std::cerr << "error: unexpected end of tile" << std::endl;
+                        return false;
+                    }
+                    i = 0;
+                }
+                for(; i < line.size(); ++i)
+                    if(line[i] != ' ') break;
+
+                j = i;
+                for(; i < line.size(); ++i)
+                    if(line[i] == ' ') break;
+                auto conv = line.substr(j, (i-j));
+                if(conv.empty())
+                {
+                    std::cerr << "warning: skip rule without protocol" << std::endl;
+                    std::cerr << line << std::endl;
+                }
+
+                auto res = indir.insert((const unsigned char*)rn.c_str(), rn.size());
+                auto& data = indir.get_data(res.second);
+                if(!res.first)
+                {
+                    if(data.first != iface)
+                    {
+                        std::cerr << "error: duplicate rule " << rn << " expected \"" << data.first << ":" << data.second << "\" got \"" << iface << "\"" << std::endl;
+                    }
+                }
+                else
+                {
+                    data.first.swap(iface);
+                }
+
+                if(!res.first)
+                {
+                    if(data.second != conv)
+                    {
+                        std::cerr << "warning: duplicate rule expected \"" << data.first << ":" << data.second << "\" got \"" << conv << "\"" << std::endl;
+                    }
+                }
+                else
+                {
+                    data.second.swap(conv);
+                }
+            }
+        }
+        while(n)
+        {
+            _tables.emplace_back(RoutingTable::parse(n, indir, this));
+            if(_tables.back().empty())
+            {
+                std::cerr << "error: in router " << name() << std::endl;
+                return false;
+            }
+            n = n->next_sibling("route-table");
+        }
+    }
+    return true;
+}
+
 
 void Router::print_dot(std::ostream& out)
 {

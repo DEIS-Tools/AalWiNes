@@ -18,4 +18,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/rapidxml)
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/ptrie)
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/)

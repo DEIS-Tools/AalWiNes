@@ -15,7 +15,7 @@
 
 #include "model/Router.h"
 
-#include <ptrie/ptrie_map.h>
+#include <ptrie_map.h>
 
 #include <boost/program_options.hpp>
 
@@ -57,7 +57,8 @@ int main(int argc, const char** argv)
     // lets start by creating empty router-objects for all the alias' we have
     ptrie::map<Router*> mapping;
     std::vector<std::unique_ptr<Router>> routers;
-    std::vector<std::pair<std::string,std::string>> configs;
+    using tp = std::tuple<std::string,std::string,std::string>;
+    std::vector<tp> configs;
     std::string line;
     while(getline(data, line))
     {
@@ -102,36 +103,87 @@ int main(int argc, const char** argv)
             configs.emplace_back();
             if(en + 1 < line.size())
             {
+                // TODO: cleanup this pasta.
                 ++en;
                 size_t config = en;
                 for(;config < line.size(); ++config) if(line[config] == ':') break;
-                configs.back().first = line.substr(en, (config - en));
+                if(en < config)
+                    std::get<0>(configs.back()) = line.substr(en, (config - en));
                 ++config;
-                en = line.size();
-                if(line.back() == ':') --en;
-                if(en > config)
-                    configs.back().second = line.substr(config, (en-config));
-                if(configs.back().first.empty() || configs.back().second.empty())
+                en = config;
+                for(;config < line.size(); ++config) if(line[config] == ':') break;
+                if(en < config)
+                    std::get<1>(configs.back()) = line.substr(en, (config - en));
+                ++config;
+                en = config;
+                for(;config < line.size(); ++config) if(line[config] == ':') break;
+                if(en < config)
+                    std::get<2>(configs.back()) = line.substr(en, (config-en));
+
+                if(std::get<0>(configs.back()).empty() || std::get<1>(configs.back()).empty())
                 {
                     std::cerr << "error: Either no configuration files are specified, or both adjacency and mpls is specified." << std::endl;
+                    std::cerr << line << std::endl;
+                    return false;
+                }
+                if(!std::get<2>(configs.back()).empty() && (std::get<1>(configs.back()).empty() || std::get<0>(configs.back()).empty()))
+                {
+                    std::cerr << "error: next-hop-table requires definition of other configuration-files." << std::endl;
+                    std::cerr << line << std::endl;
                     return false;
                 }
             }
         }
     }
-    
+    {
+        // add sink/source
+/*        auto res = mapping.insert((unsigned char*)tmp.c_str(), tmp.size());
+        routers.emplace_back(std::make_unique<Router>(id));
+        mapping.get_data(res.second) = routers.back().get();
+        routers.back()->add_name(tmp);*/
+    }
     for(size_t i = 0; i < configs.size(); ++i)
     {
-        if(configs[i].first.empty()) continue;
-        std::ifstream stream(configs[i].first);
-        if(!stream.is_open())
+        if(std::get<0>(configs[i]).empty()) 
         {
-            std::cerr << "error: Could not open adjacency-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
-            exit(-1);
+            std::cerr << "warning: No adjacency info for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
         }
-        if(!routers[i]->parse_adjacency(stream, routers, mapping))
+        else
         {
-            exit(-1);
+            std::ifstream stream(std::get<0>(configs[i]));
+            if(!stream.is_open())
+            {
+                std::cerr << "error: Could not open adjacency-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
+                exit(-1);
+            }
+            if(!routers[i]->parse_adjacency(stream, routers, mapping))
+            {
+                exit(-1);
+            }
+            stream.close();
+        }
+        if(std::get<1>(configs[i]).empty())
+        {
+            std::cerr << "warning: No routingtables for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;            
+        }
+        else
+        {
+            std::ifstream stream(std::get<1>(configs[i]));
+            if(!stream.is_open())
+            {
+                std::cerr << "error: Could not open routing-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
+                exit(-1);
+            }
+            std::ifstream id;
+            if(!std::get<2>(configs[i]).empty())
+            {
+                id.open(std::get<2>(configs[i]));
+                std::cerr << "OPEN " << std::get<2>(configs[i]) << std::endl;
+            }
+            if(!routers[i]->parse_routing(stream, id))
+            {
+                exit(-1);
+            }            
         }
     }
     
