@@ -33,7 +33,7 @@
 #include "RoutingTable.h"
 class Interface {
 public:
-    Interface(size_t id, Router* target) : _id(id), _target(target) {};
+    Interface(size_t id, Router* target, bool virt = false) : _id(id), _target(target), _virtual(virt) {};
     Router* target() const { return _target; }
     size_t id() const { return _id; }
     int routing_table() const { return _table; }
@@ -41,6 +41,7 @@ private:
     size_t _id = std::numeric_limits<size_t>::max();
     Router* _target = nullptr;
     size_t _table = -1; // lets just chose the ingoing RT nondet for now.
+    bool _virtual = false;
 };
 
 class Router {
@@ -55,7 +56,11 @@ public:
     bool parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>& routers, ptrie::map<Router*>& mapping);
     bool parse_routing(std::istream& data, std::istream& indirect);
     void print_dot(std::ostream& out);
-    Interface* get_interface(const std::string& iface, Router* expected = nullptr);
+    Interface* get_interface(std::string iface, Router* expected = nullptr);
+    Interface* interface_no(size_t i) const {
+        return _interfaces[i].get();
+    }
+    std::unique_ptr<char[]> interface_name(size_t i);
     
 private:
     size_t _index = std::numeric_limits<size_t>::max();

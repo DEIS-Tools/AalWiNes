@@ -159,8 +159,6 @@ bool Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
                 std::cerr << "error: name not given to interface on adjacency of " << name() << std::endl;
                 return 0;
             }
-            size_t l = strlen(iname->value());
-            _inamelength = std::max(_inamelength, l);
             std::string iface = iname->value();
             auto res = get_interface(iface, next);
             if(res == nullptr) return false;
@@ -174,8 +172,18 @@ bool Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
     return true;
 }
 
-Interface* Router::get_interface(const std::string& iface, Router* expected)
+Interface* Router::get_interface(std::string iface, Router* expected)
 {
+    for(size_t i = 0; i < iface.size(); ++i)
+    {
+        if(iface[i] == ' ') 
+        {
+            iface = iface.substr(0, i);
+            break;
+        }
+    }
+    size_t l = strlen(iface.c_str());
+    _inamelength = std::max(_inamelength, l);    
     auto res = _interface_map.insert((unsigned char*)iface.c_str(), iface.length());
     if(expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected)
     {
@@ -188,7 +196,7 @@ Interface* Router::get_interface(const std::string& iface, Router* expected)
     if(!res.first)
         return _interface_map.get_data(res.second);
     auto iid = _interfaces.size();
-    _interfaces.emplace_back(std::make_unique<Interface>(iid, expected));
+    _interfaces.emplace_back(std::make_unique<Interface>(iid, expected, expected == this));
     _interface_map.get_data(res.second) = _interfaces.back().get();
     return _interfaces.back().get();
 }
@@ -318,6 +326,13 @@ bool Router::parse_routing(std::istream& data, std::istream& indirect)
                 std::cerr << "error: in router " << name() << std::endl;
                 return false;
             }
+            for(size_t i = 0; i < _tables.size() - 1; ++i)
+            {
+                if(_tables.back().overlaps(_tables[i], *this))
+                {
+                    std::cerr << "warning: nondeterministic routing discovered for " << name() << " in table " << n->first_node("table-name")->value() << std::endl;
+                }
+            }
             n = n->next_sibling("route-table");
         }
     }
@@ -334,7 +349,8 @@ void Router::print_dot(std::ostream& out)
     {
         auto res = _interface_map.unpack(i->id(), (unsigned char*)n.get());
         n[res] = 0;
-        out << "\"" << name() << "\" -> \"" << i->target()->name() 
+        auto tgtstring = i->target() != nullptr ? i->target()->name() : "SINK";
+        out << "\"" << name() << "\" -> \"" << tgtstring 
             << "\" [ label=\"" << n.get() << "\" ];\n";
     }
     if(!_inferred)
@@ -355,6 +371,12 @@ void Router::print_dot(std::ostream& out)
 
 }
 
-
+std::unique_ptr<char[]> Router::interface_name(size_t i)
+{
+    auto n = std::make_unique<char[]>(_inamelength+1);
+    auto res = _interface_map.unpack(i, (unsigned char*)n.get());
+    n[res] = 0;
+    return n;
+}
 
 
