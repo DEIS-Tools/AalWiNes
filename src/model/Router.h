@@ -31,13 +31,23 @@
 #include <ptrie_map.h>
 
 #include "RoutingTable.h"
+
 class Interface {
 public:
     Interface(size_t id, Router* target, uint32_t ip);
-    Router* target() const { return _target; }
-    size_t id() const { return _id; }
-    int routing_table() const { return _table; }
-    void print_json(std::ostream& , const char* name) const;
+
+    Router* target() const {
+        return _target;
+    }
+
+    size_t id() const {
+        return _id;
+    }
+
+    int routing_table() const {
+        return _table;
+    }
+    void print_json(std::ostream&, const char* name) const;
     void make_pairing(Router* parent);
 private:
     size_t _id = std::numeric_limits<size_t>::max();
@@ -52,18 +62,25 @@ public:
     Router(size_t id);
     Router(const Router& orig) = default;
     virtual ~Router() = default;
-    size_t index() const { return _index; }
+
+    size_t index() const {
+        return _index;
+    }
     void add_name(const std::string& name);
     const std::string& name() const;
-    bool has_config() const { return _has_config; }
-    void parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>& routers, ptrie::map<Router*>& mapping, std::ostream& warnings);
+
+    bool has_config() const {
+        return _has_config;
+    }
+    void parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::ostream& warnings);
     void parse_routing(std::istream& data, std::istream& indirect, std::ostream& warnings);
     void print_dot(std::ostream& out);
     Interface* get_interface(std::string iface, Router* expected = nullptr, uint32_t ip = std::numeric_limits<uint32_t>::max());
+
     Interface* interface_no(size_t i) const {
         return _interfaces[i].get();
     }
-    std::unique_ptr<char[]> interface_name(size_t i);
+    std::unique_ptr<char[] > interface_name(size_t i);
     void pair_interfaces();
     void print_json(std::ostream& s);
 private:

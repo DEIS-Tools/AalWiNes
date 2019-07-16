@@ -46,92 +46,79 @@ const std::string& Router::name() const
 
 void write_ip(std::ostream& s, uint32_t ip)
 {
-    uint8_t* add = (uint8_t*)&ip;
-    for(size_t i = 0; i < 4; ++i)
-    {
-        if(i != 0) s << ".";
-        s << (int)add[3-i];
+    uint8_t* add = (uint8_t*) & ip;
+    for (size_t i = 0; i < 4; ++i) {
+        if (i != 0) s << ".";
+        s << (int) add[3 - i];
     }
 }
 
-
 uint32_t get_ip(rapidxml::xml_node<char>* ip)
 {
-    if(ip == nullptr)
+    if (ip == nullptr)
         return std::numeric_limits<uint32_t>::max();
     uint32_t res;
-    uint8_t* add = (uint8_t*)&res;
+    uint8_t* add = (uint8_t*) & res;
     std::string val = ip->value();
     size_t j = 0;
     size_t n = 0;
-    for(size_t i = 0; i < val.size(); ++i)
-    {
-        if(val[i] == '.' || i == val.size() - 1)
-        {
-            if(i == val.size()-1)
+    for (size_t i = 0; i < val.size(); ++i) {
+        if (val[i] == '.' || i == val.size() - 1) {
+            if (i == val.size() - 1)
                 ++i;
             auto v = atoi(&(val[j]));
-            add[3-n] = v;
-            j = i+1;
+            add[3 - n] = v;
+            j = i + 1;
             ++n;
         }
     }
     return res;
 }
 
-
-void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>& routers, ptrie::map<Router*>& mapping, std::ostream& warnings)
+void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::ostream& warnings)
 {
     rapidxml::xml_document<> doc;
     std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
     buffer.push_back('\0');
     doc.parse<0>(&buffer[0]);
-    if(!doc.first_node())
-    {
+    if (!doc.first_node()) {
         std::stringstream e;
         e << "Ill-formed XML-document for " << name() << std::endl;
         throw base_error(e.str());
     }
     auto info = doc.first_node()->first_node("isis-adjacency-information");
-    if(!info)
-    {
+    if (!info) {
         std::stringstream e;
         e << "Missing an \"isis-adjacency-information\"-tag for " << name() << std::endl;
         throw base_error(e.str());
     }
     auto n = info->first_node("isis-adjacency");
     _has_config = true;
-    if(n) {
+    if (n) {
         do {
             // we look up in order of ipv6, ipv4, name
             Router* next = nullptr;
             auto state = n->first_node("adjacency-state");
-            if(state && strcmp(state->value(), "Up") != 0)
+            if (state && strcmp(state->value(), "Up") != 0)
                 continue;
             auto addv6 = n->first_node("ipv6-address");
-            if(addv6)
-            {
-                auto res = mapping.exists((unsigned char*)addv6->value(), strlen(addv6->value()));
-                if(!res.first)
-                {
+            if (addv6) {
+                auto res = mapping.exists((unsigned char*) addv6->value(), strlen(addv6->value()));
+                if (!res.first) {
                     warnings << "warning: Could not find ipv6 " << addv6->value() << " in adjacency of " << name() << std::endl;
                 }
                 else next = mapping.get_data(res.second);
-                    
+
             }
             auto addv4 = n->first_node("ip-address");
-            if(addv4)
-            {
-                auto res = mapping.exists((unsigned char*)addv4->value(), strlen(addv4->value()));
-                if(!res.first)
-                {
+            if (addv4) {
+                auto res = mapping.exists((unsigned char*) addv4->value(), strlen(addv4->value()));
+                if (!res.first) {
                     warnings << "warning: Could not find ipv4 " << addv4->value() << " in adjacency of " << name() << std::endl;
                 }
-                else if(next)
-                {
+                else if (next) {
                     auto o = mapping.get_data(res.second);
-                    if(next != o)
-                    {
+                    if (next != o) {
                         std::stringstream e;
                         e << "Mismatch between ipv4 and ipv6 in adjacency of " << name() << ", expected next router " << next->name() << " got " << o->name() << std::endl;
                         throw base_error(e.str());
@@ -140,18 +127,14 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
                 else next = mapping.get_data(res.second);
             }
             auto name_node = n->first_node("system-name");
-            if(name_node)
-            {
-                auto res = mapping.exists((unsigned char*)name_node->value(), strlen(name_node->value()));
-                if(!res.first)
-                {
+            if (name_node) {
+                auto res = mapping.exists((unsigned char*) name_node->value(), strlen(name_node->value()));
+                if (!res.first) {
                     warnings << "warning: Could not find name " << name_node->value() << " in adjacency of " << name() << std::endl;
                 }
-                else if(next)
-                {
+                else if (next) {
                     auto o = mapping.get_data(res.second);
-                    if(next != o)
-                    {
+                    if (next != o) {
                         std::stringstream e;
                         e << "Mismatch between ipv4 or ipv6 and name in adjacency of " << name() << ", expected next router " << next->name() << " got " << o->name() << std::endl;
                         throw base_error(e.str());
@@ -159,33 +142,29 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
                 }
                 else next = mapping.get_data(res.second);
             }
-            
-            if(next == nullptr)
-            {
+
+            if (next == nullptr) {
                 warnings << "warning: no matches router for adjecency-list of " << name() << " creating external node" << std::endl;
                 auto nnid = routers.size();
                 routers.emplace_back(std::make_unique<Router>(nnid));
                 next = routers.back().get();
-                if(addv4)
-                {
-                    auto res = mapping.insert((unsigned char*)addv4->value(), strlen(addv4->value()));
+                if (addv4) {
+                    auto res = mapping.insert((unsigned char*) addv4->value(), strlen(addv4->value()));
                     mapping.get_data(res.second) = next;
                     std::string nn = addv4->value();
                     next->add_name(nn);
                     warnings << "\t" << nn << std::endl;
                 }
-                if(addv6)
-                {
-                    auto res = mapping.insert((unsigned char*)addv6->value(), strlen(addv6->value()));
+                if (addv6) {
+                    auto res = mapping.insert((unsigned char*) addv6->value(), strlen(addv6->value()));
                     mapping.get_data(res.second) = next;
                     std::string nn = addv6->value();
                     next->add_name(nn);
                     warnings << "\t" << nn << std::endl;
                 }
-                if(name_node)
-                {
+                if (name_node) {
 
-                    auto res = mapping.insert((unsigned char*)name_node->value(), strlen(name_node->value()));
+                    auto res = mapping.insert((unsigned char*) name_node->value(), strlen(name_node->value()));
                     mapping.get_data(res.second) = next;
                     std::string nn = name_node->value();
                     next->add_name(nn);
@@ -196,8 +175,7 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
             }
 
             auto iname = n->first_node("interface-name");
-            if(!iname)
-            {
+            if (!iname) {
                 std::stringstream e;
                 e << "name not given to interface on adjacency of " << name() << std::endl;
                 throw base_error(e.str());
@@ -205,16 +183,15 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
             std::string iface = iname->value();
 
             auto res = get_interface(iface, next, get_ip(n->first_node("ip-address")));
-            if(res == nullptr)
-            {
+            if (res == nullptr) {
                 std::stringstream e;
                 e << "Could not find interface " << iface << std::endl;
                 throw base_error(e.str());
             }
-        } while((n = n->next_sibling("isis-adjacency")));
+        }
+        while ((n = n->next_sibling("isis-adjacency")));
     }
-    else
-    {
+    else {
         std::stringstream e;
         e << "No isis-adjacency tags in " << name() << std::endl;
         throw base_error(e.str());
@@ -223,19 +200,16 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
 
 Interface* Router::get_interface(std::string iface, Router* expected, uint32_t ip)
 {
-    for(size_t i = 0; i < iface.size(); ++i)
-    {
-        if(iface[i] == ' ') 
-        {
+    for (size_t i = 0; i < iface.size(); ++i) {
+        if (iface[i] == ' ') {
             iface = iface.substr(0, i);
             break;
         }
     }
     size_t l = strlen(iface.c_str());
-    _inamelength = std::max(_inamelength, l);    
-    auto res = _interface_map.insert((unsigned char*)iface.c_str(), iface.length());
-    if(expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected)
-    {
+    _inamelength = std::max(_inamelength, l);
+    auto res = _interface_map.insert((unsigned char*) iface.c_str(), iface.length());
+    if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {
         auto tgt = _interface_map.get_data(res.second)->target();
         auto tname = tgt != nullptr ? tgt->name() : "SINK";
         std::stringstream e;
@@ -243,17 +217,15 @@ Interface* Router::get_interface(std::string iface, Router* expected, uint32_t i
                 << " new target " << expected->name() << " on adjacency of " << name() << std::endl;
         throw base_error(e.str());
     }
-    if(!res.first)
+    if (!res.first)
         return _interface_map.get_data(res.second);
     auto iid = _interfaces.size();
-    if(expected == this)
+    if (expected == this)
         ip = 0;
     _interfaces.emplace_back(std::make_unique<Interface>(iid, expected, ip));
     _interface_map.get_data(res.second) = _interfaces.back().get();
     return _interfaces.back().get();
 }
-
-
 
 void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostream& warnings)
 {
@@ -261,134 +233,114 @@ void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostr
     std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
     buffer.push_back('\0');
     doc.parse<0>(&buffer[0]);
-    if(!doc.first_node())
-    {
+    if (!doc.first_node()) {
         std::stringstream e;
         e << "Ill-formed XML-document for " << name() << std::endl;
         throw base_error(e.str());
     }
     auto info = doc.first_node()->first_node("forwarding-table-information");
-    if(!info)
-    {
+    if (!info) {
         std::stringstream e;
         e << "Missing an \"forwarding-table-information\"-tag for " << name() << std::endl;
         throw base_error(e.str());
     }
-    auto n = info->first_node("route-table");    
-    if(n == nullptr)
-    {
+    auto n = info->first_node("route-table");
+    if (n == nullptr) {
         std::stringstream e;
         e << "Found no \"route-table\"-entries" << std::endl;
         throw base_error(e.str());
     }
-    else
-    {
-        ptrie::map<std::pair<std::string,std::string>> indir;
-        if(indirect.good() && indirect.peek() != EOF)
-        {
+    else {
+        ptrie::map<std::pair < std::string, std::string>> indir;
+        if (indirect.good() && indirect.peek() != EOF) {
             std::string line;
-            while(std::getline(indirect, line))
-            {
+            while (std::getline(indirect, line)) {
                 size_t i = 0;
-                for(; i < line.size(); ++i)
-                    if(line[i] != ' ') break;
+                for (; i < line.size(); ++i)
+                    if (line[i] != ' ') break;
                 size_t j = i;
-                for(; j < line.size(); ++j)
-                {
-                    if(!std::isdigit(line[j]))
+                for (; j < line.size(); ++j) {
+                    if (!std::isdigit(line[j]))
                         break;
                 }
                 // TODO: a lot of pasta here too.
-                if(j <= i) continue;
-                auto rn = line.substr(i, (j-i));
+                if (j <= i) continue;
+                auto rn = line.substr(i, (j - i));
                 i = j;
                 // find type
-                for(; i < line.size(); ++i)
-                    if(line[i] != ' ') break;
+                for (; i < line.size(); ++i)
+                    if (line[i] != ' ') break;
                 // skip type
-                for(; i < line.size(); ++i)
-                    if(line[i] == ' ') break;
+                for (; i < line.size(); ++i)
+                    if (line[i] == ' ') break;
                 // find eth
-                for(; i < line.size(); ++i)
-                    if(line[i] != ' ') break;
+                for (; i < line.size(); ++i)
+                    if (line[i] != ' ') break;
                 j = i;
-                for(; i < line.size(); ++i)
-                    if(line[i] == ' ') break;
-                if(i <= j) {
+                for (; i < line.size(); ++i)
+                    if (line[i] == ' ') break;
+                if (i <= j) {
                     warnings << "warning; no iface for " << rn << std::endl;
                     continue;
-                }            
-                auto iface = line.substr(j, (i-j));
-                for(; i < line.size(); ++i)
-                    if(line[i] != ' ') break;  
-                for(; i < line.size(); ++i)
-                    if(line[i] == ' ') break;
-                if(i == line.size())
-                {
+                }
+                auto iface = line.substr(j, (i - j));
+                for (; i < line.size(); ++i)
+                    if (line[i] != ' ') break;
+                for (; i < line.size(); ++i)
+                    if (line[i] == ' ') break;
+                if (i == line.size()) {
                     // next line
-                    if(!std::getline(indirect, line))
-                    {
+                    if (!std::getline(indirect, line)) {
                         std::stringstream e;
                         e << "unexpected end of tile" << std::endl;
                         throw base_error(e.str());
                     }
                     i = 0;
                 }
-                for(; i < line.size(); ++i)
-                    if(line[i] != ' ') break;
+                for (; i < line.size(); ++i)
+                    if (line[i] != ' ') break;
 
                 j = i;
-                for(; i < line.size(); ++i)
-                    if(line[i] == ' ') break;
-                auto conv = line.substr(j, (i-j));
-                if(conv.empty())
-                {
+                for (; i < line.size(); ++i)
+                    if (line[i] == ' ') break;
+                auto conv = line.substr(j, (i - j));
+                if (conv.empty()) {
                     warnings << "warning: skip rule without protocol" << std::endl;
                     warnings << "\t" << line << std::endl;
                 }
 
-                auto res = indir.insert((const unsigned char*)rn.c_str(), rn.size());
+                auto res = indir.insert((const unsigned char*) rn.c_str(), rn.size());
                 auto& data = indir.get_data(res.second);
-                if(!res.first)
-                {
-                    if(data.first != iface)
-                    {
+                if (!res.first) {
+                    if (data.first != iface) {
                         warnings << "warning: duplicate rule " << rn << " expected \"" << data.first << ":" << data.second << "\" got \"" << iface << "\"" << std::endl;
                     }
                 }
-                else
-                {
+                else {
                     data.first.swap(iface);
                 }
 
-                if(!res.first)
-                {
-                    if(data.second != conv)
-                    {
+                if (!res.first) {
+                    if (data.second != conv) {
                         warnings << "warning: duplicate rule expected \"" << data.first << ":" << data.second << "\" got \"" << conv << "\"" << std::endl;
                     }
                 }
-                else
-                {
+                else {
                     data.second.swap(conv);
                 }
             }
         }
-        while(n)
-        {
-            try{
+        while (n) {
+            try {
                 _tables.emplace_back(RoutingTable::parse(n, indir, this, warnings));
-            } 
-            catch(base_error& ex)
-            {
+            }
+            catch (base_error& ex) {
                 std::stringstream e;
                 e << ex._message << " :: in router " << name() << std::endl;
                 throw base_error(e.str());
             }
-            for(size_t i = 0; i < _tables.size() - 1; ++i)
-            {
-                if(_tables.back().overlaps(_tables[i], *this, warnings))
-                {
+            for (size_t i = 0; i < _tables.size() - 1; ++i) {
+                if (_tables.back().overlaps(_tables[i], *this, warnings)) {
                     warnings << "warning: nondeterministic routing discovered for " << name() << " in table " << n->first_node("table-name")->value() << std::endl;
                 }
             }
@@ -403,22 +355,19 @@ Interface::Interface(size_t id, Router* target, uint32_t ip) : _id(id), _target(
 
 void Interface::make_pairing(Router* parent)
 {
-    if(_matching != nullptr)
+    if (_matching != nullptr)
         return;
-    if(_target == nullptr)
+    if (_target == nullptr)
         return;
-    if(_target == parent)
+    if (_target == parent)
         return;
-    if(_target->_interfaces.empty() && _target->_tables.empty())
+    if (_target->_interfaces.empty() && _target->_tables.empty())
         return; // sink
     _matching = nullptr;
-    for(auto& i : _target->_interfaces)
-    {
-        auto diff = std::max(i->_ip, _ip) - std::min(i->_ip, _ip); 
-        if(diff == 1 && i->_target == parent)
-        {
-            if(_matching != nullptr)
-            {
+    for (auto& i : _target->_interfaces) {
+        auto diff = std::max(i->_ip, _ip) - std::min(i->_ip, _ip);
+        if (diff == 1 && i->_target == parent) {
+            if (_matching != nullptr) {
                 std::stringstream e;
                 auto n = parent->interface_name(_id);
                 auto n2 = _target->interface_name(_matching->_id);
@@ -438,14 +387,12 @@ void Interface::make_pairing(Router* parent)
             _matching = i.get();
         }
     }
-    
 
-    if(_matching)
-    {
+
+    if (_matching) {
         _matching->_matching = this;
     }
-    else
-    {
+    else {
         auto n = parent->interface_name(_id);
         std::stringstream e;
         e << "Could not find a pairing for interface " << n.get() << "(";
@@ -457,47 +404,42 @@ void Interface::make_pairing(Router* parent)
 
 void Router::pair_interfaces()
 {
-    for(auto& i : _interfaces)
+    for (auto& i : _interfaces)
         i->make_pairing(this);
 }
 
-
-
 void Router::print_dot(std::ostream& out)
 {
-    if(_interfaces.empty())
+    if (_interfaces.empty())
         return;
-    auto n = std::make_unique<char[]>(_inamelength+1);
-    for(auto& i : _interfaces)
-    {
-        auto res = _interface_map.unpack(i->id(), (unsigned char*)n.get());
+    auto n = std::make_unique<char[]>(_inamelength + 1);
+    for (auto& i : _interfaces) {
+        auto res = _interface_map.unpack(i->id(), (unsigned char*) n.get());
         n[res] = 0;
         auto tgtstring = i->target() != nullptr ? i->target()->name() : "SINK";
-        out << "\"" << name() << "\" -> \"" << tgtstring 
-            << "\" [ label=\"" << n.get() << "\" ];\n";
+        out << "\"" << name() << "\" -> \"" << tgtstring
+                << "\" [ label=\"" << n.get() << "\" ];\n";
     }
-    if(!_inferred)
-    {
-        if(_interfaces.size() == 0)
+    if (!_inferred) {
+        if (_interfaces.size() == 0)
             out << "\"" << name() << "\" [shape=triangle];\n";
-        else if(_has_config)
+        else if (_has_config)
             out << "\"" << name() << "\" [shape=circle];\n";
         else
             out << "\"" << name() << "\" [shape=square];\n";
     }
-    else
-    {
+    else {
         out << "\"" << name() << "\" [shape=square,color=red];\n";
     }
-        
+
     out << "\n";
 
 }
 
-std::unique_ptr<char[]> Router::interface_name(size_t i)
+std::unique_ptr<char[] > Router::interface_name(size_t i)
 {
-    auto n = std::make_unique<char[]>(_inamelength+1);
-    auto res = _interface_map.unpack(i, (unsigned char*)n.get());
+    auto n = std::make_unique<char[]>(_inamelength + 1);
+    auto res = _interface_map.unpack(i, (unsigned char*) n.get());
     n[res] = 0;
     return n;
 }
@@ -506,41 +448,35 @@ void Router::print_json(std::ostream& s)
 {
     s << "{";
     s << "\n\t\"alias\":[";
-    for(size_t n = 0; n < _names.size(); ++n)
-    {
-        if(n != 0) s << ",";
+    for (size_t n = 0; n < _names.size(); ++n) {
+        if (n != 0) s << ",";
         s << "\"" << _names[n] << "\"";
     }
     s << "],\n\t";
-    if(!_interfaces.empty())
-    {
+    if (!_interfaces.empty()) {
         s << "\"interfaces\":[\n\t\t";
-        auto name = std::make_unique<char[]>(_inamelength+1);
-        for(size_t i = 0; i < _interfaces.size(); ++i)
-        {
+        auto name = std::make_unique<char[]>(_inamelength + 1);
+        for (size_t i = 0; i < _interfaces.size(); ++i) {
             auto id = _interfaces[i]->id();
-            _interface_map.unpack(id, (unsigned char*)name.get());
-            if(i != 0)
+            _interface_map.unpack(id, (unsigned char*) name.get());
+            if (i != 0)
                 s << ",\n\t\t";
             s << "\"" << id << "\":";
             _interfaces[i]->print_json(s, name.get());
-        }    
+        }
         s << "},\n\t";
     }
-    if(_tables.empty())
-    {
+    if (_tables.empty()) {
         s << "\"sink\":true";
-    }    
-    else
-    {
+    }
+    else {
         s << "\"tables\":[\n";
-        for(size_t t = 0; t < _tables.size(); ++t)
-        {
-            if(t != 0)
+        for (size_t t = 0; t < _tables.size(); ++t) {
+            if (t != 0)
                 s << ",\n";
             _tables[t].print_json(s);
         }
-        s << "]";        
+        s << "]";
     }
     s << "\n}";
 }
@@ -548,16 +484,14 @@ void Router::print_json(std::ostream& s)
 void Interface::print_json(std::ostream& s, const char* name) const
 {
     s << "{\"name\":\"" << name << "\",\"virtual\":" << (_ip == 0 ? "true" : "false");
-    if(_ip != 0)
-    {
+    if (_ip != 0) {
         s << ",";
-        if(_target)
-        {
+        if (_target) {
             s << "\"target\":\"" << _target->name() << "\",";
-            if(_matching)
+            if (_matching)
                 s << "\"pairing\":" << _matching->_id << ", ";
             s << "\"ip\":";
-            write_ip(s, _ip);           
+            write_ip(s, _ip);
         }
         else
             s << "\"sink\":true";
