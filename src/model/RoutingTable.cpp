@@ -22,14 +22,51 @@
 
 #include "RoutingTable.h"
 #include "Router.h"
+#include "utils/errors.h"
 
 #include <algorithm>
+#include <sstream>
 
 RoutingTable::RoutingTable()
 {
 }
 
-RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string,std::string>>& indirect, Router* parent)
+int RoutingTable::parse_weight(rapidxml::xml_node<char>* nh){
+    auto nhweight = nh->first_node("nh-weight");
+    if(nhweight)
+    {
+        auto val = nhweight->value();
+        auto len = strlen(val);
+        if(len > 1 && val[0] == '0' && val[1] == 'x')
+            return std::stoull(&(val[2]), nullptr, 16);
+        else
+            return atoll(val);
+    }
+    return 0;
+}
+
+Interface* RoutingTable::parse_via(Router* parent, rapidxml::xml_node<char>* via){
+    std::string iname = via->value();
+    for(size_t i = 0; i < iname.size(); ++i)
+    {
+        if(iname[i] == ' ')
+        {
+            iname = iname.substr(0,i);
+            break;
+        }
+    }
+    if(iname.find("lsi.") == 0)
+    {
+        // self-looping interface
+        return parent->get_interface(iname, parent);
+    }
+    else
+    {
+        return parent->get_interface(iname);
+    }
+}
+
+RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string,std::string>>& indirect, Router* parent, std::ostream& warnings)
 {
     RoutingTable nr;
     if(node == nullptr)
@@ -43,16 +80,18 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
     {
         if(strcmp(tn->value(), "MPLS") != 0)
         {
-            std::cerr << "error: Not MPLS-type address-family routing-table (\"" << nr._name << "\")" << std::endl;
-            return nr;
+            std::stringstream e;
+            e << "Not MPLS-type address-family routing-table (\"" << nr._name << "\")" << std::endl;
+            throw base_error(e.str());
         }
     }
     
     auto rule = node->first_node("rt-entry");
     if(rule == nullptr)
     {
-        std::cerr << "error: no entries in routing-table \"" << nr._name << "\"" << std::endl;
-        return nr;
+        std::stringstream e;
+        e << "no entries in routing-table \"" << nr._name << "\"" << std::endl;
+        throw base_error(e.str());
     }
     
     std::vector<std::pair<std::string,std::pair<size_t,size_t>>> lsi;
@@ -68,9 +107,9 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
         {
             if(pos != tl.size() - 5)
             {
-                std::cerr << "error: expect only (S=0) notation as postfix of <rt-destination> in table " << nr._name << " of router " << parent->name() << std::endl;
-                nr._entries.clear();
-                return nr;
+                std::stringstream e;
+                e << "expect only (S=0) notation as postfix of <rt-destination> in table " << nr._name << " of router " << parent->name() << std::endl;
+                throw base_error(e.str());
             }
             entry._decreasing = true;
             tl = tl.substr(0, pos);
@@ -91,19 +130,16 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
         auto nh = rule->first_node("nh");
         if(nh == nullptr)
         {
-            std::cerr << "error: no \"nh\" entries in routing-table \"" << nr._name << "\" for \"" << entry._top_label << "\"" << std::endl;
-            return nr;
+            std::stringstream e;
+            e << "no \"nh\" entries in routing-table \"" << nr._name << "\" for \"" << entry._top_label << "\"" << std::endl;
+            throw base_error(e.str());
         }
         int cast = 0;
         
         do {
             entry._rules.emplace_back();
             auto& r = entry._rules.back();
-            auto nhweight = nh->first_node("nh-weight");
-            if(nhweight)
-            {
-                r._weight = atoll(nhweight->value());
-            }
+            r._weight = parse_weight(nh);
             auto ops = nh->first_node("nh-type");
             bool skipvia = true;
             rapidxml::xml_node<>* nhid = nullptr;
@@ -114,9 +150,9 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
                 {
                     if(cast != 0)
                     {
-                        std::cerr << "error: already in cast" << std::endl;
-                        nr._entries.clear();
-                        return nr;
+                        std::stringstream e;
+                        e << "already in cast" << std::endl;
+                        throw base_error(e.str());
                     }
                     cast = 1;
                     entry._rules.pop_back();
@@ -141,9 +177,9 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
                     nhid = nh->first_node("nh-index");
                     if(!nhid)
                     {
-                        std::cerr << "error: expected nh-index of indirect";
-                        nr._entries.clear();
-                        return nr;
+                        std::stringstream e;
+                        e << "expected nh-index of indirect";
+                        throw base_error(e.str());
                     }
                 }
                 else if(strcmp(val, "unicast") == 0)
@@ -154,73 +190,7 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
                 else
                 {
                     std::string ostr = ops->value();
-                    auto pos = ostr.find("(top)");
-                    if(pos != std::string::npos)
-                    {
-                        if(pos != ostr.size() - 5)
-                        {
-                            std::cerr << "error: expected \"(top)\" predicate at the end of <nh-type> only. Error in routing-table for router " << parent->name() << std::endl;
-                            nr._entries.clear();
-                            return nr;
-                        }
-                        ostr = ostr.substr(0,pos);
-                    }
-                    // parse ops
-                    bool parse_label = false;
-                    r._ops.emplace_back();
-                    for(size_t i = 0; i < ostr.size(); ++i)
-                    {
-                        if(ostr[i] == ' ') continue;
-                        if(ostr[i] == ',') continue;
-                        if(!parse_label)
-                        {
-                            if(ostr[i] == 'S')
-                            {
-                                r._ops.back()._op = SWAP;
-                                i += 4;
-                                parse_label = true;
-                            }
-                            else if(ostr[i] == 'P')
-                            {
-                                if(ostr[i+1] == 'u')
-                                {
-                                    r._ops.back()._op = PUSH;
-                                    parse_label = true;
-                                    i += 4;
-                                }
-                                else if(ostr[i+1] == 'o')
-                                {
-                                    r._ops.back()._op = POP;
-                                    i += 2;
-                                    continue;                                   
-                                }
-                            }
-
-                            if(parse_label)
-                            {
-                                while(i < ostr.size() && ostr[i] == ' ')
-                                {
-                                    ++i;
-                                }
-                                if(i != ostr.size() && std::isdigit(ostr[i]))
-                                {
-                                    size_t j = i;
-                                    while(j < ostr.size() && std::isdigit(ostr[j]))
-                                    {
-                                        ++j;
-                                    }
-                                    auto n = ostr.substr(i, (j-i));
-                                    r._ops.back()._label = std::atoi(n.c_str());
-                                    i = j;
-                                    parse_label = false;
-                                    continue;
-                                }
-                            }
-                            std::cerr << "error: unexpected operation type \"" << (&ostr[i]) << "\". Error in routing-table for router " << parent->name() << std::endl;
-                            nr._entries.clear();
-                            return nr;                                
-                        }
-                    }
+                    r.parse_ops(ostr);
                     skipvia = false;
                 }
             }
@@ -230,30 +200,11 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
             {
                 if(skipvia)
                 {
-                    std::cerr << "warning: found via \"" << via->value() << "\" in \"" << nr._name << "\" for \"" << entry._top_label << "\"" << std::endl;
-                    std::cerr << "\t\tbut got type expecting no via: " << ops->value() << std::endl;                    
+                    warnings << "warning: found via \"" << via->value() << "\" in \"" << nr._name << "\" for \"" << entry._top_label << "\"" << std::endl;
+                    warnings << "\t\tbut got type expecting no via: " << ops->value() << std::endl;                    
                 }
-                else
-                {
-                    std::string iname = via->value();
-                    for(size_t i = 0; i < iname.size(); ++i)
-                    {
-                        if(iname[i] == ' ')
-                        {
-                            iname = iname.substr(0,i);
-                            break;
-                        }
-                    }
-                    if(iname.find("lsi.") == 0)
-                    {
-                        // self-looping interface
-                        r._via = parent->get_interface(iname, parent);
-                    }
-                    else
-                    {
-                        r._via = parent->get_interface(iname);
-                    }
-                }
+
+                r._via = parse_via(parent, via);
             }
             else if(!skipvia && indirect.size() > 0)
             {
@@ -263,10 +214,10 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
                     auto alt = indirect.exists((const unsigned char*)val, strlen(val));
                     if(!alt.first)
                     {
-                        std::cerr << "error: Could not lookup indirect : " << val << std::endl;
-                        std::cerr << "\ttype : " << ops->value() << std::endl;
-                        nr._entries.clear();
-                        return nr;
+                        std::stringstream e;
+                        e << "Could not lookup indirect : " << val << std::endl;
+                        e << "\ttype : " << ops->value() << std::endl;
+                        throw base_error(e.str());
                     }
                     else
                     {
@@ -276,26 +227,109 @@ RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std:
                 }
                 else
                 {
-                    std::cerr << "warning: found no via in \"" << nr._name << "\" for \"" << entry._top_label << "\"" << std::endl;
-                    std::cerr << "\t\tbut got type: " << ops->value() << std::endl;
-                    std::cerr << std::endl;
+                    warnings << "warning: found no via in \"" << nr._name << "\" for \"" << entry._top_label << "\"" << std::endl;
+                    warnings << "\t\tbut got type: " << ops->value() << std::endl;
+                    warnings << std::endl;
                 }
             }
         } while((nh = nh->next_sibling("nh")));
         rule = rule->next_sibling("rt-entry");
     }
     std::sort(nr._entries.begin(), nr._entries.end());
+    std::stringstream e;
+    bool some = false;
     for(size_t i = 1 ; i < nr._entries.size(); ++i)
     {
         if(nr._entries[i-1] == nr._entries[i])
         {
-            std::cerr << "warning: nondeterministic routing-table found, dual matches on " << nr._entries[i]._top_label << " for router " << parent->name() << std::endl;
+            some = true;
+            e << "nondeterministic routing-table found, dual matches on " << nr._entries[i]._top_label << " for router " << parent->name() << std::endl;
         }
+    }
+    if(some)
+    {
+        throw base_error(e.str());
     }
     return nr;
 }
 
-bool RoutingTable::overlaps(const RoutingTable& other, Router& parent) const
+void RoutingTable::forward_t::parse_ops(std::string& ostr)
+{
+    auto pos = ostr.find("(top)");
+    if(pos != std::string::npos)
+    {
+        if(pos != ostr.size() - 5)
+        {
+            std::stringstream e;
+            e << "expected \"(top)\" predicate at the end of <nh-type> only." << std::endl;
+            throw base_error(e.str());
+        }
+        ostr = ostr.substr(0,pos);
+    }
+    // parse ops
+    bool parse_label = false;
+    _ops.emplace_back();
+    for(size_t i = 0; i < ostr.size(); ++i)
+    {
+        if(ostr[i] == ' ') continue;
+        if(ostr[i] == ',') continue;
+        if(!parse_label)
+        {
+            if(ostr[i] == 'S')
+            {
+                _ops.back()._op = SWAP;
+                i += 4;
+                parse_label = true;
+            }
+            else if(ostr[i] == 'P')
+            {
+                if(ostr[i+1] == 'u')
+                {
+                    _ops.back()._op = PUSH;
+                    parse_label = true;
+                    i += 4;
+                }
+                else if(ostr[i+1] == 'o')
+                {
+                    _ops.back()._op = POP;
+                    i += 2;
+                    _ops.emplace_back();
+                    continue;                                   
+                }
+            }
+
+            if(parse_label)
+            {
+                while(i < ostr.size() && ostr[i] == ' ')
+                {
+                    ++i;
+                }
+                if(i != ostr.size() && std::isdigit(ostr[i]))
+                {
+                    size_t j = i;
+                    while(j < ostr.size() && std::isdigit(ostr[j]))
+                    {
+                        ++j;
+                    }
+                    auto n = ostr.substr(i, (j-i));
+                    _ops.back()._label = std::atoi(n.c_str());
+                    i = j;
+                    parse_label = false;
+                    _ops.emplace_back();
+                    continue;
+                }
+            }
+            std::stringstream e;
+            e << "unexpected operation type \"" << (&ostr[i]) << "\"." << std::endl;
+            throw base_error(e.str());
+        }
+    }
+    _ops.pop_back();
+}
+
+
+
+bool RoutingTable::overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const
 {
     auto oit = other._entries.begin();
     for(auto& e : _entries)
@@ -307,40 +341,115 @@ bool RoutingTable::overlaps(const RoutingTable& other, Router& parent) const
             return false;
         if((*oit) == e)
         {
-            auto label = e._top_label;
-            std::cerr << "\t\tOverlap on label ";
-            if(label > 0)
-                std::cerr << (label-1) << std::endl;
-            else if(label == 0)
-            {
-                std::cerr << "default" << std::endl;
-            }
-            else
-            {
-                auto id = -1*(label+1);
-                auto iname = parent.interface_name(id);
-                std::cerr << iname.get() << " (" << id << ")" << std::endl;                
-            }
-            std::cerr << " for router " << parent.name() << std::endl;
+            if(e._rules.size() == 1 && oit->_rules.size() == 1 &&
+               e._rules[0]._type == oit->_rules[0]._type && oit->_rules[0]._type != MPLS)
+                continue;
+            warnings << "\t\tOverlap on label ";
+            entry_t::print_label(e._top_label, warnings);
+            warnings << " for router " << parent.name() << std::endl;
             return true;
         }
     }
     return false;
 }
 
-std::ostream& RoutingTable::action_t::operator<<(std::ostream& s) const
+bool RoutingTable::entry_t::operator<(const entry_t& other) const
+{
+    if (other._decreasing == _decreasing)
+        return _top_label < other._top_label;
+    return _decreasing < other._decreasing;
+}
+
+bool RoutingTable::entry_t::operator==(const entry_t& other) const
+{
+    return _decreasing == other._decreasing && _top_label == other._top_label;
+}
+
+
+void RoutingTable::action_t::print_json(std::ostream& s) const
 {
     switch(_op)
     {
     case SWAP:
-        s << "Swap " << _label;
+        s << "{\"swap\":";
+        print_label(_label,s);
+        s << "}";
         break;
     case PUSH:
-        s << "Push " << _label;
+        s << "{\"push\":";
+        print_label(_label,s);
+        s << "}";
         break;
     case POP:
-        s << "Pop";
+        s << "\"pop\"";
         break;
     }
-    return s;
+}
+
+void RoutingTable::action_t::print_label(int64_t label, std::ostream& s)
+{
+    s << "\"l" << label << "\"";
+}
+
+
+void RoutingTable::entry_t::print_json(std::ostream& s) const
+{
+    print_label(_top_label, s);
+    s << ":\n";
+    s << "\t[";
+    for(size_t i = 0; i < _rules.size(); ++i)
+    {
+        if(i != 0)
+            s << ",";
+        s << "\n\t\t";
+        _rules[i].print_json(s);
+    }
+    s << "\n\t]";
+}
+
+void RoutingTable::entry_t::print_label(uint64_t label, std::ostream& s)
+{
+    s << "\"";
+    if(label == 0)
+        s << "default";
+    else if(label > 0)
+        s << 'l' << (label -1);
+    else
+        s << 'i' << ((label+1)*-1);
+    s << "\"";
+}
+
+
+void RoutingTable::forward_t::print_json(std::ostream& s) const
+{
+    s << "{";
+    s << "\"weight\":" << _weight;
+    if(_via)
+    {
+        s << ", \"via\":" << _via->id() << ", \"ops\":[";
+        for(size_t i = 0; i < _ops.size(); ++i)
+        {
+            if(i != 0)
+                s << ", ";
+            _ops[i].print_json(s);
+        }
+        s << "]";
+    }
+    else
+        s << ",  \"drop\":true";
+    
+    s << "}";
+}
+
+void RoutingTable::print_json(std::ostream& s) const
+{
+    s << "\t{\n";
+    for(size_t i = 0; i < _entries.size(); ++i)
+    {
+        if(i != 0)
+            s << ",\n";
+        s << "\t";
+        _entries[i].print_json(s);
+    }
+    s << "\n\t}";
 }

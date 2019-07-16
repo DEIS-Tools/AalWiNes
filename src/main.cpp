@@ -14,6 +14,7 @@
  */
 
 #include "model/Router.h"
+#include "utils/errors.h"
 
 #include <ptrie_map.h>
 
@@ -32,11 +33,15 @@ int main(int argc, const char** argv)
     po::options_description opts;
     std::string network;
     bool print_dot = false;
+    bool dump_json = false;
+    bool no_parser_warnings = false;
     opts.add_options()
             ("help,h", "produce help message")
             ("network,n", po::value<std::string>(&network),
                 "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml\". ")
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
+            ("json", po::bool_switch(&dump_json), "A dot output will be printed to cout when set.")
+            ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
     ;
 
     po::variables_map vm;
@@ -53,6 +58,9 @@ int main(int argc, const char** argv)
         std::cerr << "Could not open " << network << std::endl;
         exit(-1);
     }
+    
+    std::stringstream dummy;
+    std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
     
     // lets start by creating empty router-objects for all the alias' we have
     ptrie::map<Router*> mapping;
@@ -88,7 +96,7 @@ int main(int argc, const char** argv)
                     }
                     else
                     {
-                        std::cerr << "Warning: entry " << id << " contains the duplicate alias \"" << tmp << "\"" << std::endl; 
+                        warnings << "Warning: entry " << id << " contains the duplicate alias \"" << tmp << "\"" << std::endl; 
                         continue;
                     }
                 }
@@ -135,18 +143,11 @@ int main(int argc, const char** argv)
             }
         }
     }
-    {
-        // add sink/source
-/*        auto res = mapping.insert((unsigned char*)tmp.c_str(), tmp.size());
-        routers.emplace_back(std::make_unique<Router>(id));
-        mapping.get_data(res.second) = routers.back().get();
-        routers.back()->add_name(tmp);*/
-    }
     for(size_t i = 0; i < configs.size(); ++i)
     {
         if(std::get<0>(configs[i]).empty()) 
         {
-            std::cerr << "warning: No adjacency info for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
+            warnings << "warning: No adjacency info for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
         }
         else
         {
@@ -156,15 +157,21 @@ int main(int argc, const char** argv)
                 std::cerr << "error: Could not open adjacency-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
                 exit(-1);
             }
-            if(!routers[i]->parse_adjacency(stream, routers, mapping))
+            try {
+                routers[i]->parse_adjacency(stream, routers, mapping, warnings);
+            } 
+            catch(base_error& ex)
             {
+                std::cerr << ex.what() << "\n";
+                std::cerr << "while parsing : " << std::get<0>(configs[i]) << std::endl;
+                stream.close();
                 exit(-1);
-            }
+            } 
             stream.close();
         }
         if(std::get<1>(configs[i]).empty())
         {
-            std::cerr << "warning: No routingtables for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;            
+            warnings << "warning: No routingtables for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;            
         }
         else
         {
@@ -177,14 +184,25 @@ int main(int argc, const char** argv)
             std::ifstream id;
             if(!std::get<2>(configs[i]).empty())
             {
-                id.open(std::get<2>(configs[i]));
-                std::cerr << "OPEN " << std::get<2>(configs[i]) << std::endl;
+                id.open(std::get<2>(configs[i]));                
             }
-            if(!routers[i]->parse_routing(stream, id))
+            try {
+                routers[i]->parse_routing(stream, id, warnings);
+            } 
+            catch(base_error& ex)
             {
+                std::cerr << ex.what() << "\n";
+                std::cerr << "while parsing : " << std::get<0>(configs[i]) << std::endl;
+                stream.close();
                 exit(-1);
-            }            
+            }
+            stream.close();
         }
+    }
+    
+    for(auto& r : routers)
+    {
+        r->pair_interfaces();
     }
     
     if(print_dot)
@@ -197,5 +215,17 @@ int main(int argc, const char** argv)
         std::cout << "}" << std::endl;
     }
     
+    if(dump_json)
+    {
+        std::cout << "{\n";
+        for(size_t i = 0; i < routers.size(); ++i)
+        {
+            if(i != 0)
+                std::cout << ",\n";
+            std::cout << "\"" << routers[i]->name() << "\":";
+            routers[i]->print_json(std::cout);
+        }
+        std::cout << "\n}";
+    }
     return 0;
 }
