@@ -15,6 +15,7 @@
 
 #include "model/Router.h"
 #include "utils/errors.h"
+#include "parser/QueryBuilder.h"
 
 #include <ptrie_map.h>
 
@@ -167,27 +168,44 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
  */
 int main(int argc, const char** argv)
 {
-    std::string junos_config;
+    po::options_description opts;
+    opts.add_options()
+            ("help,h", "produce help message");
+    
+    po::options_description output("Output Options");
+    po::options_description input("Input Options");
+    po::options_description verification("Verification Options");    
+    
     bool print_dot = false;
     bool dump_json = false;
     bool no_parser_warnings = false;
-
-    po::options_description opts;
-    po::options_description output("Output Options");
-    po::options_description input("Input Options");
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
             ("json", po::bool_switch(&dump_json), "A json output will be printed to cout when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ;
+
+    std::string junos_config;
     input.add_options()
             ("juniper,j", po::value<std::string>(&junos_config),
             "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
-            ;
-    opts.add_options()
-            ("help,h", "produce help message");
+            ;    
+
+    std::string query_file;
+    bool dump_to_moped = false;
+    int approx = 1;
+    unsigned int link_failures = 0;
+    verification.add_options()
+            ("query,q", po::value<std::string>(&query_file),
+            "A file containing valid queries over the input network.")
+            ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
+            ("approximation,a", po::value<int>(&approx), "-1=under,0=exact,1=over")
+            ("moped,m", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
+            ;    
+    
     opts.add(input);
     opts.add(output);
+    opts.add(verification);
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, opts), vm);
@@ -197,7 +215,7 @@ int main(int argc, const char** argv)
         std::cout << opts << "\n";
         return 1;
     }
-
+    
     std::stringstream dummy;
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
 
@@ -228,5 +246,10 @@ int main(int argc, const char** argv)
         }
         std::cout << "\n}\n";
     }
+    
+    Builder builder;
+    builder.
+    
+    
     return 0;
 }
