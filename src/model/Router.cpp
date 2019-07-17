@@ -28,7 +28,7 @@
 #include <rapidxml.hpp>
 #include <bits/basic_string.h>
 #include <sstream>
-
+namespace mpls2pda {
 Router::Router(size_t id) : _index(id)
 {
 }
@@ -497,4 +497,5 @@ void Interface::print_json(std::ostream& s, const char* name) const
             s << "\"sink\":true";
     }
     s << "}";
+}
 }

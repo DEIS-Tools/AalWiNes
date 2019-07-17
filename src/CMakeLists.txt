@@ -14,7 +14,7 @@ add_flex_bison_dependency(flexer bparser)
 find_package(Boost 1.66 COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR} rapidxml)
 
-add_executable(mpls2pda ${HEADER_FILES} main.cpp model/Router.cpp model/RoutingTable.cpp model/Query.cpp ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} parser/QueryBuilder.cpp)
+add_executable(mpls2pda ${HEADER_FILES} main.cpp model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} parser/QueryBuilder.cpp)
 target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml ptrie)
 
 install(TARGETS mpls2pda

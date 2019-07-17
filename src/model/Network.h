@@ -14,21 +14,23 @@
  */
 
 /* 
- * File:   Query.cpp
+ * File:   Network.h
  * Author: Peter G. Jensen <root@petergjoel.dk>
- * 
- * Created on July 16, 2019, 5:38 PM
+ *
+ * Created on July 17, 2019, 2:17 PM
  */
 
-#include "Query.h"
+#ifndef NETWORK_H
+#define NETWORK_H
 
+class Network {
+public:
+    Network();
+    Network(const Network& orig);
+    virtual ~Network();
+private:
 
-namespace mpls2pda {
+};
 
-    Query::Query(const pdaaal::NFA<label_t>& pre, const pdaaal::NFA<label_t>& path, const pdaaal::NFA<label_t>& post, int lf, mode_t mode)
-    : _prestack(pre), _poststack(post), _path(path), _link_failures(lf), _mode(mode)
-    {
+#endif /* NETWORK_H */
 
-    }
-
-}

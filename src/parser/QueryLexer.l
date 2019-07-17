@@ -1,4 +1,19 @@
 %{ /* -*- C++ -*- */
+/* 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+    
 //
 // Created by Peter G. Jensen on 10/15/18.
 //
@@ -9,25 +24,25 @@
 #include <string>
 #include <sstream>
 #include <fstream>
-#include "generated_parser.hh"
-#include "Builder.h"
-#include "errors.h"
+#include "generated_QueryParser.hh"
+#include "QueryBuilder.h"
+#include "parsererrors.h"
 #include "Scanner.h"
 #undef  YY_DECL
-#define YY_DECL int adpp::Scanner::yylex()
-using token = adpp::Parser::token;
+#define YY_DECL int mpls2pda::Scanner::yylex()
+using token = mpls2pda::Parser::token;
 %}
 
 %option noyywrap nounput batch debug noinput interactive c++
-%option yyclass="adpp::Scanner"
-%option debug
+%option yyclass="mpls2pda::Scanner"
 %x comment
 
 id    [a-zA-Z][a-zA-Z_0-9_$#\-]*
+hex   [0-9a-fA-F]
 int   [0-9]+
 float {int}*\.{int}+
 blank [ \t]
-name  \"(\\.|[^\\"])*\"
+literal  \"(\\.|[^\\"])*\"
 
 %{
   // Code run each time a pattern is matched.
@@ -54,76 +69,45 @@ name  \"(\\.|[^\\"])*\"
 <comment>"*"+"/"        BEGIN(INITIAL);
 <comment><<EOF>>        {
 
-                            adpp::Parser::syntax_error
+                            mpls2pda::Parser::syntax_error
                                        (builder._location, "Unterminated multiline comment: " + std::string(yytext));
                         }
 
-"true"  return token::TRUE;
-"false" return token::FALSE;
-"="     return token::EQUAL;
-"{"     return token::LBRCKT;
-"}"     return token::RBRCKT;
 "("     return token::LPAREN;
 ")"     return token::RPAREN;
 "["     return token::LSQBRCKT;
 "]"     return token::RSQBRCKT;
-"&&"    return token::AND;
 "&"     return token::AND;
-"AND"   return token::AND;
-"and"   return token::AND;
-"/\\"   return token::AND;
-"||"    return token::OR;
 "|"     return token::OR;
-"OR"    return token::OR;
-"or"    return token::OR;
-"\\/"   return token::OR;
-"!"     return token::NOT;
-"~"     return token::NOT;
-"NOT"   return token::NOT;
-"not"   return token::NOT;
-","     return token::COMMA;
-";"     return token::SEMICOLON;
-":"     return token::COLON;
 "+"     return token::PLUS;
-"-"     return token::MINUS;
-"<="    return token::LTEQ;
+"*"     return token::STAR;
 "."     return token::DOT;
+"<"     return token::LT;
+">"     return token::GT;
+","     return token::COMMA;
+"^"     return token::HAT;
+"#"     return token::HASH;
+":"     return token::COLON;
 
-"Atomics"           return token::ATOMICS;
-"Forest"            return token::FOREST;
-"Arena"             return token::ARENA;
+{int}      {
+  long int n = strtol (yytext, NULL, 10);
+  if (! (INT_MIN <= n && n <= INT_MAX))
+    throw mpls2pda::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
-"Attacker"          return token::ATTACKER;
-"Defender"          return token::DEFENDER;
+  last_int = n;
+  return token::NUMBER;
+}
 
-"Budget"            return token::BUDGET;
-"Cost"              return token::COST;
-"Probability"       return token::PROBABILITY;
-"Duration"          return token::DURATION;
-"Dependency"        return token::DEPENDENCY;
-"Expiration"        return token::EXPIRATION;
-"Policy"            return token::POLICY;
+{hex}     {
+  long int n = strtol (yytext, NULL, 16);
+  if (! (INT_MIN <= n && n <= INT_MAX))
+    throw mpls2pda::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
+  last_int = n;
+  return token::HEX;
+}
 
-"For"                   return token::FOR;
-"under"                 return token::UNDER;
-"in"                    return token::UNDER;
-"against"               return token::AGAINST;
-"Refines"               return token::REFINES;
-"Classic"               return token::CLASSIC;
-"AttackerCost"          return token::ATTACKERCOST;
-"AttackerProbability"   return token::ATTACKERPROBABILITY;
-"Minimise"              return token::MINIMISE;
-"Minimize"              return token::MINIMISE;
-"as"                    return token::AS;
-"excluding"             return token::EXCLUDING;
-
-"Exit"                  return token::EXIT;
-"Show"                  return token::SHOW;
-"Import"                return token::IMPORT;
-"Module"                return token::MODULE;
-
-{name}   {
+{literal}   {
     last_string = yytext;
     return token::LITERAL;
 }
@@ -131,20 +115,4 @@ name  \"(\\.|[^\\"])*\"
     last_string = yytext;
     return token::IDENTIFIER;
 }
-{int}      {
-  errno = 0;
-  long n = strtol (yytext, NULL, 10);
-  if (! (INT_MIN <= n && n <= INT_MAX && errno != ERANGE))
-    throw adpp::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
-  last_int = n;
-  return token::NUMBER;
-}
-
-{float}    {
-
-    std::string data(yytext);
-    std::istringstream i(data);
-    i >> last_float;
-    return token::FLOAT;
-}

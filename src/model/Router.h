@@ -31,7 +31,7 @@
 #include <ptrie_map.h>
 
 #include "RoutingTable.h"
-
+namespace mpls2pda {
 class Interface {
 public:
     Interface(size_t id, Router* target, uint32_t ip);
@@ -94,6 +94,6 @@ private:
     bool _inferred = false;
     friend class Interface;
 };
-
+}
 #endif /* ROUTER_H */
 

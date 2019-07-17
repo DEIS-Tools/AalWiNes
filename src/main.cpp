@@ -13,9 +13,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//
+// Created by Peter G. Jensen
+//
+
 #include "model/Router.h"
 #include "utils/errors.h"
 #include "parser/QueryBuilder.h"
+#include "model/Network.h"
 
 #include <ptrie_map.h>
 
@@ -28,7 +33,7 @@
 #include <memory.h>
 
 namespace po = boost::program_options;
-
+using namespace mpls2pda;
 void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                  ptrie::map<Router*>& mapping,
                  const std::string& network,
@@ -247,9 +252,15 @@ int main(int argc, const char** argv)
         std::cout << "\n}\n";
     }
     
-    Builder builder;
-    builder.
+    Network compiled;
     
+    Builder builder(compiled);
+    std::ifstream qstream(query_file);
+    if (!qstream.is_open()) {
+        std::cerr << "Could not open " << query_file << std::endl;
+        exit(-1);
+    }
+    builder.do_parse(qstream);
     
     return 0;
 }

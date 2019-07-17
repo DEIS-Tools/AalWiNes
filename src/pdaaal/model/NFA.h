@@ -31,7 +31,39 @@ namespace pdaaal {
     template<typename T = char>
     class NFA {
     public:
-        NFA() {}
+        NFA(bool initially_accepting = true) {}
+        NFA(std::vector<T>&& initial_accepting, bool negated = false) {}
+        NFA(const NFA&) = default;
+        NFA(NFA&&) = default;
+        NFA& operator=(const NFA&) = default;
+        NFA& operator=(NFA&&) = default;
+
+
+        // construction from regex
+        void dot_extend(NFA& other)
+        {
+            
+        }
+        
+        void plus_extend(NFA& other)
+        {
+            
+        }
+        
+        void star_extend(NFA& other)
+        {
+            
+        }
+        
+        void and_extend(NFA& other)
+        {
+            
+        }
+        
+        void or_extend(NFA& other)
+        {
+            
+        }
         
         struct edge_t {
             T _symbol;

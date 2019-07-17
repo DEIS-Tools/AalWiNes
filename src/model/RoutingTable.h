@@ -30,7 +30,7 @@
 
 #ifndef ROUTINGTABLE_H
 #define ROUTINGTABLE_H
-
+namespace mpls2pda {
 class Router;
 class Interface;
 
@@ -95,6 +95,6 @@ private:
     std::string _name;
     std::vector<entry_t> _entries;
 };
-
+}
 #endif /* ROUTINGTABLE_H */
 

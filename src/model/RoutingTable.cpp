@@ -26,7 +26,7 @@
 
 #include <algorithm>
 #include <sstream>
-
+namespace mpls2pda {
 RoutingTable::RoutingTable()
 {
 }
@@ -400,4 +400,5 @@ void RoutingTable::print_json(std::ostream& s) const
         _entries[i].print_json(s);
     }
     s << "\n\t}";
+}
 }

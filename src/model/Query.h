@@ -24,17 +24,29 @@
 #define QUERY_H
 #include "pdaaal/model/NFA.h"
 #include "Router.h"
-
+namespace mpls2pda {
 class Query {
 public:
+    enum mode_t {
+        OVER, UNDER, EXACT
+    };
     using label_t = size_t;
+    Query() {};
+    Query(const pdaaal::NFA<label_t>& pre, const pdaaal::NFA<label_t>& path, const pdaaal::NFA<label_t>& post, int lf, mode_t mode);
+    Query(Query&&) = default;
+    Query(const Query&) = default;
+    virtual ~Query() = default;
+    Query& operator=(Query&&) = default;
+    Query& operator=(const Query&) = default;
     
 private:
     pdaaal::NFA<label_t> _prestack;
     pdaaal::NFA<label_t> _poststack;
-    pdaaal::NFA<Interface*> _path;
+    pdaaal::NFA<label_t> _path;
+    int _link_failures = 0;
+    mode_t _mode;
 
 };
-
+}
 #endif /* QUERY_H */
 
