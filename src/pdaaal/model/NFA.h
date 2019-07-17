@@ -95,6 +95,7 @@ namespace pdaaal {
         }
         return empty;
     }
+    
 }
 
 #endif /* NFA_H */

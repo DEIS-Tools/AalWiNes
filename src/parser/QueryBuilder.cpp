@@ -137,6 +137,7 @@ namespace mpls2pda
 
     filter_t Builder::match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int mask)
     {
+        throw base_error("IPv6 parsing is not yet implemented");
         return {};
     }
 
@@ -198,6 +199,7 @@ namespace mpls2pda
 
     filter_t Builder::discard_id()
     {
+        throw base_error("discard matching is not yet implemented");
         filter_t res;
         res._link = [](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
             if(strcmp(fname, "!") == 0) return true;
@@ -208,6 +210,7 @@ namespace mpls2pda
 
     filter_t Builder::routing_id()
     {
+        throw base_error("routing matching is not yet implemented");
         filter_t res;
         res._link = [](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
             if(strcmp(fname, "^") == 0) return true;
