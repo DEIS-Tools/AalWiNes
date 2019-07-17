@@ -32,7 +32,7 @@ public:
     };
     using label_t = ssize_t;
     Query() {};
-    Query(const pdaaal::NFA<label_t>& pre, const pdaaal::NFA<label_t>& path, const pdaaal::NFA<label_t>& post, int lf, mode_t mode);
+    Query(pdaaal::NFA<label_t>&& pre, pdaaal::NFA<label_t>&& path, pdaaal::NFA<label_t>&& post, int lf, mode_t mode);
     Query(Query&&) = default;
     Query(const Query&) = default;
     virtual ~Query() = default;

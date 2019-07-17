@@ -26,6 +26,9 @@
 
 #ifndef ERRORS_H
 #define ERRORS_H
+#include <exception>
+#include <string>
+#include <ostream>
 
 struct base_error : public std::exception {
     std::string _message;

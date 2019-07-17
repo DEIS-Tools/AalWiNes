@@ -25,8 +25,8 @@
 
 namespace mpls2pda {
 
-    Query::Query(const pdaaal::NFA<label_t>& pre, const pdaaal::NFA<label_t>& path, const pdaaal::NFA<label_t>& post, int lf, mode_t mode)
-    : _prestack(pre), _poststack(post), _path(path), _link_failures(lf), _mode(mode)
+    Query::Query(pdaaal::NFA<label_t>&& pre, pdaaal::NFA<label_t>&& path, pdaaal::NFA<label_t>&& post, int lf, mode_t mode)
+    : _prestack(std::move(pre)), _poststack(std::move(post)), _path(std::move(path)), _link_failures(lf), _mode(mode)
     {
 
     }

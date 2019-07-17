@@ -75,6 +75,8 @@
         OR        "|"
         DOT       "."
         PLUS      "+"
+        STAR      "*"
+        QUESTION  "?"
 
         LSQBRCKT  "["
         RSQBRCKT  "]"
@@ -131,11 +133,12 @@ regex
     : LSQBRCKT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($2), false); }
     | LSQBRCKT HAT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($3), true); } // negated set
     | LPAREN regex RPAREN { $$ = std::move($2); }
-    | regex AND regex { $$ = std::move($1); $$.and_extend($3); }
-    | regex OR regex { $$ = std::move($1); $$.or_extend($3); }
-    | regex DOT regex { $$ = std::move($1); $$.dot_extend($3); }
-    | regex PLUS regex { $$ = std::move($1); $$.plus_extend($3); }
-    | regex STAR regex { $$ = std::move($1); $$.star_extend($3); }
+    | regex AND regex { $$ = std::move($1); $$.and_extend(std::move($3)); }
+    | regex OR regex { $$ = std::move($1); $$.or_extend(std::move($3)); }
+    | regex DOT regex { $$ = std::move($1); $$.dot_extend(); $$.concat(std::move($3)); }
+    | regex PLUS regex { $$ = std::move($1); $$.plus_extend(); $$.concat(std::move($3)); }
+    | regex STAR regex { $$ = std::move($1); $$.star_extend(); $$.concat(std::move($3)); }
+    | regex QUESTION regex { $$ = std::move($1); $$.question_extend(); $$.concat(std::move($3)); }
     | { $$ = NFA<Query::label_t>(); } // empty.
     ;
     
