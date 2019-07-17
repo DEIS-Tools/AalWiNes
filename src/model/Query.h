@@ -30,7 +30,7 @@ public:
     enum mode_t {
         OVER, UNDER, EXACT
     };
-    using label_t = size_t;
+    using label_t = ssize_t;
     Query() {};
     Query(const pdaaal::NFA<label_t>& pre, const pdaaal::NFA<label_t>& path, const pdaaal::NFA<label_t>& post, int lf, mode_t mode);
     Query(Query&&) = default;

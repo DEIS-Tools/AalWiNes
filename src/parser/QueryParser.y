@@ -26,10 +26,11 @@
     // Created by Peter G. Jensen on 10/15/18.
     //
     #include <string>
-    #include <unordered_map>
+    #include <unordered_set>
     #include <memory>
     #include "pdaaal/model/NFA.h"
     #include "model/Query.h"
+    #include "model/filter.h"
 
     namespace mpls2pda {
         class Builder;
@@ -54,6 +55,7 @@
     #include "Scanner.h"
     #include "model/Query.h"
     #include "pdaaal/model/NFA.h"
+    #include "model/filter.h"
 
     using namespace pdaaal;
     using namespace mpls2pda;
@@ -97,7 +99,8 @@
 %type  <Query> query;
 %type  <NFA<Query::label_t>> regex;
 %type  <Query::mode_t> mode;
-%type  <std::vector<Query::label_t>> atom atom_list ip4 ip6 identifier label name;
+%type  <std::unordered_set<Query::label_t>> atom_list label;
+%type  <filter_t> atom ip4 ip6 identifier name;
 %type  <std::string> literal;
 //%printer { yyoutput << $$; } <*>;
 %left AND OR DOT PLUS STAR
@@ -109,9 +112,9 @@ query_list
         | { $$ = {};  }// empty 
         ;
 query
-    : LT { builder.link_mode(); } regex 
+    : LT { builder.label_mode(); } regex 
       GT { builder.path_mode(); } regex 
-      LT { builder.link_mode(); } regex GT number mode
+      LT { builder.label_mode(); } regex GT number mode
     {
         $$ = Query(std::move($3), std::move($6), std::move($9), $11, $12);
     }
@@ -149,23 +152,22 @@ hexnumber
     ;
     
 atom_list
-    : atom COMMA atom_list { $$ = std::move($3); $$.insert($$.end(), $1.begin(), $1.end()); }
-    | atom { $$ = std::move($1); }
+    : atom COMMA atom_list { $$ = builder.filter_and_merge($1, $3); }
+    | atom { $$ = builder.filter($1); }
+    | label COMMA atom_list{ $$ = std::move($3); $$.insert($1.begin(), $1.end()); }
+    | label { $$ = std::move($1); }
     ;
     
 atom 
-    : label { $$ = std::move($1); }     // labels
-    | identifier HASH { builder.set_filter(std::move($1), false); }
-      identifier { $$ = std::move($4); builder.clear_filter(); }// LINKS
-    | HASH identifier { $$ = std::move($2); } // ingoing
+    : identifier HASH { builder.set_post(); } identifier { $$ = $1 && $4; builder.clear_post(); }// LINKS
+    | HASH { builder.set_post(); } identifier { $$ = std::move($3); builder.clear_post(); } // ingoing
     | identifier HASH { $$ = std::move($1); } // outgoing
     ;
 
 identifier
     : name { $$ = std::move($1); }
-    | name DOT { builder.set_filter(std::move($1), true);} name
-    { $$ = std::move($4); builder.clear_filter(); }
-    | "_" { $$ = builder.ip_id(); }
+    | name DOT { builder.set_link(); } name
+    { $$ = $1 && $4; builder.clear_link(); }
     | "^" { $$ = builder.routing_id(); }
     | "!" { $$ = builder.discard_id(); }
     ;
@@ -205,6 +207,7 @@ name
 label
     : number  { $$ = builder.find_label($1, 1); }
     | number "/" number  { $$ = builder.find_label($1, $3); }
+    | "ip" {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($3); }
     ;
     
 

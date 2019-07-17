@@ -25,6 +25,7 @@
 
 #include <inttypes.h>
 #include <vector>
+#include <unordered_set>
 
 namespace pdaaal {
 
@@ -33,6 +34,7 @@ namespace pdaaal {
     public:
         NFA(bool initially_accepting = true) {}
         NFA(std::vector<T>&& initial_accepting, bool negated = false) {}
+        NFA(std::unordered_set<T>&& initial_accepting, bool negated = false) {}
         NFA(const NFA&) = default;
         NFA(NFA&&) = default;
         NFA& operator=(const NFA&) = default;

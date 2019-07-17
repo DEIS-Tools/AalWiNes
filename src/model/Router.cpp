@@ -22,6 +22,7 @@
 
 #include "Router.h"
 #include "utils/errors.h"
+#include "utils/parsing.h"
 
 #include <vector>
 #include <streambuf>
@@ -42,37 +43,6 @@ const std::string& Router::name() const
 {
     assert(_names.size() > 0);
     return _names.back();
-}
-
-void write_ip(std::ostream& s, uint32_t ip)
-{
-    uint8_t* add = (uint8_t*) & ip;
-    for (size_t i = 0; i < 4; ++i) {
-        if (i != 0) s << ".";
-        s << (int) add[3 - i];
-    }
-}
-
-uint32_t get_ip(rapidxml::xml_node<char>* ip)
-{
-    if (ip == nullptr)
-        return std::numeric_limits<uint32_t>::max();
-    uint32_t res;
-    uint8_t* add = (uint8_t*) & res;
-    std::string val = ip->value();
-    size_t j = 0;
-    size_t n = 0;
-    for (size_t i = 0; i < val.size(); ++i) {
-        if (val[i] == '.' || i == val.size() - 1) {
-            if (i == val.size() - 1)
-                ++i;
-            auto v = atoi(&(val[j]));
-            add[3 - n] = v;
-            j = i + 1;
-            ++n;
-        }
-    }
-    return res;
 }
 
 void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::ostream& warnings)
@@ -181,8 +151,10 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
                 throw base_error(e.str());
             }
             std::string iface = iname->value();
-
-            auto res = get_interface(iface, next, get_ip(n->first_node("ip-address")));
+            const char* str = nullptr;
+            if(auto ip = n->first_node("ip-address"))
+                str = ip->value();
+            auto res = get_interface(iface, next, parse_ip4(str));
             if (res == nullptr) {
                 std::stringstream e;
                 e << "Could not find interface " << iface << std::endl;
@@ -222,7 +194,7 @@ Interface* Router::get_interface(std::string iface, Router* expected, uint32_t i
     auto iid = _interfaces.size();
     if (expected == this)
         ip = 0;
-    _interfaces.emplace_back(std::make_unique<Interface>(iid, expected, ip));
+    _interfaces.emplace_back(std::make_unique<Interface>(iid, expected, ip, this));
     _interface_map.get_data(res.second) = _interfaces.back().get();
     return _interfaces.back().get();
 }
@@ -349,7 +321,7 @@ void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostr
     }
 }
 
-Interface::Interface(size_t id, Router* target, uint32_t ip) : _id(id), _target(target), _ip(ip)
+Interface::Interface(size_t id, Router* target, uint32_t ip, Router* parent) : _id(id), _target(target), _ip(ip), _parent(parent)
 {
 }
 
@@ -374,13 +346,13 @@ void Interface::make_pairing(Router* parent)
                 auto n3 = _target->interface_name(i->_id);
                 e << "Non-unique paring of links between " << parent->name() << " and " << _target->name() << "\n";
                 e << n.get() << "(";
-                write_ip(e, _ip);
+                write_ip4(e, _ip);
                 e << ") could be matched with both :\n";
                 e << n2.get() << "(";
-                write_ip(e, _matching->_ip);
+                write_ip4(e, _matching->_ip);
                 e << ") and\n";
                 e << n3.get() << "(";
-                write_ip(e, i->_ip);
+                write_ip4(e, i->_ip);
                 e << ")" << std::endl;
                 throw base_error(e.str());
             }
@@ -396,7 +368,7 @@ void Interface::make_pairing(Router* parent)
         auto n = parent->interface_name(_id);
         std::stringstream e;
         e << "Could not find a pairing for interface " << n.get() << "(";
-        write_ip(e, _ip);
+        write_ip4(e, _ip);
         e << ") of " << parent->name() << " in " << _target->name() << std::endl;
         throw base_error(e.str());
     }
@@ -491,7 +463,7 @@ void Interface::print_json(std::ostream& s, const char* name) const
             if (_matching)
                 s << "\"pairing\":" << _matching->_id << ", ";
             s << "\"ip\":";
-            write_ip(s, _ip);
+            write_ip4(s, _ip);
         }
         else
             s << "\"sink\":true";

@@ -224,37 +224,38 @@ int main(int argc, const char** argv)
     std::stringstream dummy;
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
 
-    ptrie::map<Router*> mapping;
-    std::vector<std::unique_ptr < Router>> routers;
-    if (junos_config.size() > 0)
-        parse_junos(routers, mapping, junos_config, warnings);
+    Network network = [&] {
+        ptrie::map<Router*> mapping;
+        std::vector<std::unique_ptr < Router>> routers;
+        if (junos_config.size() > 0)
+            parse_junos(routers, mapping, junos_config, warnings);
 
-    for (auto& r : routers) {
-        r->pair_interfaces();
-    }
-
-    if (print_dot) {
-        std::cout << "digraph network {\n";
         for (auto& r : routers) {
-            r->print_dot(std::cout);
+            r->pair_interfaces();
         }
-        std::cout << "}" << std::endl;
-    }
 
-    if (dump_json) {
-        std::cout << "{\n";
-        for (size_t i = 0; i < routers.size(); ++i) {
-            if (i != 0)
-                std::cout << ",\n";
-            std::cout << "\"" << routers[i]->name() << "\":";
-            routers[i]->print_json(std::cout);
+        if (print_dot) {
+            std::cout << "digraph network {\n";
+            for (auto& r : routers) {
+                r->print_dot(std::cout);
+            }
+            std::cout << "}" << std::endl;
         }
-        std::cout << "\n}\n";
-    }
+
+        if (dump_json) {
+            std::cout << "{\n";
+            for (size_t i = 0; i < routers.size(); ++i) {
+                if (i != 0)
+                    std::cout << ",\n";
+                std::cout << "\"" << routers[i]->name() << "\":";
+                routers[i]->print_json(std::cout);
+            }
+            std::cout << "\n}\n";
+        }
+        return Network(std::move(mapping), std::move(routers));
+    }();
     
-    Network compiled;
-    
-    Builder builder(compiled);
+    Builder builder(network);
     std::ifstream qstream(query_file);
     if (!qstream.is_open()) {
         std::cerr << "Could not open " << query_file << std::endl;

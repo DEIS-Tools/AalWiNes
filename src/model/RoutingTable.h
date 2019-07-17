@@ -31,70 +31,97 @@
 #ifndef ROUTINGTABLE_H
 #define ROUTINGTABLE_H
 namespace mpls2pda {
-class Router;
-class Interface;
+    class Router;
+    class Interface;
 
-class RoutingTable {
-public:
-    RoutingTable(const RoutingTable& orig) = default;
-    virtual ~RoutingTable() = default;
-    RoutingTable(RoutingTable&&) = default;
-    static RoutingTable parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::ostream& warnings);
+    class RoutingTable {
+    public:
 
-    RoutingTable& operator=(const RoutingTable&) = default;
-    RoutingTable& operator=(RoutingTable&&) = default;
+        enum type_t {
+            DISCARD, RECIEVE, ROUTE, MPLS
+        };
 
-    bool empty() const {
-        return _entries.empty();
-    }
-    bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
-    void print_json(std::ostream&) const;
-private:
-    RoutingTable();
+        enum op_t {
+            PUSH, POP, SWAP
+        };
 
-    enum type_t {
-        DISCARD, RECIEVE, ROUTE, MPLS
-    };
+        struct action_t {
+            op_t _op = POP;
+            int64_t _label = std::numeric_limits<int64_t>::min();
+            void print_json(std::ostream& s) const;
+            static void print_label(int64_t label, std::ostream& s);
+        };
 
-    enum op_t {
-        PUSH, POP, SWAP
-    };
+        struct forward_t {
+            type_t _type = MPLS;
+            std::vector<action_t> _ops;
+            Interface* _via = nullptr;
+            size_t _weight = 0;
+            void print_json(std::ostream&) const;
+            void parse_ops(std::string& opstr);
+        };
 
-    struct action_t {
-        op_t _op = POP;
-        int64_t _label = std::numeric_limits<int64_t>::min();
-        void print_json(std::ostream& s) const;
-        static void print_label(int64_t label, std::ostream& s);
-    };
+        struct entry_t {
+            int64_t _top_label = std::numeric_limits<int64_t>::min();
+            bool _decreasing = false;
+            std::vector<forward_t> _rules;
+            bool operator==(const entry_t& other) const;
 
-    struct forward_t {
-        type_t _type = MPLS;
-        std::vector<action_t> _ops;
-        Interface* _via = nullptr;
-        size_t _weight = 0;
+            bool operator<(const entry_t& other) const;
+            void print_json(std::ostream&) const;
+            static void print_label(uint64_t label, std::ostream& s);
+
+            bool is_interface() const {
+                return _top_label < 0;
+            }
+
+            bool is_default() const {
+                return _top_label == 0;
+            }
+
+            bool is_mpls() const {
+                return _top_label > 0;
+            }
+
+            int64_t as_mpls() const {
+                return _top_label - 1;
+            }
+
+            int64_t as_interface() const {
+                return -(_top_label + 1);
+            }
+        };
+    public:
+        RoutingTable(const RoutingTable& orig) = default;
+        virtual ~RoutingTable() = default;
+        RoutingTable(RoutingTable&&) = default;
+        static RoutingTable parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::ostream& warnings);
+
+        RoutingTable& operator=(const RoutingTable&) = default;
+        RoutingTable& operator=(RoutingTable&&) = default;
+
+        bool empty() const {
+            return _entries.empty();
+        }
+        bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
         void print_json(std::ostream&) const;
-        void parse_ops(std::string& opstr);
+
+        const std::vector<entry_t>& entries() const {
+            return _entries;
+        }
+
+        RoutingTable();
+
+    private:
+
+        static Interface* parse_via(Router* parent, rapidxml::xml_node<char>* via);
+        static int parse_weight(rapidxml::xml_node<char>* nh);
+
+
+
+        std::string _name;
+        std::vector<entry_t> _entries;
     };
-
-    struct entry_t {
-        int64_t _top_label = std::numeric_limits<int64_t>::min();
-        bool _decreasing = false;
-        std::vector<forward_t> _rules;
-        bool operator==(const entry_t& other) const;
-
-        bool operator<(const entry_t& other) const;
-        void print_json(std::ostream&) const;
-        static void print_label(uint64_t label, std::ostream& s);
-    };
-
-    static Interface* parse_via(Router* parent, rapidxml::xml_node<char>* via);
-    static int parse_weight(rapidxml::xml_node<char>* nh);
-
-
-
-    std::string _name;
-    std::vector<entry_t> _entries;
-};
 }
 #endif /* ROUTINGTABLE_H */
 

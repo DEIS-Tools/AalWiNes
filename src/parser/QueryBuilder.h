@@ -23,6 +23,7 @@
 #include "pdaaal/model/NFA.h"
 #include "model/Query.h"
 #include "model/Network.h"
+#include "model/filter.h"
 
 #include <string>
 #include <sstream>
@@ -33,6 +34,8 @@
 #include <vector>
 #include <cassert>
 #include <queue>
+#include <functional>
+#include <unordered_set>
 
 namespace std {
 
@@ -61,22 +64,27 @@ namespace mpls2pda {
         int do_parse(std::istream &stream);
 
 	// Building
-	void link_mode();
 	void path_mode();
-        using labelset_t = std::vector<Query::label_t>;
+	void label_mode();
+        using labelset_t = std::unordered_set<Query::label_t>;
         
-        void set_filter(labelset_t&& labels, bool internal);
-        void clear_filter();
+        // matching on atomics 
+        labelset_t filter_and_merge(filter_t&, labelset_t&);
+        labelset_t filter(filter_t& f);
+        void set_post() { _post = true; }
+        void clear_post() { _post = false; }
+        void set_link() { _link = true; }
+        void clear_link() { _link = false; }
         
-        // matching on atomics
-        labelset_t match_ip4(int i1, int i2, int i3, int i4, int mask);
-        labelset_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int mask);
-        labelset_t match_re(std::string&& re);
-        labelset_t match_exact(const std::string& str);
+        
+        filter_t match_ip4(int i1, int i2, int i3, int i4, int mask);
+        filter_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int mask);
+        filter_t match_re(std::string&& re);
+        filter_t match_exact(const std::string& str);
+        filter_t routing_id();
+        filter_t discard_id();
         labelset_t find_label(uint64_t label, uint64_t mask);
-        labelset_t ip_id();
-        labelset_t routing_id();
-        labelset_t discard_id();
+        labelset_t ip_labels(filter_t& filter);
 
         // Error handling.
         void error(const location &l, const std::string &m);
@@ -87,12 +95,11 @@ namespace mpls2pda {
 	location _location;
         
         // filtering
-        labelset_t _filter;
-        bool _using_filter = false;
-        bool _internal_filter = false;
-        
+        labelset_t _links;
         // if we are parsing a path or a stack-type regex
-        bool _linkmode = true;
+        bool _pathmode = true;
+        bool _post = false;
+        bool _link = false;
     };
 }
 
