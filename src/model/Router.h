@@ -40,6 +40,14 @@ public:
     Router* target() const {
         return _target;
     }
+    
+    Router* source() const {
+        return _parent;
+    }
+    
+    bool is_virtual() const {
+        return _parent == _target;
+    }
 
     size_t id() const {
         return _id;

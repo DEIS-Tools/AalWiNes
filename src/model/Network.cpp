@@ -64,6 +64,7 @@ namespace mpls2pda {
             {
                 for(auto& i : r->interfaces())
                 {
+                    if(i->is_virtual()) continue;
                     // can we have empty interfaces??
                     assert(i);
                     auto fname = r->interface_name(i->id());
@@ -126,6 +127,7 @@ namespace mpls2pda {
                 {
                     auto iid = entry.first->as_interface();
                     Interface* inf = entry.second->interface_no(iid);
+                    if(inf->is_virtual()) continue;
                     if(ifaces.count(reinterpret_cast<ssize_t>(inf)) > 0)
                         res.insert(reinterpret_cast<ssize_t>(entry.first->_top_label));
                 }
