@@ -30,11 +30,16 @@
 #include <unordered_set>
 #include <memory>
 #include <unordered_map>
+#include <ostream>
+#include <functional>
+#include <iostream>
+
 
 namespace pdaaal {
 
     template<typename T = char>
     class NFA {
+        // TODO: Some trivial optimizations to be had here.
     public:
 
         struct state_t;
@@ -46,15 +51,22 @@ namespace pdaaal {
             std::vector<T> _symbols;
             state_t* _destination;
             edge_t(bool negated, std::unordered_set<T>& symbols, state_t* dest)
-                    : _negated(negated), _symbols(symbols.begin(), symbols.end()), _destination(dest) {};
+                    : _negated(negated), _symbols(symbols.begin(), symbols.end()), _destination(dest) 
+            {
+                ++_destination->_ingoing;
+            };
             edge_t(state_t* dest, bool epsilon = false)
-                    : _epsilon(epsilon), _negated(true), _destination(dest) {};
+                    : _epsilon(epsilon), _negated(!epsilon), _destination(dest) 
+            {
+                ++dest->_ingoing;
+            };
             edge_t(const edge_t& other) = default;
         };
         
         struct state_t {
             std::vector<edge_t> _edges;
             bool _accepting = false;
+            int32_t _ingoing = 0;
             state_t(bool accepting) : _accepting(accepting) {};
             state_t(const state_t& other) = default;
         };
@@ -68,8 +80,8 @@ namespace pdaaal {
         NFA(std::unordered_set<T>&& initial_accepting, bool negated = false) {
             if (initial_accepting.size() > 0 || negated) {
                 _states.emplace_back(std::make_unique<state_t>(false));
-                _states.emplace_back(std::make_unique<state_t>(true));
                 _initial.push_back(_states[0].get());
+                _states.emplace_back(std::make_unique<state_t>(true));
                 _accepting.push_back(_states[1].get());
                 _initial.back()->_edges.emplace_back(negated,initial_accepting,_accepting.back());
             }
@@ -180,7 +192,56 @@ namespace pdaaal {
             }            
             _initial = {initial};
             _accepting.insert(_accepting.end(), other._accepting.begin(), other._accepting.end());
-        }        
+        }       
+        
+        void to_dot(std::ostream& out, std::function<void(std::ostream&, const T&)> printer = [](auto& s, auto& e){ s << e ;}) const
+        {
+            out << "digraph NFA {\n";
+            for(auto& s : _states)
+            {
+                out << "\"" << s.get() << "\" [shape=";
+                if(s->_accepting)
+                    out << "double";
+                out << "circle];\n";
+                for(const edge_t& e : s->_edges)
+                {
+                    out << "\"" << s.get() << "\" -> \"" << e._destination << "\" [ label=\"";
+                    if(e._negated && !e._symbols.empty())
+                    {
+                        out << "^";
+                    }
+                    if(!e._symbols.empty())
+                    {
+                        out << "\\[";
+                        bool first = true;
+                        for(auto& s : e._symbols)
+                        {
+                            if(!first)
+                                out << ", ";
+                            first = false;
+                            printer(out, s);
+                        }
+                        out << "\\]";
+                    }
+                    if(e._symbols.empty() && e._negated)
+                        out << "*";
+                    if(e._epsilon)
+                    {
+                        if(!e._symbols.empty() || e._negated) out << " ";
+                        out << u8"𝜀";
+                    }
+                    
+                    out << "\"];\n";
+                }
+            }
+            for(auto& i : _initial)
+            {
+                out << "\"I" << i << "\" -> \"" << i << "\";\n";
+                out << "\"I" << i << "\" [style=invisible];\n";
+            }
+            
+            out << "}\n";
+        }
 
     private:
         const static std::vector<state_t*> empty;

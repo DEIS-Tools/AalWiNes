@@ -30,5 +30,15 @@ namespace mpls2pda {
     {
 
     }
+    
+    void Query::print_dot(std::ostream& out)
+    {
+        out << "// PRE\n";
+        _prestack.to_dot(out);
+        out << "// POST\n";
+        _poststack.to_dot(out);
+        out << "// PATH\n";
+        _path.to_dot(out);
+    }
 
 }

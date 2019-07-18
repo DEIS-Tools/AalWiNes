@@ -24,6 +24,9 @@
 #define QUERY_H
 #include "pdaaal/model/NFA.h"
 #include "Router.h"
+
+#include <ostream>
+
 namespace mpls2pda {
 class Query {
 public:
@@ -39,6 +42,7 @@ public:
     Query& operator=(Query&&) = default;
     Query& operator=(const Query&) = default;
     
+    void print_dot(std::ostream& out);
 private:
     pdaaal::NFA<label_t> _prestack;
     pdaaal::NFA<label_t> _poststack;
