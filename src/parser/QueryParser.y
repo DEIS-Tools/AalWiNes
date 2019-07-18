@@ -102,7 +102,7 @@
 // bison does not seem to like naked shared pointers :(
 %type  <int64_t> number hexnumber;
 %type  <Query> query;
-%type  <NFA<Query::label_t>> regex cregex uregex bregex;
+%type  <NFA<Query::label_t>> regex cregex;
 %type  <Query::mode_t> mode;
 %type  <std::unordered_set<Query::label_t>> atom_list label;
 %type  <filter_t> atom ip4 ip6 identifier name;
@@ -140,12 +140,13 @@ mode
 cregex
     : regex cregex { $$ = std::move($1); $$.concat(std::move($2)); }
     | regex { $$ = std::move($1); }
+    | { $$ = NFA<Query::label_t>(true); }
     ;
     
 regex    
     : regex AND regex { $$ = std::move($1); $$.and_extend(std::move($3)); }
     | regex OR regex { $$ = std::move($1); $$.or_extend(std::move($3)); }
-    | regex DOT { $$ = std::move($1); $$.dot_extend(); }
+    | DOT { std::unordered_set<Query::label_t> empty; $$ = NFA(std::move(empty), true); }
     | regex PLUS { $$ = std::move($1); $$.plus_extend(); }
     | regex STAR { $$ = std::move($1); $$.star_extend(); }
     | regex QUESTION { $$ = std::move($1); $$.question_extend(); }    

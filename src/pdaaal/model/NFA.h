@@ -125,15 +125,6 @@ namespace pdaaal {
             _accepting = std::move(other._accepting);
         }
         
-        void dot_extend() 
-        {
-            _states.emplace_back(std::make_unique<state_t>(false));
-            _states.emplace_back(std::make_unique<state_t>(true));
-            _initial.push_back(_states[0].get());
-            _accepting.push_back(_states[1].get());
-            _initial.back()->_edges.emplace_back(_accepting.back(), false);
-        }
-
         void question_extend()
         {
             for(auto s : _initial)
