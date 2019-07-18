@@ -54,6 +54,7 @@ namespace mpls2pda {
         }
     }
     
+    const char* empty_string = "";
     std::unordered_set<Query::label_t> Network::interfaces(filter_t& filter)
     {
         std::unordered_set<Query::label_t> res;
@@ -68,15 +69,19 @@ namespace mpls2pda {
                     auto fname = r->interface_name(i->id());
                     auto fip = i->ip4();
                     auto fip6 = i->ip6();
-                    std::unique_ptr<char[]> tname;
-                    const char* tr = nullptr;
+                    std::unique_ptr<char[]> tname = std::make_unique<char[]>(1);
+                    tname.get()[0] = '\0';
+                    const char* tr = empty_string;
                     uint32_t tip = 0;
                     uint64_t tip6 = 0;
                     if(i->target() != nullptr)
                     {
-                        tname = i->target()->interface_name(i->match()->id());
-                        tip = i->match()->ip4();
-                        tip6 = i->match()->ip6();
+                        if(i->match() != nullptr)
+                        {
+                            tname = i->target()->interface_name(i->match()->id());
+                            tip = i->match()->ip4();
+                            tip6 = i->match()->ip6();
+                        }
                         tr = i->target()->name().c_str();
                     }
                     if(filter._link(fname.get(), fip, fip6, tname.get(), tip, tip6, tr))
@@ -128,4 +133,26 @@ namespace mpls2pda {
         }
         return res;
     }
+    
+    void Network::print_dot(std::ostream& s)
+    {
+        s << "digraph network {\n";
+        for (auto& r : _routers) {
+            r->print_dot(s);
+        }
+        s << "}" << std::endl;
+    }
+
+    void Network::print_json(std::ostream& s)
+    {
+        s << "{\n";
+        for (size_t i = 0; i < _routers.size(); ++i) {
+            if (i != 0)
+                s << ",\n";
+            s << "\"" << _routers[i]->name() << "\":";
+            _routers[i]->print_json(s);
+        }
+        s << "\n}\n";
+    }
+
 }

@@ -93,6 +93,7 @@ namespace mpls2pda {
 
         Network& _network;
 	location _location;
+        std::vector<Query> _result;
         
         // filtering
         labelset_t _links;

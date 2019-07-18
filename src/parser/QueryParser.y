@@ -92,55 +92,68 @@
         HAT       "^"
         HASH      "#"
         COLON     ":"
+        
+        OVER      "OVER"
+        UNDER     "UNDER"
+        EXACT     "EXACT"
 ;
 
 
 // bison does not seem to like naked shared pointers :(
 %type  <int64_t> number hexnumber;
-%type  <std::vector<Query>> query_list;
 %type  <Query> query;
-%type  <NFA<Query::label_t>> regex;
+%type  <NFA<Query::label_t>> regex cregex uregex bregex;
 %type  <Query::mode_t> mode;
 %type  <std::unordered_set<Query::label_t>> atom_list label;
 %type  <filter_t> atom ip4 ip6 identifier name;
 %type  <std::string> literal;
 //%printer { yyoutput << $$; } <*>;
-%left AND OR DOT PLUS STAR
+%left AND
+%left OR
+%left DOT 
+%left PLUS 
+%left STAR 
+%left QUESTION
+        
 %%
 %start query_list;
 query_list
-        : query_list query { std::swap($$,$1); $$.emplace_back(std::move($2)); }
-        | query { $$ = {std::move($1)}; }
-        | { $$ = {};  }// empty 
+        : query_list query { builder._result.emplace_back(std::move($2)); }
+        | query { builder._result.emplace_back(std::move($1)); }
+        | END// empty 
         ;
 query
-    : LT { builder.label_mode(); } regex 
-      GT { builder.path_mode(); } regex 
-      LT { builder.label_mode(); } regex GT number mode
+    : LT { builder.label_mode(); } cregex 
+      GT { builder.path_mode(); } cregex 
+      LT { builder.label_mode(); } cregex GT number mode
     {
         $$ = Query(std::move($3), std::move($6), std::move($9), $11, $12);
     }
     ;
 
 mode 
-    : "OVER" { $$ = Query::OVER; }
-    | "UNDER" { $$ = Query::UNDER; }
-    | "EXACT" { $$ = Query::EXACT; }
-    | { $$ = Query::OVER; } //empty 
+    : OVER { $$ = Query::OVER; }
+    | UNDER { $$ = Query::UNDER; }
+    | EXACT { $$ = Query::EXACT; }
     ;
-
-regex
-    : LSQBRCKT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($2), false); }
+    
+cregex
+    : regex cregex { $$ = std::move($1); $$.concat(std::move($2)); }
+    | regex { $$ = std::move($1); }
+    ;
+    
+regex    
+    : regex AND regex { $$ = std::move($1); $$.and_extend(std::move($3)); }
+    | regex OR regex { $$ = std::move($1); $$.or_extend(std::move($3)); }
+    | regex DOT { $$ = std::move($1); $$.dot_extend(); }
+    | regex PLUS { $$ = std::move($1); $$.plus_extend(); }
+    | regex STAR { $$ = std::move($1); $$.star_extend(); }
+    | regex QUESTION { $$ = std::move($1); $$.question_extend(); }    
+    | LSQBRCKT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($2), false); }
     | LSQBRCKT HAT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($3), true); } // negated set
     | LPAREN regex RPAREN { $$ = std::move($2); }
-    | regex AND regex { $$ = std::move($1); $$.and_extend(std::move($3)); }
-    | regex OR regex { $$ = std::move($1); $$.or_extend(std::move($3)); }
-    | regex DOT regex { $$ = std::move($1); $$.dot_extend(); $$.concat(std::move($3)); }
-    | regex PLUS regex { $$ = std::move($1); $$.plus_extend(); $$.concat(std::move($3)); }
-    | regex STAR regex { $$ = std::move($1); $$.star_extend(); $$.concat(std::move($3)); }
-    | regex QUESTION regex { $$ = std::move($1); $$.question_extend(); $$.concat(std::move($3)); }
-    | { $$ = NFA<Query::label_t>(); } // empty.
     ;
+
     
 number
     : NUMBER {

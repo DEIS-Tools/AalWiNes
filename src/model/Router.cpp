@@ -264,7 +264,7 @@ void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostr
                     // next line
                     if (!std::getline(indirect, line)) {
                         std::stringstream e;
-                        e << "unexpected end of tile" << std::endl;
+                        e << "unexpected end of file" << std::endl;
                         throw base_error(e.str());
                     }
                     i = 0;

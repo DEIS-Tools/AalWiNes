@@ -89,6 +89,9 @@ literal  \"(\\.|[^\\"])*\"
 "^"     return token::HAT;
 "#"     return token::HASH;
 ":"     return token::COLON;
+"OVER"  return token::OVER;
+"UNDER" return token::UNDER;
+"EXACT" return token::EXACT;
 
 {int}      {
   long int n = strtol (yytext, NULL, 10);

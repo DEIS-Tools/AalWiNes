@@ -21,6 +21,7 @@
 #include "utils/errors.h"
 #include "parser/QueryBuilder.h"
 #include "model/Network.h"
+#include "parser/parsererrors.h"
 
 #include <ptrie_map.h>
 
@@ -234,34 +235,34 @@ int main(int argc, const char** argv)
             r->pair_interfaces();
         }
 
-        if (print_dot) {
-            std::cout << "digraph network {\n";
-            for (auto& r : routers) {
-                r->print_dot(std::cout);
-            }
-            std::cout << "}" << std::endl;
-        }
-
-        if (dump_json) {
-            std::cout << "{\n";
-            for (size_t i = 0; i < routers.size(); ++i) {
-                if (i != 0)
-                    std::cout << ",\n";
-                std::cout << "\"" << routers[i]->name() << "\":";
-                routers[i]->print_json(std::cout);
-            }
-            std::cout << "\n}\n";
-        }
         return Network(std::move(mapping), std::move(routers));
     }();
     
-    Builder builder(network);
-    std::ifstream qstream(query_file);
-    if (!qstream.is_open()) {
-        std::cerr << "Could not open " << query_file << std::endl;
-        exit(-1);
+    if (print_dot) {
+        network.print_dot(std::cout);
     }
-    builder.do_parse(qstream);
-    
+
+    if (dump_json) {
+        network.print_json(std::cout);
+    }
+
+
+    if(!query_file.empty())
+    {
+        Builder builder(network);
+        std::ifstream qstream(query_file);
+        if (!qstream.is_open()) {
+            std::cerr << "Could not open Query-file\"" << query_file << "\"" << std::endl;
+            exit(-1);
+        }
+        try {
+            builder.do_parse(qstream);
+        } 
+        catch(base_parser_error& error)
+        {
+            std::cerr << "Error during parsing:\n" << error << std::endl;
+            exit(-1);
+        }
+    }
     return 0;
 }

@@ -45,11 +45,13 @@ public:
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask);
     std::unordered_set<Query::label_t> ip_labels(filter_t& filter);
+    void print_dot(std::ostream& s);
+    void print_json(std::ostream& s);
     
 private:
     // NO TOUCHEE AFTER INIT!
-    const ptrie::map<Router*> _mapping;
-    const std::vector<std::unique_ptr<Router>>&& _routers;
+    ptrie::map<Router*> _mapping;
+    std::vector<std::unique_ptr<Router>> _routers;    
     std::unordered_map<int64_t,std::vector<std::pair<const RoutingTable::entry_t*, const Router*>>> _label_map;
     
 //    ptrie::map<size_t> _linkmap;
