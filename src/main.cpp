@@ -22,6 +22,7 @@
 #include "parser/QueryBuilder.h"
 #include "model/Network.h"
 #include "parser/parsererrors.h"
+#include "pdaaal/model/PDA.h"
 
 #include <ptrie_map.h>
 
@@ -35,6 +36,7 @@
 
 namespace po = boost::program_options;
 using namespace mpls2pda;
+using namespace pdaaal;
 void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                  ptrie::map<Router*>& mapping,
                  const std::string& network,
@@ -262,6 +264,12 @@ int main(int argc, const char** argv)
         {
             std::cerr << "Error during parsing:\n" << error << std::endl;
             exit(-1);
+        }
+        
+        for(auto& q : builder._result)
+        {
+            PDA<Query::label_t> pda(q.construction(), q.destruction(), network.all_labels());
+            pda.print_moped(std::cout);
         }
     }
     return 0;

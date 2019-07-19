@@ -50,23 +50,26 @@ namespace pdaaal {
             bool _negated = false;
             std::vector<T> _symbols;
             state_t* _destination;
-            edge_t(bool negated, std::unordered_set<T>& symbols, state_t* dest)
+            edge_t(bool negated, std::unordered_set<T>& symbols, state_t* dest, state_t* source, size_t id)
                     : _negated(negated), _symbols(symbols.begin(), symbols.end()), _destination(dest) 
             {
-                ++_destination->_ingoing;
+                _destination->_backedges.emplace_back(source, id);
             };
-            edge_t(state_t* dest, bool epsilon = false)
+            edge_t(state_t* dest, state_t* source, size_t id, bool epsilon = false)
                     : _epsilon(epsilon), _negated(!epsilon), _destination(dest) 
             {
-                ++dest->_ingoing;
+                _destination->_backedges.emplace_back(source, id);
+                if(_epsilon)
+                    source->_has_epsilon = true;
             };
             edge_t(const edge_t& other) = default;
         };
         
         struct state_t {
             std::vector<edge_t> _edges;
+            std::vector<std::pair<state_t*,size_t>> _backedges;
             bool _accepting = false;
-            int32_t _ingoing = 0;
+            bool _has_epsilon = false;
             state_t(bool accepting) : _accepting(accepting) {};
             state_t(const state_t& other) = default;
         };
@@ -83,14 +86,65 @@ namespace pdaaal {
                 _initial.push_back(_states[0].get());
                 _states.emplace_back(std::make_unique<state_t>(true));
                 _accepting.push_back(_states[1].get());
-                _initial.back()->_edges.emplace_back(negated,initial_accepting,_accepting.back());
+                _initial.back()->_edges.emplace_back(negated,initial_accepting,_accepting.back(),_initial.back(), 0);
             }
         }
+        
+        void compile()
+        {
+            std::sort(_accepting.begin(), _accepting.end());
+            std::sort(_initial.begin(), _initial.end());
+            follow_epsilon(_initial);
+            std::sort(_states.begin(), _states.end());
+        }
+        
         NFA(NFA&&) = default;
         NFA& operator=(NFA&&) = default;
         NFA(const NFA& other )
         {
             (*this) = other;
+        }
+
+        template<typename C>
+        static void follow_epsilon(std::vector<C>& states)
+        {
+            std::vector<C> waiting = states;
+            while(!waiting.empty())
+            {
+                auto s = waiting.back();
+                waiting.pop_back();
+                if(!s->_has_epsilon) continue;
+                for(auto& e : s->_edges)
+                {
+                    if(e._epsilon)
+                    {
+                        auto lb = std::lower_bound(states.begin(), states.end(), e._destination);
+                        if(lb == std::end(states) || *lb != e._destination)
+                            states.insert(lb, e._destination);
+                    }
+                }
+            }
+        }
+        
+        static std::vector<const state_t*> successor(std::vector<const state_t*>& states, const T& label)
+        {
+            std::vector<const state_t*> next;
+            for(auto& s : states)
+            {
+                for(auto& e : s->_edges)
+                {
+                    auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), label);
+                    auto match = lb != std::end(e._symbols) && *lb == label;
+                    if(match == e._negated)
+                    {
+                        auto slb = std::lower_bound(next.begin(), next.end(), e._destination);
+                        if(slb == std::end(next) || *slb != e._destination)
+                            next.insert(slb, e._destination);
+                    }
+                }
+            }
+            follow_epsilon(next);
+            return next;
         }
         
         NFA& operator=(const NFA& other)
@@ -130,7 +184,8 @@ namespace pdaaal {
             {
                 for(auto& s : other._initial)
                 {
-                    sa->_edges.emplace_back(s, true);
+                    auto id = sa->_edges.size();
+                    sa->_edges.emplace_back(s, sa, id, true);
                 }
                 sa->_accepting = false;
             }
@@ -161,7 +216,10 @@ namespace pdaaal {
                             e._epsilon = true;
                     }
                     if(!found)
-                        s->_edges.emplace_back(si, true);
+                    {
+                        auto id = s->_edges.size();
+                        s->_edges.emplace_back(si, s, id, true);
+                    }
                 }
             }
         }
@@ -184,11 +242,11 @@ namespace pdaaal {
             auto initial = _states.back().get();
             for(auto& i : _initial)
             {
-                initial->_edges.emplace_back(i, true);
+                initial->_edges.emplace_back(i, initial, 0, true);
             }
             for(auto& i : other._initial)
             {
-                initial->_edges.emplace_back(i, true);
+                initial->_edges.emplace_back(i, initial, 0, true);
             }            
             _initial = {initial};
             _accepting.insert(_accepting.end(), other._accepting.begin(), other._accepting.end());
@@ -243,6 +301,10 @@ namespace pdaaal {
             out << "}\n";
         }
 
+        const std::vector<state_t*>& initial() { return _initial; }
+        const std::vector<state_t*>& accepting() { return _accepting; }
+        const std::vector<std::unique_ptr<state_t>> states() { return _states; }
+        
     private:
         const static std::vector<state_t*> empty;
         std::vector<std::unique_ptr<state_t>> _states;

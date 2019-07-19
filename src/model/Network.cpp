@@ -135,6 +135,16 @@ namespace mpls2pda {
         }
         return res;
     }
+
+    std::unordered_set<Query::label_t> Network::all_labels()
+    {
+        std::unordered_set<Query::label_t> res;
+        res.reserve(_label_map.size());
+        for(auto& l : _label_map)
+            res.insert(l.first);
+        return res;
+    }
+
     
     void Network::print_dot(std::ostream& s)
     {

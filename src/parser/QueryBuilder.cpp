@@ -174,14 +174,6 @@ namespace mpls2pda
         {
             res._from = [regex](const char* name)
             {
-                std::cerr << "MATCHING " << regex << std::endl;
-                std::cerr << "\t" << name << std::endl;
-                auto res = boost::regex_match(name, regex);
-                std::cerr << "\t\t";
-                if(res)
-                    std::cerr << "TRUE" << std::endl;
-                else
-                    std::cerr << "FALSE" << std::endl;
                 return boost::regex_match(name, regex);
             };
         }
