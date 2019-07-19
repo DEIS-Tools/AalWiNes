@@ -15,7 +15,7 @@ find_package(Boost 1.66 COMPONENTS program_options regex REQUIRED)
 include_directories(${Boost_INCLUDE_DIR} rapidxml)
 
 add_executable(mpls2pda ${HEADER_FILES} main.cpp 
-    model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp
+    model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDA.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} parser/QueryBuilder.cpp 
     utils/parsing.cpp)
 target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml ptrie)

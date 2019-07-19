@@ -363,7 +363,7 @@ void RoutingTable::entry_t::print_json(std::ostream& s) const
     s << "\n\t]";
 }
 
-void RoutingTable::entry_t::print_label(uint64_t label, std::ostream& s)
+void RoutingTable::entry_t::print_label(label_t label, std::ostream& s)
 {
     s << "\"";
     if (label == 0)

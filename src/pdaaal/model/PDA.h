@@ -40,16 +40,11 @@ namespace pdaaal {
         struct rule_t
         {
             op_t _op = POP;
-            bool _any = false;
-            std::vector<T> _pre;
+            T _pre;
             size_t _dest;
             T _op_label;
         };
         
-        struct state_t 
-        {
-            size_t _id;
-        };
         using nfastate_t = typename NFA<T>::state_t;
     public:
         PDA(NFA<T>& prestack, NFA<T>& poststack, std::unordered_set<T>&& all_labels)
@@ -58,10 +53,16 @@ namespace pdaaal {
             _cons_stack.compile();
             _des_stack.compile();
         };
-
+        
+        protected:
+        virtual const std::vector<size_t>& initial() = 0;
+        virtual bool empty_accept() const = 0; 
+        virtual bool accepting(size_t)  = 0;
+        virtual std::vector<rule_t> rules(size_t ) = 0;
+        
+        public:
         std::string print_moped(std::ostream& out, 
-                std::function<void(std::ostream&,const T&)> printer = [](auto& o, auto&e) { o << e; },
-                std::function<void(std::ostream&,const state_t&,const rule_t&, const T& )> tracer = [](auto& o, const state_t&, auto&e, auto&t) { ; })
+                std::function<void(std::ostream&,const T&)> printer = [](auto& o, auto&e) { o << e; })
         {
             // CONSTRUCTION NFA
             out << "(I<_>)\n";
@@ -214,43 +215,146 @@ namespace pdaaal {
                 // CONNECT TO NEXT
                 if(top->_accepting)
                 {
-                    for(auto& sd : _des_stack.initial())
+                    // TODO there is some nice and easy pruning to be done here
+                    // by just considering "next step".
+                    auto to_next = [&,this] (auto& nodes, char M)
                     {
-                        if(pre.size() == _all_labels.size())
+                        for(auto& sd : nodes)
                         {
-                            out << "C" << top << "<DOT> --> D" << sd << "<DOT>\n";
-                        }
-                        else
-                        {
-                            for(auto& p : pre)
+                            // TODO:
+                            // we can prune a lot here by checking if elements
+                            // from pre are accepted by the next state
+                            if(pre.size() == _all_labels.size())
                             {
-                                // TODO, match with outgoing rules of initial here
-                                out << "C" << top << "<";
-                                printer(out, p);
-                                out << "> --> D" << sd << "<";
-                                printer(out, p);
-                                out << ">\n";
+                                out << "C" << top << "<DOT> --> " << M << sd << "<DOT>\n";
+                            }
+                            else
+                            {
+                                for(auto& p : pre)
+                                {
+                                    // TODO, match with outgoing rules of initial here
+                                    out << "C" << top << "<";
+                                    printer(out, p);
+                                    out << "> --> " << M << sd << "<";
+                                    printer(out, p);
+                                    out << ">\n";
+                                }
+                            }
+                        }
+                    };
+                    to_next(initial(), 'P');
+                    if(empty_accept())
+                        to_next(_des_stack.initial(), 'D');
+                }
+            }
+
+            bool des_empty_accept = false;
+            for(auto s : _des_stack.initial())
+            {
+                if(s->_accepting)
+                {
+                    des_empty_accept = true;
+                    break;
+                }
+            }
+
+            // PATH & NETWORK
+            // SYNC!
+            waiting.clear();
+            seen.clear();
+            auto pdawaiting = initial();
+            std::unordered_set<size_t> pdaseen(pdawaiting.begin(), pdawaiting.end());
+            while(!pdawaiting.empty())
+            {
+                auto top = pdawaiting.back();
+                pdawaiting.pop_back();
+                if(accepting(top))
+                {
+                    // any label could really be on the top of the stack here
+                    // do first step of DES
+                    if(des_empty_accept)
+                    {
+                        out << "P" << top << "<_> --> DONE<_>\n";
+                    }
+                    for(auto ds : _des_stack.initial())
+                    {
+                        for(auto& e : ds->_edges)
+                        {
+                            if(!e.empty(_all_labels.size()))
+                            {
+                                out << "P" << top << "<DOT> --> D" << e._destination << "<>\n";
+                            }
+                            std::vector<nfastate_t*> next{e._destination};
+                            NFA<T>::follow_epsilon(next);
+                            if(!e._negated)
+                            {
+                                for(auto& s : e._symbols)
+                                {
+                                    for(auto n : next)
+                                    {
+                                        out << "P" << top << "<";
+                                        printer(out, s);
+                                        out << "> --> D" << n << "<>\n";
+                                    }
+                                }
+                            }
+                            else 
+                            {
+                                for(auto& s : _all_labels)
+                                {
+                                    auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), s);
+                                    if(lb != std::end(e._symbols) && *lb != s)
+                                    {
+                                        for(auto n : next)
+                                        {
+                                            out << "P" << top << "<";
+                                            printer(out, s);
+                                            out << "> --> D" << n << "<>\n";
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-            // PATH & NETWORK
-            // DESTRUCTION NFA
-            if(has_empty_accept)
-            {
-                for(auto& s : _des_stack.initial())
+                for(auto& r : rules(top))
                 {
-                    if(s->_accepting)
+                    out << "P" << top << "<";
+                    printer(out, r._pre);
+                    out << "> --> ";
+                    out << "P" << r._dest << "<";
+                    if(r._op == PUSH || r._op == SWAP)
+                        printer(out, r._op_label);
+                    if(r._op == PUSH)
                     {
-                        out << "I<_> --> DONE<_> \"empty\"\n";
-                        break;
+                        out << " ";
+                        printer(out, r._pre);
+                    }
+                    out << ">\n";
+                    out << "P" << top << "<DOT> --> ";
+                    out << "P" << r._dest << "<";
+                    if(r._op == PUSH || r._op == SWAP)
+                        printer(out, r._op_label);
+                    if(r._op == PUSH)
+                    {
+                        out << " ";
+                        printer(out, r._pre);
+                    }           
+                    out << ">\n";
+                    if(pdaseen.count(r._dest) == 0)
+                    {
+                        pdaseen.insert(r._dest);
+                        pdawaiting.push_back(r._dest);
                     }
                 }
             }
-
-            waiting.clear();
-            seen.clear();
+            
+            
+            // DESTRUCTION NFA
+            if(has_empty_accept && empty_accept() && des_empty_accept)
+            {
+                out << "I<_> --> DONE<_> \"empty\"\n";
+            }          
 
             std::vector<nfastate_t*> waiting_next = _des_stack.initial();
             std::unordered_set<nfastate_t*> seen_next(waiting_next.begin(), waiting_next.end());

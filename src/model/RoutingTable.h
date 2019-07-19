@@ -44,12 +44,14 @@ namespace mpls2pda {
         enum op_t {
             PUSH, POP, SWAP
         };
+        
+        using label_t = int64_t;
 
         struct action_t {
             op_t _op = POP;
-            int64_t _label = std::numeric_limits<int64_t>::min();
+            label_t _label = std::numeric_limits<label_t>::min();
             void print_json(std::ostream& s) const;
-            static void print_label(int64_t label, std::ostream& s, bool quoted = true);
+            static void print_label(label_t label, std::ostream& s, bool quoted = true);
         };
 
         struct forward_t {
@@ -62,14 +64,14 @@ namespace mpls2pda {
         };
 
         struct entry_t {
-            int64_t _top_label = std::numeric_limits<int64_t>::min();
+            label_t _top_label = std::numeric_limits<label_t>::min();
             bool _decreasing = false;
             std::vector<forward_t> _rules;
             bool operator==(const entry_t& other) const;
 
             bool operator<(const entry_t& other) const;
             void print_json(std::ostream&) const;
-            static void print_label(uint64_t label, std::ostream& s);
+            static void print_label(label_t label, std::ostream& s);
 
             bool is_interface() const {
                 return _top_label < 0;
@@ -83,11 +85,11 @@ namespace mpls2pda {
                 return _top_label > 0;
             }
 
-            int64_t as_mpls() const {
+            label_t as_mpls() const {
                 return _top_label - 1;
             }
 
-            int64_t as_interface() const {
+            label_t as_interface() const {
                 return -(_top_label + 1);
             }
         };

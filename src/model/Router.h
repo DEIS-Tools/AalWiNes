@@ -95,7 +95,7 @@ public:
     std::unique_ptr<char[] > interface_name(size_t i);
     void pair_interfaces();
     void print_json(std::ostream& s);
-    const std::vector<RoutingTable>& tables() {return _tables; }
+    const std::vector<RoutingTable>& tables() const {return _tables; }
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;

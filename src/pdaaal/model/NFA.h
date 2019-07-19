@@ -61,6 +61,11 @@ namespace pdaaal {
                 _destination->_backedges.emplace_back(source, id);
             };
             edge_t(const edge_t& other) = default;
+            bool empty(size_t n) const {
+                if(!_negated)
+                    return _symbols.empty();
+                return _symbols.size() != n;
+            }
             bool wildcard(size_t n) const {
                 if(_negated)
                     return _symbols.empty();
@@ -144,6 +149,8 @@ namespace pdaaal {
 
         NFA(bool initially_accepting = true) {
             _states.emplace_back(std::make_unique<state_t>(initially_accepting));
+            _accepting.push_back(_states.back().get());
+            _initial.push_back(_states.back().get());
         }
 
         NFA(std::unordered_set<T>&& initial_accepting, bool negated = false) {

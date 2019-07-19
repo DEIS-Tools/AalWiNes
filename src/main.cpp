@@ -17,10 +17,13 @@
 // Created by Peter G. Jensen
 //
 
-#include "model/Router.h"
 #include "utils/errors.h"
 #include "parser/QueryBuilder.h"
+
+#include "model/Router.h"
 #include "model/Network.h"
+#include "model/NetworkPDA.h"
+
 #include "parser/parsererrors.h"
 #include "pdaaal/model/PDA.h"
 
@@ -268,7 +271,7 @@ int main(int argc, const char** argv)
         
         for(auto& q : builder._result)
         {
-            PDA<Query::label_t> pda(q.construction(), q.destruction(), network.all_labels());
+            NetworkPDA pda(q, network);
             pda.print_moped(std::cout, [](std::ostream& o, const Query::label_t& l) {
                 RoutingTable::action_t::print_label(l, o, false);
             });

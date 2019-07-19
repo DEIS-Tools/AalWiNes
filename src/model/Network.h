@@ -42,6 +42,7 @@ public:
     Network& operator=(Network&&) = default;
     
     const Router* get_router(size_t id) const;
+    size_t size() const { return _routers.size(); }
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask);
     std::unordered_set<Query::label_t> ip_labels(filter_t& filter);
