@@ -61,6 +61,12 @@ namespace pdaaal {
                 _destination->_backedges.emplace_back(source, id);
             };
             edge_t(const edge_t& other) = default;
+            bool wildcard(size_t n) const {
+                if(_negated)
+                    return _symbols.empty();
+                else //if(!_negated)
+                    return _symbols.size() == n;
+            }
         };
         
         struct state_t {
