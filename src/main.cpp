@@ -269,7 +269,9 @@ int main(int argc, const char** argv)
         for(auto& q : builder._result)
         {
             PDA<Query::label_t> pda(q.construction(), q.destruction(), network.all_labels());
-            pda.print_moped(std::cout);
+            pda.print_moped(std::cout, [](std::ostream& o, const Query::label_t& l) {
+                RoutingTable::action_t::print_label(l, o, false);
+            });
         }
     }
     return 0;

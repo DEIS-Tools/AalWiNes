@@ -49,7 +49,7 @@ namespace mpls2pda {
             op_t _op = POP;
             int64_t _label = std::numeric_limits<int64_t>::min();
             void print_json(std::ostream& s) const;
-            static void print_label(int64_t label, std::ostream& s);
+            static void print_label(int64_t label, std::ostream& s, bool quoted = true);
         };
 
         struct forward_t {

@@ -48,7 +48,7 @@ namespace pdaaal {
             // we already know that we will have many more symbols than destinations
             bool _epsilon = false;
             bool _negated = false;
-            std::vector<T> _symbols;
+            const std::vector<T> _symbols;
             state_t* _destination;
             edge_t(bool negated, std::unordered_set<T>& symbols, state_t* dest, state_t* source, size_t id)
                     : _negated(negated), _symbols(symbols.begin(), symbols.end()), _destination(dest) 
@@ -59,8 +59,6 @@ namespace pdaaal {
                     : _epsilon(epsilon), _negated(!epsilon), _destination(dest) 
             {
                 _destination->_backedges.emplace_back(source, id);
-                if(_epsilon)
-                    source->_has_epsilon = true;
             };
             edge_t(const edge_t& other) = default;
         };
@@ -69,9 +67,71 @@ namespace pdaaal {
             std::vector<edge_t> _edges;
             std::vector<std::pair<state_t*,size_t>> _backedges;
             bool _accepting = false;
-            bool _has_epsilon = false;
             state_t(bool accepting) : _accepting(accepting) {};
             state_t(const state_t& other) = default;
+            bool has_non_epsilon() const 
+            {
+                for(auto& e : _edges)
+                {
+                    if(!e._negated && !e._symbols.empty())
+                        return true;
+                    else if(e._negated) return true;
+                }
+                return false;
+            }
+            std::vector<T> prelabels(const std::unordered_set<T>& all_labels) const
+            {
+                std::unordered_set<const state_t*> seen{this};
+                std::vector<const state_t*> waiting{this};
+                std::vector<T> labels;
+                while(!waiting.empty())
+                {
+                    auto s = waiting.back();
+                    waiting.pop_back();
+                    
+                    for(auto& e : s->_backedges)
+                    {
+                        if(seen.count(e.first) == 0)
+                        {
+                            seen.insert(e.first);
+                            waiting.push_back(e.first);
+                        }
+                        auto& edge = e.first->_edges[e.second];
+                        if(edge._negated)
+                        {
+                            if(edge._symbols.empty())
+                            {
+                                labels.clear();
+                                labels.insert(labels.end(), all_labels.begin(), all_labels.end());
+                                return labels;
+                            }
+                            else
+                            {
+                                for(auto& l : all_labels)
+                                {
+                                    auto lb = std::lower_bound(edge._symbols.begin(), edge._symbols.end(), l);
+                                    if(lb == std::end(edge._symbols) || *lb != l)
+                                    {
+                                        auto lb2 = std::lower_bound(labels.begin(), labels.end(), l);
+                                        if(lb2 == std::end(labels) || *lb2 != l)
+                                            labels.insert(lb2, l);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            for(auto l : edge._symbols)
+                            { // sorted, so we can optimize here of we want to 
+                                auto lb2 = std::lower_bound(labels.begin(), labels.end(), l);
+                                if(lb2 == std::end(labels) || *lb2 != l)
+                                    labels.insert(lb2, l);
+                            }
+                        }
+                    }
+                }
+                return labels;
+            }
         };
         
     public:
@@ -113,17 +173,21 @@ namespace pdaaal {
             {
                 auto s = waiting.back();
                 waiting.pop_back();
-                if(!s->_has_epsilon) continue;
                 for(auto& e : s->_edges)
                 {
                     if(e._epsilon)
                     {
                         auto lb = std::lower_bound(states.begin(), states.end(), e._destination);
                         if(lb == std::end(states) || *lb != e._destination)
+                        {
                             states.insert(lb, e._destination);
+                            waiting.push_back(e._destination);
+                        }
                     }
                 }
             }
+            auto res = std::remove_if(states.begin(), states.end(), [](const state_t* s){ return !(s->_accepting || s->has_non_epsilon());});
+            states.erase(res, states.end());
         }
         
         static std::vector<const state_t*> successor(std::vector<const state_t*>& states, const T& label)

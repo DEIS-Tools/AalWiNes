@@ -41,8 +41,8 @@ public:
     virtual ~Query() = default;
     Query& operator=(Query&&) = default;
     Query& operator=(const Query&) = default;
-    pdaaal::NFA<label_t> & construction() { return _poststack; }
-    pdaaal::NFA<label_t> & destruction() { return _prestack; }
+    pdaaal::NFA<label_t> & construction() { return _prestack; }
+    pdaaal::NFA<label_t> & destruction() { return _poststack; }
     pdaaal::NFA<label_t> & path() { return _path; }
     void print_dot(std::ostream& out);
 private:

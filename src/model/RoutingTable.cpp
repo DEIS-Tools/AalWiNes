@@ -340,9 +340,13 @@ void RoutingTable::action_t::print_json(std::ostream& s) const
     }
 }
 
-void RoutingTable::action_t::print_label(int64_t label, std::ostream& s)
+void RoutingTable::action_t::print_label(int64_t label, std::ostream& s, bool quoted)
 {
-    s << "\"l" << label << "\"";
+    if(quoted) s << "\"";
+    if(label == 0) s << "default";
+    else if(label < 0) s << "I" << (-(label+1));
+    else if(label > 0) s << "L" << (label-1);
+    if(quoted) s << "\"";
 }
 
 void RoutingTable::entry_t::print_json(std::ostream& s) const
