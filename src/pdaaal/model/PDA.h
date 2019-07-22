@@ -43,6 +43,7 @@ namespace pdaaal {
             T _pre;
             size_t _dest;
             T _op_label;
+            std::string _verbose;
         };
         
         using nfastate_t = typename NFA<T>::state_t;
@@ -64,6 +65,7 @@ namespace pdaaal {
         std::string print_moped(std::ostream& out, 
                 std::function<void(std::ostream&,const T&)> printer = [](auto& o, auto&e) { o << e; })
         {
+            _des_stack.to_dot(std::cerr);
             // CONSTRUCTION NFA
             out << "(I<_>)\n";
             bool has_empty_accept = false;
@@ -332,7 +334,9 @@ namespace pdaaal {
                     }
                     if(r._op == NOOP)
                         printer(out, r._pre);
-                    out << ">\n";
+                    out << ">";
+                    if(!r._verbose.empty()) out << " \"" << r._verbose << "\"";
+                    out << "\n";
                     out << "P" << top << "<DOT> --> ";
                     out << "P" << r._dest << "<";
                     if(r._op == PUSH || r._op == SWAP)
@@ -343,8 +347,10 @@ namespace pdaaal {
                         printer(out, r._pre);
                     }
                     if(r._op == NOOP)
-                        out << "DOT";
-                    out << ">\n";
+                        printer(out, r._pre);
+                    out << ">";
+                    if(!r._verbose.empty()) out << " \"" << r._verbose << "\"";
+                    out << "\n";
                     if(pdaseen.count(r._dest) == 0)
                     {
                         pdaseen.insert(r._dest);
@@ -402,9 +408,9 @@ namespace pdaaal {
                     else           for(auto& s : e._symbols) foreach(s);
                     if(some)
                     {
-                        out << "D" << top << "<DOT> --> D" << e._destination << "<>\n";
                         for(auto& s : next)
                         {
+                            out << "D" << top << "<DOT> --> D" << s << "<>\n";
                             if(seen_next.count(s) == 0)
                             {
                                 waiting_next.push_back(s);
@@ -414,44 +420,6 @@ namespace pdaaal {
                     }
                 }
             }
-            
-            /*            
-            
-            
-            out << "(s" << initial() << "<_>)\n";
-            for(auto s : states())
-            {
-                auto& state = (*this)[s];
-                
-                for(auto& r : rules(s))
-                {
-                    for(auto& p : (r._any ? all_labels() : r._pre))
-                    {
-                        out << "s" << s << "<l";
-                        printer(out, p);
-                        out << "> --> s" << r._dest << "<";
-                        if(r._op == SWAP)
-                        {
-                            printer(out, r._op_label);
-                        }
-                        if(r._op == PUSH)
-                        {
-                            printer(out, r._op_label);
-                            printer(out, p);
-                        }
-                        out << ">";
-                        tracer(out, state, r, p);
-                        out << "\n";
-                    }
-                    if(s == initial() && r._op == PUSH)
-                    {
-                        out << "s" << s << "<_> --> s" << r._dest << "<" << printer(out, r._op_label); << ">\n";
-                    }
-                }
-            }
-            std::stringstream ss;
-            ss << "s" << initial() << ":s" << accepting();
-            return ss.str();*/
             return "";
         }        
     protected:

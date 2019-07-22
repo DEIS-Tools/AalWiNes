@@ -34,8 +34,7 @@ namespace mpls2pda
         {
             std::vector<NFA::state_t*> next{state};
             NFA::follow_epsilon(next);
-            for(auto& n : next)
-            {
+            for (auto& n : next) {
                 auto res = add_state(n, router);
                 if (res.first)
                     _initial.push_back(res.second);
@@ -85,16 +84,16 @@ namespace mpls2pda
             auto& d = _states.get_data(res.second);
             d = op == -1 ? state->_accepting : false;
         }
-/*        if(res.first) std::cerr << "## NEW " << std::endl;
-        std::string rn;
-        if(router)
-            rn = router->name();
-        else
-            rn = "SINK";
-        std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
-        std::cerr << "\tID " << res.second << std::endl;
-        if(_states.get_data(res.second))
-            std::cerr << "\t\tACCEPTING !" << std::endl;*/
+        /*        if(res.first) std::cerr << "## NEW " << std::endl;
+                std::string rn;
+                if(router)
+                    rn = router->name();
+                else
+                    rn = "SINK";
+                std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
+                std::cerr << "\tID " << res.second << std::endl;
+                if(_states.get_data(res.second))
+                    std::cerr << "\t\tACCEPTING !" << std::endl;*/
 
         return res;
     }
@@ -118,56 +117,100 @@ namespace mpls2pda
         return _states.get_data(i);
     }
 
+    int32_t NetworkPDA::set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward)
+    {
+        auto num_fail = _query.number_of_failures();
+        auto err = std::numeric_limits<int32_t>::max();
+        switch (_query.approximation()) {
+        case Query::OVER:
+            if ((int)forward._weight > num_fail)
+                return err;
+            else
+                return 0;
+        case Query::UNDER:
+        {
+            auto nm = state._appmode + forward._weight;
+            if ((int)nm > num_fail)
+                return err;
+            else
+                return nm;
+        }
+        case Query::EXACT:
+
+        default:
+            return err;
+        }
+    }
+
     std::vector<NetworkPDA::PDA::rule_t> NetworkPDA::rules(size_t id)
     {
         nstate_t s;
         _states.unpack(id, (unsigned char*) &s);
         std::vector<NetworkPDA::PDA::rule_t> result;
         if (s._opid == -1) {
-            if(s._router == nullptr) return result;
+            if (s._router == nullptr) return result;
             // all clean! start pushing.
             for (auto& table : s._router->tables()) {
                 for (auto& entry : table.entries()) {
                     for (auto& forward : entry._rules) {
-                        if(forward._via == nullptr) continue; // drop/discard/lookup
+                        if (forward._via == nullptr) continue; // drop/discard/lookup
                         for (auto& e : s._nfastate->_edges) {
                             if (e.empty(_all_interfaces.size()))
                                 continue;
                             auto iid = reinterpret_cast<Query::label_t> (forward._via);
                             auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                             bool found = lb != std::end(e._symbols) && *lb == iid;
-                                 
+
                             if (found != (!e._negated)) {
-/*                                auto name = forward._via->source()->interface_name( forward._via->id());
-                                std::cerr << "IID " << iid << std::endl;
-                                std::cerr << "COLD NOT FIND " <<  forward._via->source()->name() << "." << name.get() << " (" << forward._via << ") " << " IN [\n";
-                                if(e._negated) std::cerr << "NEG" << std::endl;
-                                for(auto& n : e._symbols)
-                                {
-                                    Interface* inf = reinterpret_cast<Interface*>(n);
-                                    auto rn = inf->source()->interface_name(inf->id());
-                                    std::cerr << "\t" << inf->source()->name() << "." << rn.get() << " (" << inf << ")" << reinterpret_cast<ssize_t>(inf) << std::endl;
-                                }
-                                std::cerr << "];\n";
-                                std::cerr << std::endl;*/
-                            } else {
+                                /*                                auto name = forward._via->source()->interface_name( forward._via->id());
+                                                                std::cerr << "IID " << iid << std::endl;
+                                                                std::cerr << "COLD NOT FIND " <<  forward._via->source()->name() << "." << name.get() << " (" << forward._via << ") " << " IN [\n";
+                                                                if(e._negated) std::cerr << "NEG" << std::endl;
+                                                                for(auto& n : e._symbols)
+                                                                {
+                                                                    Interface* inf = reinterpret_cast<Interface*>(n);
+                                                                    auto rn = inf->source()->interface_name(inf->id());
+                                                                    std::cerr << "\t" << inf->source()->name() << "." << rn.get() << " (" << inf << ")" << reinterpret_cast<ssize_t>(inf) << std::endl;
+                                                                }
+                                                                std::cerr << "];\n";
+                                                                std::cerr << std::endl;*/
+                            }
+                            else {
                                 rule_t nr;
-                                nr._pre = entry._top_label;
-                                if(forward._ops.size() > 0)
+                                std::stringstream ss;
+                                auto name = forward._via->source()->interface_name( forward._via->id());
+                                ss << s._router->name() << "." << name.get() << " -- [";
+                                RoutingTable::entry_t::print_label(entry._top_label, ss, false);
+                                ss << "| ";
+                                for(auto& o : forward._ops)
                                 {
+                                    o.print_json(ss, false);
+                                    ss << " ";
+                                }
+                                ss << "]";
+                                ss << " --> ";
+                                if(forward._via != nullptr && forward._via->target() != nullptr) ss << forward._via->target()->name();
+                                else ss << "SINK";
+                                nr._verbose = ss.str();
+                                nr._pre = entry._top_label;
+                                auto appmode = s._appmode;
+                                if (!forward._via->is_virtual()) {
+                                    appmode = set_approximation(s, forward);
+                                    if (appmode == std::numeric_limits<int32_t>::max())
+                                        continue;
+                                }
+                                if (forward._ops.size() > 0) {
                                     switch (forward._ops[0]._op) {
                                     case RoutingTable::POP:
                                         nr._op = POP;
                                         assert(!entry.is_interface());
                                         break;
                                     case RoutingTable::PUSH:
-                                        if(entry.is_interface())
-                                        {
+                                        if (entry.is_interface()) {
                                             nr._op = SWAP;
-                                            nr._op_label = forward._ops[0]._label;                                            
+                                            nr._op_label = forward._ops[0]._label;
                                         }
-                                        else
-                                        {
+                                        else {
                                             nr._op = PUSH;
                                             nr._op_label = forward._ops[0]._label;
                                         }
@@ -179,40 +222,35 @@ namespace mpls2pda
                                         break;
                                     }
                                 }
-                                else
-                                {
+                                else {
                                     nr._op = NOOP;
                                 }
-                                if(forward._ops.size() <= 1)
-                                {
+                                if (forward._ops.size() <= 1) {
                                     std::vector<NFA::state_t*> next{e._destination};
-                                    if(forward._via->is_virtual())
+                                    if (forward._via->is_virtual())
                                         next = {s._nfastate};
                                     else
                                         NFA::follow_epsilon(next);
-                                    for(auto& n : next)
-                                    {
+                                    for (auto& n : next) {
                                         result.emplace_back(nr);
                                         auto& ar = result.back();
-                                        auto res = add_state(n, forward._via->target());
-                                        ar._dest = res.second;                                    
+                                        auto res = add_state(n, forward._via->target(), appmode);
+                                        ar._dest = res.second;
                                     }
                                 }
-                                else
-                                {
+                                else {
                                     std::vector<NFA::state_t*> next{e._destination};
-                                    if(forward._via->is_virtual())
+                                    if (forward._via->is_virtual())
                                         next = {s._nfastate};
                                     else
                                         NFA::follow_epsilon(next);
-                                    for(auto& n : next)
-                                    {
+                                    for (auto& n : next) {
                                         result.emplace_back(nr);
                                         auto& ar = result.back();
                                         auto tid = ((&table) - s._router->tables().data());
                                         auto eid = ((&entry) - table.entries().data());
                                         auto rid = ((&forward) - entry._rules.data());
-                                        auto res = add_state(n, s._router, s._appmode, tid, eid, rid, 0);
+                                        auto res = add_state(n, s._router, appmode, tid, eid, rid, 0);
                                         ar._dest = res.second;
                                     }
                                 }
@@ -222,17 +260,14 @@ namespace mpls2pda
                 }
             }
         }
-        else
-        {
+        else {
             auto& r = s._router->tables()[s._tid].entries()[s._eid]._rules[s._rid];
             result.emplace_back();
             auto& nr = result.back();
             auto& act = r._ops[s._opid + 1];
             nr._pre = s._router->tables()[s._tid].entries()[s._eid]._top_label;
-            for(auto pid = 0; pid <= s._opid; ++pid)
-            {
-                switch (r._ops[pid]._op)
-                {
+            for (auto pid = 0; pid <= s._opid; ++pid) {
+                switch (r._ops[pid]._op) {
                 case PUSH:
                 case SWAP:
                     nr._pre = r._ops[pid]._label;
@@ -241,12 +276,12 @@ namespace mpls2pda
                 default:
                     throw base_error("Unexpected pop!");
                     assert(false);
-                    
+
                 }
             }
             switch (act._op) {
             case RoutingTable::POP:
-                nr._op = POP; 
+                nr._op = POP;
                 throw base_error("Unexpected pop!");
                 assert(false);
                 break;
@@ -259,13 +294,11 @@ namespace mpls2pda
                 nr._op_label = act._label;
                 break;
             }
-            if(s._opid + 2 == (int)r._ops.size())
-            {
+            if (s._opid + 2 == (int) r._ops.size()) {
                 auto res = add_state(s._nfastate, r._via->target());
                 nr._dest = res.second;
             }
-            else
-            {
+            else {
                 auto res = add_state(s._nfastate, s._router, s._appmode, s._tid, s._eid, s._rid, s._opid + 1);
                 nr._dest = res.second;
             }

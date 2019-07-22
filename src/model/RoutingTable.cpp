@@ -26,6 +26,8 @@
 
 #include <algorithm>
 #include <sstream>
+#include <map>
+
 namespace mpls2pda
 {
 
@@ -124,11 +126,12 @@ namespace mpls2pda
                 throw base_error(e.str());
             }
             int cast = 0;
-
+            std::map<size_t, size_t> weights;
             do {
                 entry._rules.emplace_back();
                 auto& r = entry._rules.back();
                 r._weight = parse_weight(nh);
+                weights[r._weight] = 0;
                 auto ops = nh->first_node("nh-type");
                 bool skipvia = true;
                 rapidxml::xml_node<>* nhid = nullptr;
@@ -206,6 +209,19 @@ namespace mpls2pda
                 }
             }
             while ((nh = nh->next_sibling("nh")));
+            
+            // align weights of rules
+            size_t wcnt = 0;
+            for(auto& w : weights)
+            {
+                w.second = wcnt;
+                ++wcnt;
+            }
+            for(auto& r : entry._rules)
+            {
+                r._weight = weights[r._weight];
+            }
+            
             rule = rule->next_sibling("rt-entry");
         }
         std::sort(nr._entries.begin(), nr._entries.end());
@@ -319,21 +335,31 @@ namespace mpls2pda
         return _decreasing == other._decreasing && _top_label == other._top_label;
     }
 
-    void RoutingTable::action_t::print_json(std::ostream& s) const
+    void RoutingTable::action_t::print_json(std::ostream& s, bool quote ) const
     {
         switch (_op) {
         case SWAP:
-            s << "{\"swap\":";
-            print_label(_label, s);
+            s << "{";
+            if(quote) s << "\"";
+            s << "swap";
+            if(quote) s << "\"";
+            s << ":";
+            print_label(_label, s, quote);
             s << "}";
             break;
         case PUSH:
-            s << "{\"push\":";
-            print_label(_label, s);
+            s << "{";
+            if(quote) s << "\"";
+            s << "push";
+            if(quote) s << "\"";
+            s << ":";
+            print_label(_label, s, quote);
             s << "}";
             break;
         case POP:
-            s << "\"pop\"";
+            if(quote) s << "\"";
+            s << "pop";
+            if(quote) s << "\"";
             break;
         }
     }
@@ -361,16 +387,16 @@ namespace mpls2pda
         s << "\n\t]";
     }
 
-    void RoutingTable::entry_t::print_label(label_t label, std::ostream& s)
+    void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
     {
-        s << "\"";
+        if(quote) s << "\"";
         if (label == 0)
             s << "default";
         else if (label > 0)
             s << 'l' << (label - 1);
         else
             s << 'i' << ((label + 1)*-1);
-        s << "\"";
+        if(quote) s << "\"";
     }
 
     void RoutingTable::forward_t::print_json(std::ostream& s) const

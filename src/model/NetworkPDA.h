@@ -45,6 +45,7 @@ namespace mpls2pda
     private:
         void construct_initial();
         std::pair<bool,size_t> add_state(NFA::state_t* state, const Router* router, int32_t mode = 0, int32_t tid = 0, int32_t eid = 0, int32_t fid = 0, int32_t op = -1);
+        int32_t set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward);
         Network& _network;
         Query& _query;
         NFA& _path;

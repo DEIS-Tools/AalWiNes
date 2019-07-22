@@ -50,7 +50,7 @@ namespace mpls2pda {
         struct action_t {
             op_t _op = POP;
             label_t _label = std::numeric_limits<label_t>::min();
-            void print_json(std::ostream& s) const;
+            void print_json(std::ostream& s, bool quote = true) const;
             static void print_label(label_t label, std::ostream& s, bool quoted = true);
         };
 
@@ -71,7 +71,7 @@ namespace mpls2pda {
 
             bool operator<(const entry_t& other) const;
             void print_json(std::ostream&) const;
-            static void print_label(label_t label, std::ostream& s);
+            static void print_label(label_t label, std::ostream& s, bool quote = true);
 
             bool is_interface() const {
                 return _top_label < 0;

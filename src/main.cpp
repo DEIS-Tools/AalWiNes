@@ -275,15 +275,26 @@ int main(int argc, const char** argv)
             pda.print_moped(std::cout, [](std::ostream& o, const Query::label_t& l) {
                 RoutingTable::action_t::print_label(l, o, false);
             });
-/*            q.path().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
-                Interface* i = reinterpret_cast<Interface*>(label);
+            q.destruction().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
+                /*Interface* i = reinterpret_cast<Interface*>(label);
                 auto iname = i->source()->interface_name(i->id());
                 if(i->source())
                     s << i->source()->name();
                 else
                     s << "SINK";
-                s << "." << iname.get();
-            });*/
+                s << "." << iname.get();*/
+                RoutingTable::entry_t::print_label(label, s, true);
+            });
+            q.construction().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
+                /*Interface* i = reinterpret_cast<Interface*>(label);
+                auto iname = i->source()->interface_name(i->id());
+                if(i->source())
+                    s << i->source()->name();
+                else
+                    s << "SINK";
+                s << "." << iname.get();*/
+                RoutingTable::entry_t::print_label(label, s, true);
+            });
         }
     }
     return 0;

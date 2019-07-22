@@ -44,6 +44,8 @@ public:
     pdaaal::NFA<label_t> & construction() { return _prestack; }
     pdaaal::NFA<label_t> & destruction() { return _poststack; }
     pdaaal::NFA<label_t> & path() { return _path; }
+    mode_t approximation() const { return _mode; }
+    int number_of_failures() const { return _link_failures; }
     void print_dot(std::ostream& out);
 private:
     pdaaal::NFA<label_t> _prestack;
