@@ -333,8 +333,6 @@ void Interface::make_pairing(Router* parent)
         return;
     if (_target == parent)
         return;
-    if (_target->_interfaces.empty() && _target->_tables.empty())
-        return; // sink
     _matching = nullptr;
     for (auto& i : _target->_interfaces) {
         auto diff = std::max(i->_ip, _ip) - std::min(i->_ip, _ip);
@@ -365,12 +363,13 @@ void Interface::make_pairing(Router* parent)
         _matching->_matching = this;
     }
     else {
-        auto n = parent->interface_name(_id);
+        
         std::stringstream e;
-        e << "Could not find a pairing for interface " << n.get() << "(";
-        write_ip4(e, _ip);
-        e << ") of " << parent->name() << " in " << _target->name() << std::endl;
-        throw base_error(e.str());
+        auto n = parent->interface_name(_id);
+        e << _parent->name() << "." << n.get();
+        auto iface = _target->get_interface(e.str(), parent, 0);
+        _matching = iface;
+        iface->_matching = this;
     }
 }
 

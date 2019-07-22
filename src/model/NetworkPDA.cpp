@@ -84,16 +84,18 @@ namespace mpls2pda
         if (res.first) {
             auto& d = _states.get_data(res.second);
             d = op == -1 ? state->_accepting : false;
-/*            std::string rn;
-            if(router)
-                rn = router->name();
-            else
-                rn = "SINK";
-            std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
-            std::cerr << "ID " << res.second << std::endl;
-            if(d)
-                std::cerr << "\t\tACCEPTING !" << std::endl;*/
         }
+/*        if(res.first) std::cerr << "## NEW " << std::endl;
+        std::string rn;
+        if(router)
+            rn = router->name();
+        else
+            rn = "SINK";
+        std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
+        std::cerr << "\tID " << res.second << std::endl;
+        if(_states.get_data(res.second))
+            std::cerr << "\t\tACCEPTING !" << std::endl;*/
+
         return res;
     }
 
@@ -127,59 +129,93 @@ namespace mpls2pda
             for (auto& table : s._router->tables()) {
                 for (auto& entry : table.entries()) {
                     for (auto& forward : entry._rules) {
+                        if(forward._via == nullptr) continue; // drop/discard/lookup
                         for (auto& e : s._nfastate->_edges) {
                             if (e.empty(_all_interfaces.size()))
                                 continue;
                             auto iid = reinterpret_cast<Query::label_t> (forward._via);
                             auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                             bool found = lb != std::end(e._symbols) && *lb == iid;
-                            if (found == (!e._negated)) {
-                                result.emplace_back();
-                                auto& nr = result.back();
-                                nr._pre = entry._top_label;
-                                switch (forward._ops[0]._op) {
-                                case RoutingTable::POP:
-                                    nr._op = POP;
-                                    break;
-                                case RoutingTable::PUSH:
-                                    nr._op = PUSH;
-                                    nr._op_label = forward._ops[0]._label;
-                                    break;
-                                case RoutingTable::SWAP:
-                                    nr._op = SWAP;
-                                    nr._op_label = forward._ops[0]._label;
-                                    break;
+                                 
+                            if (found != (!e._negated)) {
+/*                                auto name = forward._via->source()->interface_name( forward._via->id());
+                                std::cerr << "IID " << iid << std::endl;
+                                std::cerr << "COLD NOT FIND " <<  forward._via->source()->name() << "." << name.get() << " (" << forward._via << ") " << " IN [\n";
+                                if(e._negated) std::cerr << "NEG" << std::endl;
+                                for(auto& n : e._symbols)
+                                {
+                                    Interface* inf = reinterpret_cast<Interface*>(n);
+                                    auto rn = inf->source()->interface_name(inf->id());
+                                    std::cerr << "\t" << inf->source()->name() << "." << rn.get() << " (" << inf << ")" << reinterpret_cast<ssize_t>(inf) << std::endl;
                                 }
-                                if(forward._ops.size() == 1)
+                                std::cerr << "];\n";
+                                std::cerr << std::endl;*/
+                            } else {
+                                rule_t nr;
+                                nr._pre = entry._top_label;
+                                if(forward._ops.size() > 0)
+                                {
+                                    switch (forward._ops[0]._op) {
+                                    case RoutingTable::POP:
+                                        nr._op = POP;
+                                        assert(!entry.is_interface());
+                                        break;
+                                    case RoutingTable::PUSH:
+                                        if(entry.is_interface())
+                                        {
+                                            nr._op = SWAP;
+                                            nr._op_label = forward._ops[0]._label;                                            
+                                        }
+                                        else
+                                        {
+                                            nr._op = PUSH;
+                                            nr._op_label = forward._ops[0]._label;
+                                        }
+                                        break;
+                                    case RoutingTable::SWAP:
+                                        nr._op = SWAP;
+                                        nr._op_label = forward._ops[0]._label;
+                                        assert(!entry.is_interface());
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    nr._op = NOOP;
+                                }
+                                if(forward._ops.size() <= 1)
                                 {
                                     std::vector<NFA::state_t*> next{e._destination};
-                                    NFA::follow_epsilon(next);
+                                    if(forward._via->is_virtual())
+                                        next = {s._nfastate};
+                                    else
+                                        NFA::follow_epsilon(next);
                                     for(auto& n : next)
                                     {
+                                        result.emplace_back(nr);
+                                        auto& ar = result.back();
                                         auto res = add_state(n, forward._via->target());
-                                        nr._dest = res.second;                                    
+                                        ar._dest = res.second;                                    
                                     }
                                 }
                                 else
                                 {
                                     std::vector<NFA::state_t*> next{e._destination};
-                                    NFA::follow_epsilon(next);
+                                    if(forward._via->is_virtual())
+                                        next = {s._nfastate};
+                                    else
+                                        NFA::follow_epsilon(next);
                                     for(auto& n : next)
                                     {
+                                        result.emplace_back(nr);
+                                        auto& ar = result.back();
                                         auto tid = ((&table) - s._router->tables().data());
                                         auto eid = ((&entry) - table.entries().data());
                                         auto rid = ((&forward) - entry._rules.data());
                                         auto res = add_state(n, s._router, s._appmode, tid, eid, rid, 0);
-                                        nr._dest = res.second;
+                                        ar._dest = res.second;
                                     }
                                 }
-                            }
-                            else
-                            {
-                                /*std::string name;
-                                if(forward._via && forward._via->target())
-                                    name = forward._via->target()->name();
-                                std::cerr << "NOT FOUND " << s._router->name() << " " << name << std::endl;*/
                             }
                         }
                     }

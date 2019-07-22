@@ -48,12 +48,13 @@ namespace pdaaal {
             // we already know that we will have many more symbols than destinations
             bool _epsilon = false;
             bool _negated = false;
-            const std::vector<T> _symbols;
+            std::vector<T> _symbols;
             state_t* _destination;
             edge_t(bool negated, std::unordered_set<T>& symbols, state_t* dest, state_t* source, size_t id)
                     : _negated(negated), _symbols(symbols.begin(), symbols.end()), _destination(dest) 
             {
                 _destination->_backedges.emplace_back(source, id);
+                std::sort(_symbols.begin(), _symbols.end());
             };
             edge_t(state_t* dest, state_t* source, size_t id, bool epsilon = false)
                     : _epsilon(epsilon), _negated(!epsilon), _destination(dest) 
@@ -64,7 +65,7 @@ namespace pdaaal {
             bool empty(size_t n) const {
                 if(!_negated)
                     return _symbols.empty();
-                return _symbols.size() != n;
+                return _symbols.size() == n;
             }
             bool wildcard(size_t n) const {
                 if(_negated)

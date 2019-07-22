@@ -160,7 +160,7 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
             }
             catch (base_error& ex) {
                 std::cerr << ex.what() << "\n";
-                std::cerr << "while parsing : " << std::get<0>(configs[i]) << std::endl;
+                std::cerr << "while parsing : " << std::get<1>(configs[i]) << std::endl;
                 stream.close();
                 exit(-1);
             }
@@ -275,6 +275,15 @@ int main(int argc, const char** argv)
             pda.print_moped(std::cout, [](std::ostream& o, const Query::label_t& l) {
                 RoutingTable::action_t::print_label(l, o, false);
             });
+/*            q.path().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
+                Interface* i = reinterpret_cast<Interface*>(label);
+                auto iname = i->source()->interface_name(i->id());
+                if(i->source())
+                    s << i->source()->name();
+                else
+                    s << "SINK";
+                s << "." << iname.get();
+            });*/
         }
     }
     return 0;

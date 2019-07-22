@@ -36,7 +36,7 @@ namespace pdaaal {
     template<typename T>
     class PDA {
     public:
-        enum op_t {PUSH, POP, SWAP };
+        enum op_t {PUSH, POP, SWAP, NOOP};
         struct rule_t
         {
             op_t _op = POP;
@@ -330,6 +330,8 @@ namespace pdaaal {
                         out << " ";
                         printer(out, r._pre);
                     }
+                    if(r._op == NOOP)
+                        printer(out, r._pre);
                     out << ">\n";
                     out << "P" << top << "<DOT> --> ";
                     out << "P" << r._dest << "<";
@@ -339,7 +341,9 @@ namespace pdaaal {
                     {
                         out << " ";
                         printer(out, r._pre);
-                    }           
+                    }
+                    if(r._op == NOOP)
+                        out << "DOT";
                     out << ">\n";
                     if(pdaseen.count(r._dest) == 0)
                     {
