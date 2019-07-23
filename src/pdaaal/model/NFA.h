@@ -115,6 +115,7 @@ namespace pdaaal {
                             {
                                 labels.clear();
                                 labels.insert(labels.end(), all_labels.begin(), all_labels.end());
+                                std::sort(labels.begin(), labels.end());
                                 return labels;
                             }
                             else

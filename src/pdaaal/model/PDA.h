@@ -39,6 +39,7 @@ namespace pdaaal {
         enum op_t {PUSH, POP, SWAP, NOOP};
         struct rule_t
         {
+            bool _allow_dot = true;
             op_t _op = POP;
             T _pre;
             size_t _dest;
@@ -274,6 +275,10 @@ namespace pdaaal {
                 {
                     // any label could really be on the top of the stack here
                     // do first step of DES
+                    if(top == 0)
+                    {
+                        std::cerr << "HELLO" << std::endl;
+                    }
                     if(des_empty_accept)
                     {
                         out << "P" << top << "<_> --> DONE<_>\n";
@@ -305,7 +310,7 @@ namespace pdaaal {
                                 for(auto& s : _all_labels)
                                 {
                                     auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), s);
-                                    if(lb != std::end(e._symbols) && *lb != s)
+                                    if(lb == std::end(e._symbols) || *lb != s)
                                     {
                                         for(auto n : next)
                                         {
@@ -337,20 +342,23 @@ namespace pdaaal {
                     out << ">";
                     if(!r._verbose.empty()) out << " \"" << r._verbose << "\"";
                     out << "\n";
-                    out << "P" << top << "<DOT> --> ";
-                    out << "P" << r._dest << "<";
-                    if(r._op == PUSH || r._op == SWAP)
-                        printer(out, r._op_label);
-                    if(r._op == PUSH)
+                    if(r._allow_dot)
                     {
-                        out << " ";
-                        printer(out, r._pre);
+                        out << "P" << top << "<DOT> --> ";
+                        out << "P" << r._dest << "<";
+                        if(r._op == PUSH || r._op == SWAP)
+                            printer(out, r._op_label);
+                        if(r._op == PUSH)
+                        {
+                            out << " ";
+                            printer(out, r._pre);
+                        }
+                        if(r._op == NOOP)
+                            printer(out, r._pre);
+                        out << ">";
+                        if(!r._verbose.empty()) out << " \"" << r._verbose << "\"";
+                        out << "\n";
                     }
-                    if(r._op == NOOP)
-                        printer(out, r._pre);
-                    out << ">";
-                    if(!r._verbose.empty()) out << " \"" << r._verbose << "\"";
-                    out << "\n";
                     if(pdaseen.count(r._dest) == 0)
                     {
                         pdaseen.insert(r._dest);

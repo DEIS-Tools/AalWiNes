@@ -84,7 +84,7 @@ namespace mpls2pda
             auto& d = _states.get_data(res.second);
             d = op == -1 ? state->_accepting : false;
         }
-        /*        if(res.first) std::cerr << "## NEW " << std::endl;
+                if(res.first) std::cerr << "## NEW " << std::endl;
                 std::string rn;
                 if(router)
                     rn = router->name();
@@ -93,7 +93,7 @@ namespace mpls2pda
                 std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
                 std::cerr << "\tID " << res.second << std::endl;
                 if(_states.get_data(res.second))
-                    std::cerr << "\t\tACCEPTING !" << std::endl;*/
+                    std::cerr << "\t\tACCEPTING !" << std::endl;
 
         return res;
     }
@@ -271,6 +271,7 @@ namespace mpls2pda
                 case PUSH:
                 case SWAP:
                     nr._pre = r._ops[pid]._label;
+                    nr._allow_dot = false;
                     break;
                 case POP:
                 default:

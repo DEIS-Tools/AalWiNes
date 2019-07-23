@@ -140,8 +140,30 @@ namespace mpls2pda {
     {
         std::unordered_set<Query::label_t> res;
         res.reserve(_label_map.size());
-        for(auto& l : _label_map)
-            res.insert(l.first);
+        for(auto& r : _routers)
+        {
+            for(auto& t : r->tables())
+            {
+                for(auto& e : t.entries())
+                {
+                    res.insert(e._top_label);
+                    for(auto& f : e._rules)
+                    {
+                        for(auto& o : f._ops)
+                        {
+                            switch(o._op)
+                            {
+                            case RoutingTable::SWAP:
+                            case RoutingTable::PUSH:
+                                res.insert(o._label);
+                            default:
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         return res;
     }
 
