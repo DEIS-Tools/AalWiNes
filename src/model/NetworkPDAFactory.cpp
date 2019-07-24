@@ -200,6 +200,7 @@ namespace mpls2pda
                             }
                             else {
                                 rule_t nr;
+                                /*
                                 std::stringstream ss;
                                 auto name = forward._via->source()->interface_name( forward._via->id());
                                 ss << s._router->name() << "." << name.get() << " -- [";
@@ -214,7 +215,7 @@ namespace mpls2pda
                                 ss << " --> ";
                                 if(forward._via != nullptr && forward._via->target() != nullptr) ss << forward._via->target()->name();
                                 else ss << "SINK";
-                                nr._verbose = ss.str();
+                                nr._verbose = ss.str();*/
                                 nr._pre = entry._top_label;
                                 auto appmode = s._appmode;
                                 if (!forward._via->is_virtual()) {

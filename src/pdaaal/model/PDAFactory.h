@@ -58,7 +58,6 @@ namespace pdaaal {
             T _pre;
             size_t _dest;
             T _op_label;
-            std::string _verbose;
         };
 
     public:

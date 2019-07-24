@@ -82,8 +82,8 @@ namespace pdaaal {
         };
         
         struct tos_t {
-            std::vector<T> _tos;
-            std::vector<T> _stack;
+            std::vector<T> _tos; // TODO: some symbolic representation would be better here
+            std::vector<T> _stack; // TODO: some symbolic representation would be better here
             bool _top_dot = false;
             bool _stack_dot = false;
             bool _in_waiting = false;
@@ -137,13 +137,18 @@ namespace pdaaal {
                     else
                     {
                         auto lid = _stack.begin();
-                        for(auto& symbol : prev._stack)
+                        auto pid = prev._stack.begin();
+                        while(pid != std::end(prev._stack))
                         {
-                            while(lid != _stack.end() && *lid < symbol) ++lid;
-                            if(lid != _stack.end() && *lid == symbol) continue;
-                            lid = _stack.insert(lid, symbol);
+                            while(lid != _stack.end() && *lid < *pid) ++lid;
+                            if(lid != _stack.end() && *lid == *pid) { ++pid; continue;}
+                            if(lid == _stack.end()) break;
+                            auto oid = pid;
+                            while(pid != std::end(prev._stack) && *pid < *lid) ++pid;
+                            lid = _stack.insert(lid, oid, pid);
                             changed = true;
-                        }                            
+                        }
+                        _stack.insert(lid, pid, std::end(prev._stack));
                     }
                 }   
                 return changed;
@@ -364,18 +369,14 @@ namespace pdaaal {
         
         std::pair<size_t, size_t> reduce(int aggresivity)
         {
-            size_t cnt = 0;
-            for(auto& s : _states)
-                cnt += s._rules.size();
+            size_t cnt = size();
 
             forwards_prune();
             backwards_prune();
             std::queue<size_t> waiting;            
             if(aggresivity == 0) 
             {
-                size_t after_cnt = 0;
-                for(auto& s : _states)
-                    after_cnt += s._rules.size();
+                size_t after_cnt = size();
                 return std::make_pair(cnt, after_cnt);
             }
             auto ds = (aggresivity == 2);
@@ -474,11 +475,30 @@ namespace pdaaal {
                 if(state._rules.empty())
                     state._pre.clear();
             }
-            size_t after_cnt = 0;
-            for(auto& s : _states)
-                after_cnt += s._rules.size();
+            size_t after_cnt = size();
             return std::make_pair(cnt, after_cnt);
-
+        }
+       
+        size_t size() const {
+            size_t count = 0;
+            for(auto& state : _states)
+            {
+                for(auto& rule : state._rules)
+                {
+                    if(rule._precondition._wildcard)
+                    {
+                        if(state._pre_is_dot)
+                            ++count;
+                        else
+                            count += _all_labels.size();
+                    }
+                    else
+                    {
+                        count += rule._precondition._labels.size();
+                    }
+                }
+            }
+            return count;
         }
         
         void print_moped(std::ostream& s, std::function<void(std::ostream&, const T&)> labelprinter = [](std::ostream& s, const T& label) {
@@ -683,7 +703,7 @@ namespace pdaaal {
             auto lb = std::lower_bound(rules.begin(), rules.end(), r);
             if(lb == std::end(rules) || *lb != r)
             {
-                lb = rules.insert(lb, r);
+                lb = rules.insert(lb, r); // TODO this is expensive. Use lists?
                 if(!is_dot || (op != PUSH && op != SWAP))
                     _states[to]._pre_is_dot = false;
             }
