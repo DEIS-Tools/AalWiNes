@@ -301,6 +301,65 @@ namespace pdaaal {
                 return changed;
             }
         };
+        
+        void forwards_prune() {
+            // lets do a forward/backward pruning first
+            std::queue<size_t> waiting;
+            std::vector<bool> seen(_states.size());
+            waiting.push(0);
+            seen[0] = true;
+            while(!waiting.empty())
+            {
+                // forward
+                auto el = waiting.front();
+                waiting.pop();
+                for(auto& r : _states[el]._rules)
+                {
+                    if(!seen[r._to])
+                    {
+                        waiting.push(r._to);
+                        seen[r._to] = true;
+                    }
+                }
+            }
+            for(size_t s = 0; s < _states.size(); ++s)
+            {
+                if(!seen[s])
+                {
+                    _states[s]._rules.clear();
+                    _states[s]._pre.clear();
+                }
+            }            
+        }
+        
+        void backwards_prune(){
+            std::queue<size_t> waiting;
+            std::vector<bool> seen(_states.size());
+            waiting.push(0);
+            seen[0] = true;
+            while(!waiting.empty())
+            {
+                // forward
+                auto el = waiting.front();
+                waiting.pop();
+                for(auto& s2 : _states[el]._pre)
+                {
+                    if(!seen[s2])
+                    {
+                        waiting.push(s2);
+                        seen[s2] = true;
+                    }
+                }
+            }
+            for(size_t s = 0; s < _states.size(); ++s)
+            {
+                if(!seen[s])
+                {
+                    _states[s]._rules.clear();
+                    _states[s]._pre.clear();
+                }
+            }
+        }
     public:
         
         std::pair<size_t, size_t> reduce(int aggresivity)
@@ -309,13 +368,18 @@ namespace pdaaal {
             for(auto& s : _states)
                 cnt += s._rules.size();
 
+            forwards_prune();
+            backwards_prune();
+            std::queue<size_t> waiting;            
             if(aggresivity == 0) 
             {
-                return std::make_pair(cnt, cnt);
+                size_t after_cnt = 0;
+                for(auto& s : _states)
+                    after_cnt += s._rules.size();
+                return std::make_pair(cnt, after_cnt);
             }
             auto ds = (aggresivity == 2);
             std::vector<tos_t> approximation(_states.size());
-            std::queue<size_t> waiting;
             
             // initialize
             for(auto& r : _states[0]._rules)
@@ -325,7 +389,6 @@ namespace pdaaal {
                 auto& ss = approximation[r._to];
                 if(!ss._in_waiting)
                 {
-                    std::cerr << "PUSH " << r._to << std::endl;
                     waiting.push(r._to);
                     ss._in_waiting = true;
                 }
@@ -344,8 +407,6 @@ namespace pdaaal {
             {
                 auto el = waiting.front();
                 waiting.pop();
-                std::cerr << "SAT " << el << std::endl;
-                std::cerr << waiting.size() << std::endl;
                 auto& ss = approximation[el];
                 ss._in_waiting = false;
                 auto& state = _states[el];
@@ -384,7 +445,6 @@ namespace pdaaal {
                         {
                             to._in_waiting = true;
                             waiting.push(fit->_to);
-                            std::cerr << "IPUSH " << fit->_to << std::endl;
                         }
                     }
                     ++fit;
@@ -396,18 +456,12 @@ namespace pdaaal {
             {
                 auto& app = approximation[i];
                 auto& state = _states[i];
-                if(app.empty_tos())
-                {
-                    state._pre.clear();
-                    state._rules.clear();
-                    continue;
-                }
                 size_t br = 0;
                 for(size_t r = 0; r < state._rules.size(); ++r)
                 {
                     // check rule
                     auto& rule = state._rules[r];
-                    if(rule._precondition.intersect(app, _all_labels))
+                    if(rule._to == 0 || rule._precondition.intersect(app, _all_labels))
                     {
                         if(br != r)
                         {
@@ -417,6 +471,8 @@ namespace pdaaal {
                     }
                 }
                 state._rules.resize(br);
+                if(state._rules.empty())
+                    state._pre.clear();
             }
             size_t after_cnt = 0;
             for(auto& s : _states)
@@ -735,7 +791,11 @@ namespace pdaaal {
             return !empty();
         }
         if(_wildcard)
+        {
             _labels = tos._tos;
+            if(_labels.empty())
+                _wildcard = tos._top_dot;
+        }
         else
         {
             auto fit = tos._tos.begin();
@@ -752,11 +812,11 @@ namespace pdaaal {
                 }
             }
             _labels.resize(bit);
+            _wildcard = _labels.size() == all_labels.size();
+            if(_wildcard)
+                _labels.clear();
         }
-        _wildcard = _labels.size() == all_labels.size();
-        if(_wildcard)
-            _labels.clear();
-        return empty();
+        return !empty();
     }
 }
 #endif /* PDA_H */

@@ -278,26 +278,6 @@ int main(int argc, const char** argv)
         for(auto& q : builder._result)
         {
             NetworkPDAFactory factory(q, network);
-            q.destruction().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
-                /*Interface* i = reinterpret_cast<Interface*>(label);
-                auto iname = i->source()->interface_name(i->id());
-                if(i->source())
-                    s << i->source()->name();
-                else
-                    s << "SINK";
-                s << "." << iname.get();*/
-                RoutingTable::entry_t::print_label(label, s, true);
-            });
-            q.construction().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
-                /*Interface* i = reinterpret_cast<Interface*>(label);
-                auto iname = i->source()->interface_name(i->id());
-                if(i->source())
-                    s << i->source()->name();
-                else
-                    s << "SINK";
-                s << "." << iname.get();*/
-                RoutingTable::entry_t::print_label(label, s, true);
-            });
             auto pda = factory.compile();
             auto res = pda.reduce(tos);
             std::cerr << "\tReduced (method " << tos << ") from " << res.first << " to " << res.second << " hyper-rules" << std::endl;

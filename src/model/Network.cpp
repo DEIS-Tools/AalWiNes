@@ -146,6 +146,7 @@ namespace mpls2pda {
             {
                 for(auto& e : t.entries())
                 {
+                    if(e.is_default()) continue;
                     res.insert(e._top_label);
                     for(auto& f : e._rules)
                     {
