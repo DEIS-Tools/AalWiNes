@@ -124,6 +124,31 @@ namespace pdaaal {
                 }                
             }
 
+            bool forward_stack(const tos_t& prev, const std::vector<T>& all_labels) {
+                bool changed = false;
+                if(prev._stack_dot && !_stack_dot) { _stack_dot = true; changed = true; }
+                if(_stack.size() != all_labels.size())
+                {
+                    if(prev._stack.size() == all_labels.size())
+                    {
+                        _stack = all_labels;
+                        changed = true;
+                    }
+                    else
+                    {
+                        auto lid = _stack.begin();
+                        for(auto& symbol : prev._stack)
+                        {
+                            while(lid != _stack.end() && *lid < symbol) ++lid;
+                            if(lid != _stack.end() && *lid == symbol) continue;
+                            lid = _stack.insert(lid, symbol);
+                            changed = true;
+                        }                            
+                    }
+                }   
+                return changed;
+            }
+            
             bool merge_pop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, bool expand_dot)
             {
                 if(!active(prev, rule, all_labels)) return false;
@@ -137,51 +162,75 @@ namespace pdaaal {
                 }
                 else
                 {
-                    assert(false);
+                    // move stack->stack
+                    changed |= forward_stack(prev, all_labels);
+                    // move stack -> TOS
+                    if(!_top_dot && prev._stack_dot)
+                    {
+                        changed = true;
+                        _top_dot = true;
+                    }
+                    if(_tos.size() != all_labels.size())
+                    {
+                        if(prev._stack.size() == all_labels.size())
+                        {
+                            _tos = all_labels;
+                            changed = true;
+                        }
+                        else
+                        {
+                            auto it = _tos.begin();
+                            for(auto s : prev._stack)
+                            {
+                                while(it != std::end(_tos) && *it < s) ++it;
+                                if(it != std::end(_tos) && *it == s) continue;
+                                it = _tos.insert(it, s);
+                                changed = true;
+                            }
+                        }
+                    }
                 }
                 fixup(all_labels);
                 return changed;
             }
-            
+
+           
             bool merge_noop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, bool expand_dot)
             {
                 if(rule._precondition.empty()) return false;
                 bool changed = false;
-                if(!dual_stack)
+                if(wildcard_top(all_labels)) 
                 {
-                    if(wildcard_top(all_labels)) 
+                    assert(_top_dot);
+                    return false;
+                }
+                if(prev.wildcard_top(all_labels) && rule._precondition._wildcard)
+                {
+                    changed = !_top_dot;
+                    _top_dot = true;
+                    if(expand_dot)
                     {
-                        assert(_top_dot);
-                        return false;
+                        _tos = all_labels;
                     }
-                    if(prev.wildcard_top(all_labels) && rule._precondition._wildcard)
-                    {
-                        changed = !_top_dot;
-                        _top_dot = true;
-                        if(expand_dot)
-                        {
-                            _tos = all_labels;
-                        }
-                        fixup(all_labels);
-                        return changed;
-                    }
-                    else
-                    {
-                        // one of them is not a wildcard
-                        auto iit = _tos.begin();
-                        for(auto& symbol : rule._precondition._wildcard ? prev._tos : rule._precondition._labels)
-                        {
-                            while(iit != _tos.end() && *iit < symbol) ++iit;
-                            if(iit != _tos.end() && *iit == symbol) { ++iit; continue; }
-                            changed = true;
-                            iit = _tos.insert(iit, symbol);
-                            ++iit;
-                        }
-                    }
+                    fixup(all_labels);
+                    return changed;
                 }
                 else
                 {
-                    assert(false);
+                    // one of them is not a wildcard
+                    auto iit = _tos.begin();
+                    for(auto& symbol : rule._precondition._wildcard ? prev._tos : rule._precondition._labels)
+                    {
+                        while(iit != _tos.end() && *iit < symbol) ++iit;
+                        if(iit != _tos.end() && *iit == symbol) { ++iit; continue; }
+                        changed = true;
+                        iit = _tos.insert(iit, symbol);
+                        ++iit;
+                    }
+                }
+                if(dual_stack)
+                {
+                    changed |= forward_stack(prev, all_labels);
                 }
                 fixup(all_labels);
                 return changed;
@@ -191,28 +240,26 @@ namespace pdaaal {
             {
                 if(!active(prev, rule, all_labels)) return false; // we know that there is a match!
                 bool changed = false;
-                if(!dual_stack)
+
+                if(rule._dot_label)
                 {
-                    if(rule._dot_label)
-                    {
-                        changed = !_top_dot;
-                        _top_dot = true;
-                        if(expand_dot)
-                            _tos = all_labels;
-                    }
-                    else
-                    {
-                        auto lb = std::lower_bound(_tos.begin(), _tos.end(), rule._op_label);
-                        if(lb == std::end(_tos) || *lb != rule._op_label)
-                        {
-                            changed = true;
-                            _tos.insert(lb, rule._op_label);
-                        }
-                    }
+                    changed = !_top_dot;
+                    _top_dot = true;
+                    if(expand_dot)
+                        _tos = all_labels;
                 }
                 else
                 {
-                    assert(false);
+                    auto lb = std::lower_bound(_tos.begin(), _tos.end(), rule._op_label);
+                    if(lb == std::end(_tos) || *lb != rule._op_label)
+                    {
+                        changed = true;
+                        _tos.insert(lb, rule._op_label);
+                    }
+                }
+                if(dual_stack)
+                {
+                    changed |= forward_stack(prev, all_labels);
                 }
                 fixup(all_labels);
                 return changed;                
@@ -220,16 +267,38 @@ namespace pdaaal {
             
             bool merge_push(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, bool expand_dot)
             {
-                if(!dual_stack)
+                // similar to swap!
+                bool changed = merge_swap(prev, rule, dual_stack, all_labels, expand_dot);
+                if(dual_stack)
                 {
-                    // similar to swap!
-                    return merge_swap(prev, rule, dual_stack, all_labels, expand_dot);
-                }
-                else
-                {
-                    assert(false);
+                    // but we also push all TOS labels down
+                    if(!_stack_dot && prev._top_dot)
+                    {
+                        changed = true;
+                        _stack_dot = true;
+                    }
+                    if(_stack.size() != all_labels.size())
+                    {
+                        if(prev._tos.size() == all_labels.size())
+                        {
+                            changed = true;
+                            _stack = all_labels;
+                        }
+                        else
+                        {
+                            auto it = _stack.begin();
+                            for(auto& s : prev._tos)
+                            {
+                                while(it != _stack.end() && *it < s) ++it;
+                                if(it != std::end(_stack) && *it == s) continue;
+                                it = _stack.insert(it, s);
+                                changed = true;
+                            }
+                        }
+                    }
                 }
                 fixup(all_labels);
+                return changed;
             }
         };
     public:
@@ -256,6 +325,7 @@ namespace pdaaal {
                 auto& ss = approximation[r._to];
                 if(!ss._in_waiting)
                 {
+                    std::cerr << "PUSH " << r._to << std::endl;
                     waiting.push(r._to);
                     ss._in_waiting = true;
                 }
@@ -272,8 +342,10 @@ namespace pdaaal {
             // saturate
             while(!waiting.empty())
             {
-                auto el = waiting.back();
+                auto el = waiting.front();
                 waiting.pop();
+                std::cerr << "SAT " << el << std::endl;
+                std::cerr << waiting.size() << std::endl;
                 auto& ss = approximation[el];
                 ss._in_waiting = false;
                 auto& state = _states[el];
@@ -312,6 +384,7 @@ namespace pdaaal {
                         {
                             to._in_waiting = true;
                             waiting.push(fit->_to);
+                            std::cerr << "IPUSH " << fit->_to << std::endl;
                         }
                     }
                     ++fit;

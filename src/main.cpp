@@ -204,13 +204,13 @@ int main(int argc, const char** argv)
 
     std::string query_file;
     bool dump_to_moped = false;
-    int approx = 1;
     unsigned int link_failures = 0;
+    size_t tos = 0;
     verification.add_options()
             ("query,q", po::value<std::string>(&query_file),
             "A file containing valid queries over the input network.")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
-            ("approximation,a", po::value<int>(&approx), "-1=under,0=exact,1=over")
+            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack")
             ("moped,m", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
             ;    
     
@@ -225,6 +225,12 @@ int main(int argc, const char** argv)
     if (vm.count("help")) {
         std::cout << opts << "\n";
         return 1;
+    }
+    
+    if(tos > 2)
+    {
+        std::cerr << "Unknown option for --tos-reduction : " << tos << std::endl;
+        exit(-1);
     }
     
     std::stringstream dummy;
@@ -293,8 +299,8 @@ int main(int argc, const char** argv)
                 RoutingTable::entry_t::print_label(label, s, true);
             });
             auto pda = factory.compile();
-            auto res = pda.reduce(1);
-            std::cerr << "Reduced from " << res.first << " to " << res.second << " hyper-rules" << std::endl;
+            auto res = pda.reduce(tos);
+            std::cerr << "\tReduced (method " << tos << ") from " << res.first << " to " << res.second << " hyper-rules" << std::endl;
             pda.print_moped(std::cout, [](std::ostream& s, Query::label_t label){
                 RoutingTable::entry_t::print_label(label, s, false);
             });
