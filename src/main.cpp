@@ -292,8 +292,10 @@ int main(int argc, const char** argv)
                 s << "." << iname.get();*/
                 RoutingTable::entry_t::print_label(label, s, true);
             });
-            auto r = factory.compile();
-            r.print_moped(std::cout, [](std::ostream& s, Query::label_t label){
+            auto pda = factory.compile();
+            auto res = pda.reduce(1);
+            std::cerr << "Reduced from " << res.first << " to " << res.second << " hyper-rules" << std::endl;
+            pda.print_moped(std::cout, [](std::ostream& s, Query::label_t label){
                 RoutingTable::entry_t::print_label(label, s, false);
             });
         }
