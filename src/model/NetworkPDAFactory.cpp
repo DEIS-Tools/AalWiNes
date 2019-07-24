@@ -1,23 +1,42 @@
+/* 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /*
  *  Copyright Peter G. Jensen, all rights reserved.
  */
 
 /* 
- * File:   NetworkPDA.cpp
+ * File:   NetworkPDAFactory.cpp
  * Author: Peter G. Jensen <root@petergjoel.dk>
  * 
  * Created on July 19, 2019, 6:26 PM
  */
 
-#include "NetworkPDA.h"
-#include "pdaaal/model/PDA.h"
+#include "NetworkPDAFactory.h"
+#include "pdaaal/model/PDAFactory.h"
 
 namespace mpls2pda
 {
 
-    NetworkPDA::NetworkPDA(Query& query, Network& network)
-    : PDA(query.construction(), query.destruction(), network.all_labels()), _network(network), _query(query), _path(query.path())
+    NetworkPDAFactory::NetworkPDAFactory(Query& query, Network& network)
+    : PDAFactory(query.construction(), query.destruction(), network.all_labels()), _network(network), _query(query), _path(query.path())
     {
+        // add special NULL state initially
+        NFA::state_t* ns = nullptr;
+        Router* nr = nullptr;
+        add_state(ns, nr);
         construct_initial();
         _path.compile();
         for (size_t i = 0; i < _network.size(); ++i) {
@@ -27,7 +46,7 @@ namespace mpls2pda
         }
     }
 
-    void NetworkPDA::construct_initial()
+    void NetworkPDAFactory::construct_initial()
     {
         // there is potential for some serious pruning here!
         auto add_initial = [&, this](NFA::state_t* state, const Router * router)
@@ -69,7 +88,7 @@ namespace mpls2pda
         }
     }
 
-    std::pair<bool, size_t> NetworkPDA::add_state(NFA::state_t* state, const Router* router, int32_t mode, int32_t table, int32_t eid, int32_t fid, int32_t op)
+    std::pair<bool, size_t> NetworkPDAFactory::add_state(NFA::state_t* state, const Router* router, int32_t mode, int32_t table, int32_t eid, int32_t fid, int32_t op)
     {
         nstate_t ns;
         ns._appmode = mode;
@@ -81,10 +100,14 @@ namespace mpls2pda
         ns._eid = eid;
         auto res = _states.insert((unsigned char*) &ns, sizeof (ns));
         if (res.first) {
-            auto& d = _states.get_data(res.second);
-            d = op == -1 ? state->_accepting : false;
+            if(res.second != 0)
+            {
+                // don't check null-state
+                auto& d = _states.get_data(res.second);
+                d = op == -1 ? state->_accepting : false;
+            }
         }
-                if(res.first) std::cerr << "## NEW " << std::endl;
+/*                if(res.first) std::cerr << "## NEW " << std::endl;
                 std::string rn;
                 if(router)
                     rn = router->name();
@@ -93,17 +116,17 @@ namespace mpls2pda
                 std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
                 std::cerr << "\tID " << res.second << std::endl;
                 if(_states.get_data(res.second))
-                    std::cerr << "\t\tACCEPTING !" << std::endl;
+                    std::cerr << "\t\tACCEPTING !" << std::endl;*/
 
         return res;
     }
 
-    const std::vector<size_t>& NetworkPDA::initial()
+    const std::vector<size_t>& NetworkPDAFactory::initial()
     {
         return _initial;
     }
 
-    bool NetworkPDA::empty_accept() const
+    bool NetworkPDAFactory::empty_accept() const
     {
         for (auto s : _path.initial()) {
             if (s->_accepting)
@@ -112,12 +135,12 @@ namespace mpls2pda
         return false;
     }
 
-    bool NetworkPDA::accepting(size_t i)
+    bool NetworkPDAFactory::accepting(size_t i)
     {
         return _states.get_data(i);
     }
 
-    int32_t NetworkPDA::set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward)
+    int32_t NetworkPDAFactory::set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward)
     {
         auto num_fail = _query.number_of_failures();
         auto err = std::numeric_limits<int32_t>::max();
@@ -142,11 +165,11 @@ namespace mpls2pda
         }
     }
 
-    std::vector<NetworkPDA::PDA::rule_t> NetworkPDA::rules(size_t id)
+    std::vector<NetworkPDAFactory::PDAFactory::rule_t> NetworkPDAFactory::rules(size_t id)
     {
         nstate_t s;
         _states.unpack(id, (unsigned char*) &s);
-        std::vector<NetworkPDA::PDA::rule_t> result;
+        std::vector<NetworkPDAFactory::PDAFactory::rule_t> result;
         if (s._opid == -1) {
             if (s._router == nullptr) return result;
             // all clean! start pushing.

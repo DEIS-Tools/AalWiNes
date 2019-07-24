@@ -91,6 +91,7 @@ namespace pdaaal {
                 }
                 return false;
             }
+            
             std::vector<T> prelabels(const std::unordered_set<T>& all_labels) const
             {
                 std::unordered_set<const state_t*> seen{this};

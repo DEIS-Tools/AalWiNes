@@ -1,9 +1,24 @@
+/* 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /*
  *  Copyright Peter G. Jensen, all rights reserved.
  */
 
 /* 
- * File:   NetworkPDA.h
+ * File:   NetworkPDAFactory.h
  * Author: Peter G. Jensen <root@petergjoel.dk>
  *
  * Created on July 19, 2019, 6:26 PM
@@ -14,15 +29,15 @@
 
 #include "Query.h"
 #include "Network.h"
-#include "pdaaal/model/PDA.h"
+#include "pdaaal/model/PDAFactory.h"
 
 
 namespace mpls2pda
 {
-    class NetworkPDA : public pdaaal::PDA<Query::label_t> {
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
-        using PDA = pdaaal::PDA<label_t>;
+        using PDA = pdaaal::PDAFactory<label_t>;
     private:        
         struct nstate_t {
             int32_t _appmode = 0; // mode of approximation
@@ -32,11 +47,10 @@ namespace mpls2pda
             int32_t _rid = 0;
             NFA::state_t* _nfastate;
             const Router* _router;
-            std::tuple<uint32_t,uint32_t,uint32_t> op2table() const;
-            void setop(uint32_t,uint32_t,uint32_t);
         };
     public:
-        NetworkPDA(Query& q, Network& network);
+        NetworkPDAFactory(Query& q, Network& network);
+    protected:
         const std::vector<size_t>& initial() override;
         bool empty_accept() const override;
         bool accepting(size_t) override;

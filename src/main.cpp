@@ -22,10 +22,10 @@
 
 #include "model/Router.h"
 #include "model/Network.h"
-#include "model/NetworkPDA.h"
+#include "model/NetworkPDAFactory.h"
 
 #include "parser/parsererrors.h"
-#include "pdaaal/model/PDA.h"
+#include "pdaaal/model/PDAFactory.h"
 
 #include <ptrie_map.h>
 
@@ -271,10 +271,7 @@ int main(int argc, const char** argv)
         
         for(auto& q : builder._result)
         {
-            NetworkPDA pda(q, network);
-            pda.print_moped(std::cout, [](std::ostream& o, const Query::label_t& l) {
-                RoutingTable::action_t::print_label(l, o, false);
-            });
+            NetworkPDAFactory factory(q, network);
             q.destruction().to_dot(std::cerr, [](std::ostream& s, Query::label_t label){
                 /*Interface* i = reinterpret_cast<Interface*>(label);
                 auto iname = i->source()->interface_name(i->id());
@@ -294,6 +291,10 @@ int main(int argc, const char** argv)
                     s << "SINK";
                 s << "." << iname.get();*/
                 RoutingTable::entry_t::print_label(label, s, true);
+            });
+            auto r = factory.compile();
+            r.print_moped(std::cout, [](std::ostream& s, Query::label_t label){
+                RoutingTable::entry_t::print_label(label, s, false);
             });
         }
     }
