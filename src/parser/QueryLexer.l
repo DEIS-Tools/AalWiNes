@@ -33,7 +33,7 @@
 using token = mpls2pda::Parser::token;
 %}
 
-%option noyywrap nounput batch debug noinput interactive c++
+%option noyywrap nounput batch noinput c++
 %option yyclass="mpls2pda::Scanner"
 %x comment
 

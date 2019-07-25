@@ -11,13 +11,14 @@ bison_target(bparser "parser/QueryParser.y" "${CMAKE_CURRENT_SOURCE_DIR}/parser/
 add_flex_bison_dependency(flexer bparser)
 
 
-find_package(Boost 1.66 COMPONENTS program_options regex REQUIRED)
+find_package(Boost 1.66 COMPONENTS program_options regex filesystem REQUIRED)
 include_directories(${Boost_INCLUDE_DIR} rapidxml)
 
 add_executable(mpls2pda ${HEADER_FILES} main.cpp 
     model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDAFactory.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} parser/QueryBuilder.cpp 
-    utils/parsing.cpp)
+    pdaaal/engine/Moped.cpp
+    utils/parsing.cpp utils/system.cpp)
 target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml ptrie)
 
 install(TARGETS mpls2pda

@@ -12,9 +12,14 @@
 #ifndef PDA_H
 #define PDA_H
 
-#include <vector>
+#include "utils/errors.h"
+
 #include <ptrie_map.h>
+
+#include <vector>
 #include <queue>
+#include <unordered_set>
+
 
 namespace pdaaal {
     template<typename T>
@@ -23,14 +28,13 @@ namespace pdaaal {
     template<typename T>
     class PDA {
     public:
-        using nfastate_t = typename NFA<T>::state_t;
         enum op_t {
             PUSH, 
             POP, 
             SWAP, 
             NOOP
         };
-    private:
+    public:
         struct tos_t;
         struct pre_t {
             bool _wildcard = false;
@@ -501,136 +505,14 @@ namespace pdaaal {
             return count;
         }
         
-        void print_moped(std::ostream& s, std::function<void(std::ostream&, const T&)> labelprinter = [](std::ostream& s, const T& label) {
-            s << "l" << label;
-        })
+        const std::vector<state_t>& states() const
         {
-            auto write_op = [&labelprinter](std::ostream& s, rule_t& rule, std::string noop)
-            {
-                assert(rule._to != 0);
-                switch(rule._operation)
-                {
-                    case SWAP:
-                        if(rule._dot_label)
-                            s << "DOT";
-                        else
-                        {
-                            labelprinter(s, rule._op_label);
-                        }
-                        break;
-                    case PUSH:
-                        if(rule._dot_label)
-                            s << "DOT ";
-                        else
-                        {
-                            labelprinter(s, rule._op_label);     
-                            s << " ";
-                        }
-                    case NOOP:
-                            s << noop;
-                        break;
-                    case POP:
-                    default:
-                        break;
-                }                
-            };
-
-            s << "(I<_>)\n";
-            // lets start by the initial transitions
-            auto& is = _states[0];
-            for(auto& r : is._rules)
-            {
-                if(r._to != 0)
-                {
-                    assert(r._operation == PUSH);
-                    s << "I<_> --> S" << r._to << "<";
-                    write_op(s, r, "_");
-                    s << ">\n";
-                }
-                else
-                {
-                    assert(r._op_label == NOOP);
-                    s << "I<_> --> D<_>\n";
-                    return;
-                }
-            }
-            for(size_t sid = 1; sid < _states.size(); ++sid)
-            {
-                state_t& state = _states[sid];
-                for(auto& r : state._rules)
-                {
-                    if(r._to == 0)
-                    {
-                        assert(r._operation == NOOP);
-                        s << "S" << sid << "<_> --> DONE<_>\n";
-                        continue;
-                    }
-                    if(r._precondition.empty()) continue;
-                    if(state._pre_is_dot && (r._precondition._wildcard || r._operation == POP || r._operation == SWAP))
-                    {
-                        // we can make a DOT -> DOT rule but only if both pre and post are "DOT" -- 
-                        // or as the case with POP and SWAP; TOS can be anything 
-                        s << "S" << sid << "<DOT> --> ";
-                        s << "S" << r._to;
-                        s << "<";
-                        write_op(s, r, "DOT");
-                        s << ">\n";
-                    }
-                    else if(state._pre_is_dot)
-                    {
-                        // we effectively settle the state of the DOT symbol here
-                        assert(!r._precondition._wildcard);
-                        for(auto& symbol : r._precondition._labels)
-                        {
-                            std::stringstream ss;
-                            labelprinter(ss, symbol);
-                            s << "S" << sid << "<DOT> --> ";
-                            s << "S" << r._to;
-                            s << "<";
-                            write_op(s, r, ss.str());
-                            s << ">\n";
-                        }
-                    }
-                    else
-                    {
-                        assert(!state._pre_is_dot);
-                        bool post_settle = false;
-                        auto& symbols = r._precondition._wildcard ? _all_labels : r._precondition._labels;
-                        for(auto& symbol : symbols)
-                        {
-                            std::stringstream ss;
-                            std::stringstream postss;
-                            labelprinter(ss, symbol);
-                            postss << " --> ";
-                            postss << "S" << r._to;
-                            postss << "<";
-                            write_op(postss, r, ss.str());
-                            postss << ">\n";
-                            s << "S" << sid << "<";
-                            labelprinter(s, symbol);
-                            s << ">" << postss.str();
-                            if(r._precondition._wildcard && (r._operation == NOOP || r._operation == POP || r._operation == PUSH))
-                            {
-                                // we do not need to settle the DOT yet
-                                post_settle = true;
-                            }
-                            else
-                            {
-                                // settle the DOT
-                                s << "S" << sid << "<DOT> " << postss.str();
-                            }
-                        }
-                        if(post_settle)
-                        {
-                            s << "S" << sid << "<DOT> --> ";
-                            s << "S" << r._to;
-                            s << "<";
-                            write_op(s, r, "DOT");
-                            s << ">\n";
-                        }
-                    }
-                }
-            }
+            return _states;
+        }
+        
+        const std::vector<T>& labelset() const
+        {
+            return _all_labels;
         }
         
     protected:
@@ -716,8 +598,6 @@ namespace pdaaal {
         }
 
         std::vector<state_t> _states;
-        std::vector<size_t> _initial;
-        std::vector<size_t> _accepting;
         std::vector<T> _all_labels;
 
     };

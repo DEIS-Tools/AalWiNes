@@ -222,8 +222,8 @@ name
     ;
 
 label
-    : number  { $$ = builder.find_label($1, 1); }
-    | number "/" number  { $$ = builder.find_label($1, $3); }
+    : number "/" number  { $$ = builder.find_label($1, $3); }
+    | number  { $$ = builder.find_label($1, 1); }
     | "ip" {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($3); }
     ;
     

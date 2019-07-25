@@ -26,6 +26,7 @@
 
 #include "parser/parsererrors.h"
 #include "pdaaal/model/PDAFactory.h"
+#include "pdaaal/engine/Moped.h"
 
 #include <ptrie_map.h>
 
@@ -190,11 +191,14 @@ int main(int argc, const char** argv)
     bool print_dot = false;
     bool dump_json = false;
     bool no_parser_warnings = false;
+    bool silent = false;
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
             ("json", po::bool_switch(&dump_json), "A json output will be printed to cout when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
-            ;
+            ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
+    ;
+
 
     std::string junos_config;
     input.add_options()
@@ -206,12 +210,16 @@ int main(int argc, const char** argv)
     bool dump_to_moped = false;
     unsigned int link_failures = 0;
     size_t tos = 0;
+    size_t engine = 0;
+    bool get_trace = false;
     verification.add_options()
             ("query,q", po::value<std::string>(&query_file),
             "A file containing valid queries over the input network.")
+            ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack")
-            ("moped,m", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
+            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
+            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=internal")
             ;    
     
     opts.add(input);
@@ -229,9 +237,17 @@ int main(int argc, const char** argv)
     
     if(tos > 2)
     {
-        std::cerr << "Unknown option for --tos-reduction : " << tos << std::endl;
+        std::cerr << "Unknown value for --tos-reduction : " << tos << std::endl;
         exit(-1);
     }
+    
+    if(engine > 2)
+    {
+        std::cerr << "Unknown value : " << engine << std::endl;
+        exit(-1);        
+    }
+
+    if(silent) no_parser_warnings = true;
     
     std::stringstream dummy;
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
@@ -257,34 +273,66 @@ int main(int argc, const char** argv)
         network.print_json(std::cout);
     }
 
-
     if(!query_file.empty())
     {
         Builder builder(network);
-        std::ifstream qstream(query_file);
-        if (!qstream.is_open()) {
-            std::cerr << "Could not open Query-file\"" << query_file << "\"" << std::endl;
-            exit(-1);
-        }
-        try {
-            builder.do_parse(qstream);
-        } 
-        catch(base_parser_error& error)
         {
-            std::cerr << "Error during parsing:\n" << error << std::endl;
-            exit(-1);
+            std::ifstream qstream(query_file);
+            if (!qstream.is_open()) {
+                std::cerr << "Could not open Query-file\"" << query_file << "\"" << std::endl;
+                exit(-1);
+            }
+            try {
+                builder.do_parse(qstream);
+                qstream.close();
+            } 
+            catch(base_parser_error& error)
+            {
+                std::cerr << "Error during parsing:\n" << error << std::endl;
+                exit(-1);
+            }
         }
         
+        size_t query_no = 0;
+        std::cout << "{\n";
         for(auto& q : builder._result)
         {
+            ++query_no;
             NetworkPDAFactory factory(q, network);
             auto pda = factory.compile();
-            auto res = pda.reduce(tos);
-            std::cerr << "\tReduced (method " << tos << ") from " << res.first << " to " << res.second << " rules" << std::endl;
-            pda.print_moped(std::cout, [](std::ostream& s, Query::label_t label){
+            auto reduction = pda.reduce(tos);
+            std::function<void(std::ostream&, const Query::label_t&) > labelprinter = [](std::ostream& s, const Query::label_t& label){
                 RoutingTable::entry_t::print_label(label, s, false);
-            });
+            };
+            if(dump_to_moped)
+            {
+                Moped::dump_pda(pda, std::cout, labelprinter);
+            }
+            if(engine == 1)
+            {
+                // moped
+                Moped moped;
+                auto result = moped.verify(pda, get_trace, labelprinter);
+                std::cout << "\t\"Q1\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
+                std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
+                if(get_trace && result)
+                {
+                    std::cout << ",\n\t\t\"trace\":[\n";
+//                    builder.write_trace(std::cout, moped.trace());                    
+                    std::cout << "\n\t\t]";
+                }
+                std::cout << "\n\t}";
+                if(query_no != builder._result.size())
+                    std::cout << ",";
+                std::cout << "\n";
+            }
+            else if(engine == 2)
+            {
+                // internal
+                throw base_error("Internal engine not yet implemented!");
+            }
         }
+        std::cout << "\n}" << std::endl;
     }
     return 0;
 }
