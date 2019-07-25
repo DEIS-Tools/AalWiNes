@@ -34,6 +34,10 @@ namespace pdaaal {
             SWAP, 
             NOOP
         };
+        struct tracestate_t {
+            size_t _pdastate = 0;
+            std::vector<std::pair<bool,T>> _stack;
+        };
     public:
         struct tos_t;
         struct pre_t {

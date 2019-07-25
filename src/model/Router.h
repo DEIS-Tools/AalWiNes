@@ -35,7 +35,7 @@
 namespace mpls2pda {
 class Interface {
 public:
-    Interface(size_t id, Router* target, uint32_t ip, Router* parent);
+    Interface(size_t id, size_t global_id, Router* target, uint32_t ip, Router* parent);
 
     Router* target() const {
         return _target;
@@ -52,15 +52,19 @@ public:
     size_t id() const {
         return _id;
     }
+    size_t global_id() const {
+        return _global_id;
+    }
     
     uint32_t ip4() const { return _ip; }
     uint64_t ip6() const { return _ip6; }
     
     void print_json(std::ostream&, const char* name) const;
-    void make_pairing(Router* parent);
+    void make_pairing(Router* parent, std::vector<const Interface*>& all_interfaces);
     Interface* match() const { return _matching; }
 private:
     size_t _id = std::numeric_limits<size_t>::max();
+    size_t _global_id = std::numeric_limits<size_t>::max();
     Router* _target = nullptr;
     Interface* _matching = nullptr;
     uint32_t _ip = 0; // two special values; unknown = uint32_t::max, virtual = 0
@@ -84,16 +88,16 @@ public:
     bool has_config() const {
         return _has_config;
     }
-    void parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::ostream& warnings);
-    void parse_routing(std::istream& data, std::istream& indirect, std::ostream& warnings);
+    void parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>&, std::ostream& warnings);
+    void parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>&, std::ostream& warnings);
     void print_dot(std::ostream& out);
     const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
-    Interface* get_interface(std::string iface, Router* expected = nullptr, uint32_t ip = std::numeric_limits<uint32_t>::max());
+    Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr, uint32_t ip = std::numeric_limits<uint32_t>::max());
     Interface* interface_no(size_t i) const {
         return _interfaces[i].get();
     }
     std::unique_ptr<char[] > interface_name(size_t i);
-    void pair_interfaces();
+    void pair_interfaces(std::vector<const Interface*>&);
     void print_json(std::ostream& s);
     const std::vector<RoutingTable>& tables() const {return _tables; }
 private:

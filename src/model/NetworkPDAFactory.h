@@ -37,7 +37,8 @@ namespace mpls2pda
     class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
-        using PDA = pdaaal::PDAFactory<label_t>;
+        using PDAFactory = pdaaal::PDAFactory<label_t>;
+        using PDA = pdaaal::PDA<label_t>;
     private:        
         struct nstate_t {
             int32_t _appmode = 0; // mode of approximation
@@ -50,6 +51,13 @@ namespace mpls2pda
         };
     public:
         NetworkPDAFactory(Query& q, Network& network);
+        
+        std::function<void(std::ostream&, const Query::label_t&) > label_writer() const;
+        
+        std::function<Query::label_t(const char*, const char*)> label_reader() const;
+        
+        void write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>&& trace);
+        
     protected:
         const std::vector<size_t>& initial() override;
         bool empty_accept() const override;
@@ -65,7 +73,6 @@ namespace mpls2pda
         NFA& _path;
         std::vector<size_t> _initial;
         ptrie::map<bool> _states;
-        std::vector<const Interface*> _all_interfaces;
     };
 }
 

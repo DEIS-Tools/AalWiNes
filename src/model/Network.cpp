@@ -27,8 +27,8 @@
 
 namespace mpls2pda {
 
-    Network::Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr<Router> >&& routers)
-    : _mapping(std::move(mapping)), _routers(std::move(routers))
+    Network::Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
+    : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
     {
         for(auto& r : _routers)
         {
@@ -156,7 +156,7 @@ namespace mpls2pda {
                             {
                             case RoutingTable::SWAP:
                             case RoutingTable::PUSH:
-                                res.insert(o._label);
+                                res.insert(o._op_label);
                             default:
                                 break;
                             }

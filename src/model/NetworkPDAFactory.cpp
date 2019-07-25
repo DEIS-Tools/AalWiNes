@@ -39,11 +39,6 @@ namespace mpls2pda
         add_state(ns, nr);
         construct_initial();
         _path.compile();
-        for (size_t i = 0; i < _network.size(); ++i) {
-            auto r = _network.get_router(i);
-            for (auto& i : r->interfaces())
-                _all_interfaces.push_back(i.get());
-        }
     }
 
     void NetworkPDAFactory::construct_initial()
@@ -64,7 +59,7 @@ namespace mpls2pda
             // the path is one behind, we are coming from an unknown router via an OK interface
             // i.e. we have to move straight to the next state
             for (auto& e : i->_edges) {
-                if (e.wildcard(_all_interfaces.size())) {
+                if (e.wildcard(_network.all_interfaces().size())) {
                     for (size_t r = 0; r < _network.size(); ++r) {
                         add_initial(e._destination, _network.get_router(r));
                     }
@@ -76,7 +71,7 @@ namespace mpls2pda
                     }
                 }
                 else {
-                    for (auto inf : _all_interfaces) {
+                    for (auto inf : _network.all_interfaces()) {
                         Query::label_t iid = reinterpret_cast<Query::label_t> (inf);
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                         if (lb == std::end(e._symbols) || *lb != iid) {
@@ -178,7 +173,7 @@ namespace mpls2pda
                     for (auto& forward : entry._rules) {
                         if (forward._via == nullptr) continue; // drop/discard/lookup
                         for (auto& e : s._nfastate->_edges) {
-                            if (e.empty(_all_interfaces.size()))
+                            if (e.empty(_network.all_interfaces().size()))
                                 continue;
                             auto iid = reinterpret_cast<Query::label_t> (forward._via);
                             auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
@@ -232,21 +227,49 @@ namespace mpls2pda
                                     case RoutingTable::PUSH:
                                         if (entry.is_interface()) {
                                             nr._op = SWAP;
-                                            nr._op_label = forward._ops[0]._label;
+                                            nr._op_label = forward._ops[0]._op_label;
                                         }
                                         else {
                                             nr._op = PUSH;
-                                            nr._op_label = forward._ops[0]._label;
+                                            assert(forward._ops[0]._op_label >= 0);
+                                            nr._op_label = forward._ops[0]._op_label;
                                         }
                                         break;
                                     case RoutingTable::SWAP:
                                         nr._op = SWAP;
-                                        nr._op_label = forward._ops[0]._label;
+                                        nr._op_label = forward._ops[0]._op_label;
                                         assert(!entry.is_interface());
                                         break;
                                     }
                                 }
                                 else {
+/*                                    std::stringstream ss;
+                                    if(nr._pre < 0)
+                                    {
+                                        auto ino = (nr._pre + 1) * -1;
+                                        const Interface* inf = _network.all_interfaces()[ino];
+                                        ss << "Cannot forward interface-label on ";
+                                        if(inf->source())
+                                            ss << inf->source()->name();
+                                        else
+                                            ss << "SINK";
+                                        ss << "\n";
+                                        ss << "Routing-table: " << table.name() << "\n";
+                                        if(inf->source())
+                                        {
+                                            ss << "\n";
+                                            auto iname = inf->source()->interface_name(inf->id());
+                                            ss << "Interface : ";
+                                            inf->print_json(ss, iname.get());
+                                        }
+                                        else if(inf->target())
+                                        {
+                                            std::cerr << "TARGET " << inf->target()->name() << "\n";
+                                        }
+                                        entry.print_json(ss);
+                                        throw base_error(ss.str());
+                                    }*/
+                                    // Probably shouldnt happen?
                                     nr._op = NOOP;
                                 }
                                 if (forward._ops.size() <= 1) {
@@ -294,8 +317,7 @@ namespace mpls2pda
                 switch (r._ops[pid]._op) {
                 case PUSH:
                 case SWAP:
-                    nr._pre = r._ops[pid]._label;
-                    nr._allow_dot = false;
+                    nr._pre = r._ops[pid]._op_label;
                     break;
                 case POP:
                 default:
@@ -312,11 +334,11 @@ namespace mpls2pda
                 break;
             case RoutingTable::PUSH:
                 nr._op = PUSH;
-                nr._op_label = act._label;
+                nr._op_label = act._op_label;
                 break;
             case RoutingTable::SWAP:
                 nr._op = SWAP;
-                nr._op_label = act._label;
+                nr._op_label = act._op_label;
                 break;
             }
             if (s._opid + 2 == (int) r._ops.size()) {
@@ -329,5 +351,154 @@ namespace mpls2pda
             }
         }
         return result;
+    }
+
+    void NetworkPDAFactory::write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>&& trace)
+    {
+        bool first = true;
+        for(size_t sno = 0; sno < trace.size(); ++sno)
+        {
+            auto& step = trace[sno];
+            if(step._pdastate < _num_pda_states)
+            {
+                // handle, lookup right states
+                nstate_t s;
+                _states.unpack(step._pdastate, (unsigned char*) &s);
+                if(s._opid != -1)
+                {
+                    // Skip, we are just doing a bunch of ops here, printed elsewhere.
+                }
+                else
+                {
+                    if(!first)
+                        stream << ",\n";
+                    stream << "\t\t\t{\"router\":\"" << s._router->name() << "\",\"stack\":[";
+                    bool first_symbol = true;
+                    for(auto& symbol : step._stack)
+                    {
+                        if(!first_symbol)
+                            stream << ",";
+                        if(symbol.first)
+                            stream << "\".\"";
+                        else 
+                            RoutingTable::entry_t::print_label(symbol.second, stream, true);
+                        first_symbol = false;
+                    }                    
+                    stream << "]}";
+                    if(sno != trace.size() - 1 && trace[sno + 1]._pdastate < _num_pda_states)
+                    {
+                        stream << ",\n\t\t\t";
+                        // peek at next element, we want to write the ops here
+                        nstate_t next;
+                        _states.unpack(trace[sno + 1]._pdastate, (unsigned char*)&next);
+                        if(next._opid != -1)
+                        {
+                            // we get the rule we use, print
+                            stream << "{\"pre\":";
+                            auto& entry  = s._router->tables()[next._tid].entries()[next._eid];
+                            if(entry._top_label < 0)
+                            {
+                                auto inf = _network.all_interfaces()[entry.as_interface()];
+                                auto iname = inf->source()->interface_name(inf->id());
+                                stream << "\"" << iname.get() << "\"";
+                            }
+                            else
+                            {
+                                RoutingTable::entry_t::print_label(entry._top_label, stream, true);
+                            }
+                            stream << ",rule\":";
+                            auto& rule = entry._rules[next._rid];
+                            rule.print_json(stream);
+                            stream << "}";
+                        }
+                        else
+                        {
+                            // we have to guess which rule we used!
+                            // run through the rules and find a match!
+                            /*for(auto& table : s._router->tables())
+                            {
+                                for(auto& entry : table.entries())
+                                {
+                                    if(!step._stack.front().first && step._stack.front().second = entry._top_label)
+                                        continue; // not matching on pre
+                                    for(auto& r : entry._rules)
+                                    {
+                                        if(r._weight <= _query.number_of_failures()) // TODO, fix for approximations here!
+                                        {
+                                            if(r._ops.size() > 1) continue; // would have been handled in other case
+                                            if(r._via->target() == next._router)
+                                            {
+                                                if(r._ops.empty())
+                                                {
+                                                    if()
+                                                    // NOOP
+                                                }
+                                                else
+                                                {
+                                                    switch()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }*/
+                            stream << "[GUESS]";
+                        }
+                    }
+                    first = false;                    
+                }
+            }
+            else
+            {
+                // construction, destruction, BORRING!
+                // SKIP
+            }
+        }
+    }
+    
+    std::function<void(std::ostream&, const Query::label_t&) > NetworkPDAFactory::label_writer() const
+    {
+        return [](std::ostream& s, const Query::label_t & label)
+        {
+            RoutingTable::entry_t::print_label(label, s, false);
+        };
+    }
+    
+    std::function<Query::label_t(const char*, const char*) > NetworkPDAFactory::label_reader() const
+    {
+        return [this](const char* from, const char* to)
+        {
+            if(to <= from)
+                throw base_error("Cannot parse empty string");
+            if(*from == 'l')
+            {
+                ++from;
+                auto l = strtoll(from, (char**)&to, 10);
+                auto rl = Query::label_t{l + 1};
+                if(_all_labels.count(rl) != 1)
+                {
+                    std::stringstream e;
+                    e << "Unknown label: " << l;
+                    throw base_error(e.str());
+                }
+                return rl;
+            }
+            else if(*from == 'i')
+            {
+                auto i = strtoll(from, (char**)&to, 10);
+                if((size_t)i >= _network.all_interfaces().size())
+                {
+                    std::stringstream e;
+                    e << "Unknown interface ID: " << i;
+                    throw base_error(e.str());
+                }
+                return Query::label_t{(i+1)*-1};
+            }
+            else
+            {
+                throw base_error("Unknown label");
+            }
+            return Query::label_t{0};
+        };
     }
 }

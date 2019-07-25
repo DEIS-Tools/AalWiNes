@@ -45,7 +45,7 @@ const std::string& Router::name() const
     return _names.back();
 }
 
-void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::ostream& warnings)
+void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings)
 {
     rapidxml::xml_document<> doc;
     std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
@@ -154,7 +154,7 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
             const char* str = nullptr;
             if(auto ip = n->first_node("ip-address"))
                 str = ip->value();
-            auto res = get_interface(iface, next, parse_ip4(str));
+            auto res = get_interface(all_interfaces, iface, next, parse_ip4(str));
             if (res == nullptr) {
                 std::stringstream e;
                 e << "Could not find interface " << iface << std::endl;
@@ -170,7 +170,7 @@ void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Rou
     }
 }
 
-Interface* Router::get_interface(std::string iface, Router* expected, uint32_t ip)
+Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected, uint32_t ip)
 {
     for (size_t i = 0; i < iface.size(); ++i) {
         if (iface[i] == ' ') {
@@ -194,12 +194,14 @@ Interface* Router::get_interface(std::string iface, Router* expected, uint32_t i
     auto iid = _interfaces.size();
     if (expected == this)
         ip = 0;
-    _interfaces.emplace_back(std::make_unique<Interface>(iid, expected, ip, this));
+    auto gid = all_interfaces.size();
+    _interfaces.emplace_back(std::make_unique<Interface>(iid, gid, expected, ip, this));
+    all_interfaces.emplace_back(_interfaces.back().get());
     _interface_map.get_data(res.second) = _interfaces.back().get();
     return _interfaces.back().get();
 }
 
-void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostream& warnings)
+void Router::parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>& all_interfaces, std::ostream& warnings)
 {
     rapidxml::xml_document<> doc;
     std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
@@ -304,7 +306,7 @@ void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostr
         }
         while (n) {
             try {
-                _tables.emplace_back(RoutingTable::parse(n, indir, this, warnings));
+                _tables.emplace_back(RoutingTable::parse(n, indir, this, all_interfaces, warnings));
             }
             catch (base_error& ex) {
                 std::stringstream e;
@@ -321,11 +323,11 @@ void Router::parse_routing(std::istream& data, std::istream& indirect, std::ostr
     }
 }
 
-Interface::Interface(size_t id, Router* target, uint32_t ip, Router* parent) : _id(id), _target(target), _ip(ip), _parent(parent)
+Interface::Interface(size_t id, size_t global_id, Router* target, uint32_t ip, Router* parent) : _id(id), _global_id(global_id), _target(target), _ip(ip), _parent(parent)
 {
 }
 
-void Interface::make_pairing(Router* parent)
+void Interface::make_pairing(Router* parent, std::vector<const Interface*>& all_interfaces)
 {
     if (_matching != nullptr)
         return;
@@ -367,16 +369,16 @@ void Interface::make_pairing(Router* parent)
         std::stringstream e;
         auto n = parent->interface_name(_id);
         e << _parent->name() << "." << n.get();
-        auto iface = _target->get_interface(e.str(), parent, 0);
+        auto iface = _target->get_interface(all_interfaces, e.str(), parent, 0);
         _matching = iface;
         iface->_matching = this;
     }
 }
 
-void Router::pair_interfaces()
+void Router::pair_interfaces(std::vector<const Interface*>& interfaces)
 {
     for (auto& i : _interfaces)
-        i->make_pairing(this);
+        i->make_pairing(this, interfaces);
 }
 
 void Router::print_dot(std::ostream& out)

@@ -17,6 +17,8 @@
 #include <cassert>
 #include <sstream>
 #include <fstream>
+#include <functional>
+#include <vector>
 
 namespace pdaaal {
 
@@ -31,11 +33,15 @@ namespace pdaaal {
         
         template<typename T>
         static void dump_pda(const PDA<T>& pda, std::ostream& s, std::function<void(std::ostream&, const T&) > labelprinter);
+        
+        template<typename T>
+        std::vector<typename PDA<T>::tracestate_t> get_trace(std::function<T(const char*, const char*)> label_reader) const;
+        
     private:
         bool parse_result(const std::string&, bool build_trace);
         std::string _path;
         std::string _tmpfilepath;
-        std::vector<size_t> _trace;
+        std::vector<std::string> _raw_trace;
         // trace?
     };
 
@@ -47,6 +53,105 @@ namespace pdaaal {
         dump_pda(pda, file, labelprinter);
         file.close();
         return verify(_tmpfilepath, build_trace);
+    }
+    
+    template<typename T>
+    std::vector<typename PDA<T>::tracestate_t> Moped::get_trace(std::function<T(const char*, const char*)> label_reader) const
+    {
+        using tracestate_t = typename PDA<T>::tracestate_t;
+        std::vector<tracestate_t> trace;
+        std::stringstream error;
+        for(size_t sid = 0; sid < _raw_trace.size(); ++sid)
+        {
+            auto& s = _raw_trace[sid];
+            std::cerr << s << std::endl;
+            if(s[0] != 'S')
+            {
+                error << "Could not find state in trace-line : " << s;
+                throw base_error(error.str());                
+            }
+            const char* fit = s.c_str();
+            ++fit; // skip 'S'
+            const char* lit = fit;
+            trace.emplace_back();
+            trace.back()._pdastate = std::strtoll(fit, (char**)&lit, 10);
+            fit = lit;
+            
+            while(*fit != '<' && *fit != '\n') ++fit;
+            if(*fit != '<')
+            {
+                error << "Expected '<' to start stack after state: " << s;
+                throw base_error(error.str());     
+            }
+            ++fit;
+            while(true)
+            {
+                if(*fit != '\n')
+                {
+                    lit = fit;
+                    while(*fit != '\0' && *fit != ' ' && *fit != '_') ++fit;
+                    if(*fit == '_')
+                    {
+                        if(*(fit+1) != '>')
+                        {
+                            error << "Unexpected end of stack, expected '_>' : " << s;
+                            throw base_error(error.str());
+                        }
+                        else if(*(fit-1) == ' ')
+                        {
+                            // just the end of this stack!
+                            break;
+                        }
+                        else if(sid != (_raw_trace.size() - 1))
+                        {
+                            error << "Unexpected end of trace at line " << sid << " : " << s << std::endl;
+                            error << "Still on stack : \n";
+                            for(++sid; sid < _raw_trace.size(); ++sid)
+                                error << "\t\"" << _raw_trace[sid] << "\"\n";
+                            throw base_error(error.str());                        
+                        }
+                        else
+                        {
+                            // end of trace (and stack)
+                            break;
+                        }
+                    }
+                    else if(*fit == ' ')
+                    {
+                        if(lit == fit)
+                        {
+                            // just whitespace, skip!
+                            ++fit;
+                            ++lit;
+                        }
+                        else
+                        {
+                            assert(fit > lit);
+                            if((fit - lit) == 3 && strncmp(lit, "DOT", 3) == 0)
+                            {
+                                trace.back()._stack.emplace_back(true, 0);
+                            }
+                            else
+                            {
+                                trace.back()._stack.emplace_back(false, label_reader(lit, fit));                                
+                            }
+                        }
+                        continue;
+                    }
+                    else if(*fit == '\0')
+                    {
+                        error << "Unexpected end of line: " << s;
+                        throw base_error(error.str());
+                    }
+                }
+                else
+                {
+                    error << "Unexpected end of line: " << s;
+                    throw base_error(error.str());                                    
+                }
+            }
+        }
+        return trace;
     }
     
     template<typename T>

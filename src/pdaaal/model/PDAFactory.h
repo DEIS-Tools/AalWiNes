@@ -53,7 +53,6 @@ namespace pdaaal {
     protected:
 
         struct rule_t {
-            bool _allow_dot = true;
             op_t _op = POP;
             T _pre;
             size_t _dest;

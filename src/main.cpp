@@ -42,6 +42,7 @@ namespace po = boost::program_options;
 using namespace mpls2pda;
 using namespace pdaaal;
 void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
+                 std::vector<const Interface*>& interfaces,
                  ptrie::map<Router*>& mapping,
                  const std::string& network,
                  std::ostream& warnings)
@@ -133,7 +134,7 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                 exit(-1);
             }
             try {
-                routers[i]->parse_adjacency(stream, routers, mapping, warnings);
+                routers[i]->parse_adjacency(stream, routers, mapping, interfaces, warnings);
             }
             catch (base_error& ex) {
                 std::cerr << ex.what() << "\n";
@@ -157,7 +158,7 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                 id.open(std::get<2>(configs[i]));
             }
             try {
-                routers[i]->parse_routing(stream, id, warnings);
+                routers[i]->parse_routing(stream, id, interfaces, warnings);
             }
             catch (base_error& ex) {
                 std::cerr << ex.what() << "\n";
@@ -192,11 +193,14 @@ int main(int argc, const char** argv)
     bool dump_json = false;
     bool no_parser_warnings = false;
     bool silent = false;
+    bool dump_to_moped = false;
+
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
             ("json", po::bool_switch(&dump_json), "A json output will be printed to cout when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
+            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
     ;
 
 
@@ -207,7 +211,6 @@ int main(int argc, const char** argv)
             ;    
 
     std::string query_file;
-    bool dump_to_moped = false;
     unsigned int link_failures = 0;
     size_t tos = 0;
     size_t engine = 0;
@@ -218,7 +221,6 @@ int main(int argc, const char** argv)
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack")
-            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=internal")
             ;    
     
@@ -243,8 +245,28 @@ int main(int argc, const char** argv)
     
     if(engine > 2)
     {
-        std::cerr << "Unknown value : " << engine << std::endl;
+        std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
+    }
+    
+    if(engine != 0 && dump_to_moped)
+    {
+        std::cerr << "Cannot both verify (--engine > 0) and dump model (--dump-for-moped) to stdout" << std::endl;
+        exit(-1);
+    }
+    
+    if(dump_json)
+    {
+        if(dump_to_moped)
+        {
+            std::cerr << "Cannot use --json with --dump-for-moped" << std::endl;
+            exit(-1);
+        }
+        if(engine > 0)
+        {
+            std::cerr << "Cannot use --engine > 0 with --json" << std::endl;
+            exit(-1);
+        }        
     }
 
     if(silent) no_parser_warnings = true;
@@ -255,14 +277,15 @@ int main(int argc, const char** argv)
     Network network = [&] {
         ptrie::map<Router*> mapping;
         std::vector<std::unique_ptr < Router>> routers;
+        std::vector<const Interface*> interfaces;
         if (junos_config.size() > 0)
-            parse_junos(routers, mapping, junos_config, warnings);
+            parse_junos(routers, interfaces, mapping, junos_config, warnings);
 
         for (auto& r : routers) {
-            r->pair_interfaces();
+            r->pair_interfaces(interfaces);
         }
 
-        return Network(std::move(mapping), std::move(routers));
+        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
     }();
     
     if (print_dot) {
@@ -294,45 +317,47 @@ int main(int argc, const char** argv)
         }
         
         size_t query_no = 0;
-        std::cout << "{\n";
+        if(!dump_to_moped)
+            std::cout << "{\n";
         for(auto& q : builder._result)
         {
             ++query_no;
             NetworkPDAFactory factory(q, network);
             auto pda = factory.compile();
             auto reduction = pda.reduce(tos);
-            std::function<void(std::ostream&, const Query::label_t&) > labelprinter = [](std::ostream& s, const Query::label_t& label){
-                RoutingTable::entry_t::print_label(label, s, false);
-            };
             if(dump_to_moped)
             {
-                Moped::dump_pda(pda, std::cout, labelprinter);
+                Moped::dump_pda(pda, std::cout, factory.label_writer());
             }
-            if(engine == 1)
+            else
             {
-                // moped
-                Moped moped;
-                auto result = moped.verify(pda, get_trace, labelprinter);
-                std::cout << "\t\"Q1\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
-                std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
-                if(get_trace && result)
+                if(engine == 1)
                 {
-                    std::cout << ",\n\t\t\"trace\":[\n";
-//                    builder.write_trace(std::cout, moped.trace());                    
-                    std::cout << "\n\t\t]";
+                    // moped
+                    Moped moped;
+                    auto result = moped.verify(pda, get_trace, factory.label_writer());
+                    std::cout << "\t\"Q1\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
+                    std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
+                    if(get_trace && result)
+                    {
+                        std::cout << ",\n\t\t\"trace\":[\n";
+                        factory.write_json_trace(std::cout, moped.get_trace(factory.label_reader()));                    
+                        std::cout << "\n\t\t]";
+                    }
+                    std::cout << "\n\t}";
+                    if(query_no != builder._result.size())
+                        std::cout << ",";
+                    std::cout << "\n";
                 }
-                std::cout << "\n\t}";
-                if(query_no != builder._result.size())
-                    std::cout << ",";
-                std::cout << "\n";
-            }
-            else if(engine == 2)
-            {
-                // internal
-                throw base_error("Internal engine not yet implemented!");
+                else if(engine == 2)
+                {
+                    // internal
+                    throw base_error("Internal engine not yet implemented!");
+                }
             }
         }
-        std::cout << "\n}" << std::endl;
+        if(!dump_to_moped)
+            std::cout << "\n}" << std::endl;
     }
     return 0;
 }

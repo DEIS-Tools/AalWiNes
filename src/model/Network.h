@@ -35,7 +35,7 @@
 namespace mpls2pda {
 class Network {
 public:
-    Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr < Router>>&& routers);
+    Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
     Network(const Network&) = default;
     Network(Network&&) = default;
     Network& operator=(const Network&) = default;
@@ -47,6 +47,7 @@ public:
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask);
     std::unordered_set<Query::label_t> ip_labels(filter_t& filter);
     std::unordered_set<Query::label_t> all_labels();
+    const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);
     void print_json(std::ostream& s);
 private:
@@ -54,9 +55,9 @@ private:
     ptrie::map<Router*> _mapping;
     std::vector<std::unique_ptr<Router>> _routers;    
     std::unordered_map<Query::label_t,std::vector<std::pair<const RoutingTable::entry_t*, const Router*>>> _label_map;
+    std::vector<const Interface*> _all_interfaces;
     
-//    ptrie::map<size_t> _linkmap;
-//    std::vector<std::pair<Interface*, Interface*>> _links;
+
 };
 }
 

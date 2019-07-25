@@ -65,13 +65,59 @@ namespace pdaaal
         else
         {
             std::stringstream e;
-            e << "An error occured during verification using moped\n\n" << result;
-            throw std::runtime_error(e.str());
+            e << "An error occurred during verification using moped\n\n" << result;
+            throw base_error(e.str());
         }
-        _trace.clear();
+        _raw_trace.clear();
         if(build_trace && res)
         {
-            
+            std::istringstream is(result);
+            bool saw_start = false;
+            bool saw_init = false;
+            bool saw_end = false;
+            std::string buffer;
+            while(std::getline(is, buffer))
+            {
+                if(buffer.empty()) continue;
+                if(saw_start)
+                {
+                    if(buffer[0] == 'I' && !saw_init && !saw_end)
+                    {
+                        saw_init = true;
+                    }
+                    else if(buffer[0] == 'D' && saw_init && !saw_end)
+                    {
+                        saw_end = true;
+                    }
+                    else if(buffer[0] == 'S' && saw_init && !saw_end)
+                    {
+                        _raw_trace.push_back(buffer);
+                    }
+                    else if(buffer.substr(2, 18) == "[ target reached ]" && saw_init && saw_end)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        std::stringstream e;
+                        e << "An error occurred during parsing of trace from moped\n\n";
+                        if(saw_init) e << "\"I <_>\" seen\n";
+                        if(saw_end) e << "\"DONE <_>\" seen\n";
+                        e << buffer << "\n\n" << result;
+                        throw base_error(e.str());                        
+                    }
+                }
+                else if(buffer.substr(0, 13) == "--- START ---")
+                {
+                    saw_start = true;
+                }
+            }
+            if(!saw_end)
+            {
+                std::stringstream e;
+                e << "Missing accepting state in trace from Moped\n\n" << result;
+                throw base_error(e.str());                                        
+            }
         }
         return res;
     }

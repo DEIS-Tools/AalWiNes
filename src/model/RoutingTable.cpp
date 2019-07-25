@@ -49,7 +49,7 @@ namespace mpls2pda
         return 0;
     }
 
-    Interface* RoutingTable::parse_via(Router* parent, rapidxml::xml_node<char>* via)
+    Interface* RoutingTable::parse_via(Router* parent, rapidxml::xml_node<char>* via, std::vector<const Interface*>& all_interfaces)
     {
         std::string iname = via->value();
         for (size_t i = 0; i < iname.size(); ++i) {
@@ -60,14 +60,14 @@ namespace mpls2pda
         }
         if (iname.find("lsi.") == 0) {
             // self-looping interface
-            return parent->get_interface(iname, parent);
+            return parent->get_interface(all_interfaces, iname, parent);
         }
         else {
-            return parent->get_interface(iname);
+            return parent->get_interface(all_interfaces, iname);
         }
     }
 
-    RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::ostream& warnings)
+    RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings)
     {
         RoutingTable nr;
         if (node == nullptr)
@@ -110,13 +110,15 @@ namespace mpls2pda
                 tl = tl.substr(0, pos);
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
+            {
                 entry._top_label = atoll(tl.c_str()) + 1;
-
+            }
             else if (tl == "default") {
                 entry._top_label = 0;
             }
             else {
-                entry._top_label = (-1 * (int64_t) parent->get_interface(tl)->id()) - 1;
+                auto inf = parent->get_interface(all_interfaces, tl);
+                entry._top_label = (-1 * (int64_t) inf->global_id()) - 1;
             }
 
             auto nh = rule->first_node("nh");
@@ -184,7 +186,7 @@ namespace mpls2pda
                         warnings << "\t\tbut got type expecting no via: " << ops->value() << std::endl;
                     }
 
-                    r._via = parse_via(parent, via);
+                    r._via = parse_via(parent, via, all_interfaces);
                 }
                 else if (!skipvia && indirect.size() > 0) {
                     if (nhid) {
@@ -198,7 +200,7 @@ namespace mpls2pda
                         }
                         else {
                             auto& d = indirect.get_data(alt.second);
-                            r._via = parent->get_interface(d.first);
+                            r._via = parent->get_interface(all_interfaces, d.first);
                         }
                     }
                     else {
@@ -286,7 +288,7 @@ namespace mpls2pda
                             ++j;
                         }
                         auto n = ostr.substr(i, (j - i));
-                        _ops.back()._label = std::atoi(n.c_str());
+                        _ops.back()._op_label = 1 + std::atoi(n.c_str()); // offset by one
                         i = j;
                         parse_label = false;
                         _ops.emplace_back();
@@ -344,7 +346,7 @@ namespace mpls2pda
             s << "swap";
             if(quote) s << "\"";
             s << ":";
-            print_label(_label, s, quote);
+            entry_t::print_label(_op_label, s, quote);
             s << "}";
             break;
         case PUSH:
@@ -353,7 +355,7 @@ namespace mpls2pda
             s << "push";
             if(quote) s << "\"";
             s << ":";
-            print_label(_label, s, quote);
+            entry_t::print_label(_op_label, s, quote);
             s << "}";
             break;
         case POP:
@@ -362,15 +364,6 @@ namespace mpls2pda
             if(quote) s << "\"";
             break;
         }
-    }
-
-    void RoutingTable::action_t::print_label(int64_t label, std::ostream& s, bool quoted)
-    {
-        if (quoted) s << "\"";
-        if (label == 0) s << "default";
-        else if (label < 0) s << "I" << (-(label + 1));
-        else if (label > 0) s << "L" << (label - 1);
-        if (quoted) s << "\"";
     }
 
     void RoutingTable::entry_t::print_json(std::ostream& s) const
