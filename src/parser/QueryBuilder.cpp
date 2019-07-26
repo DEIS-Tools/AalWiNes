@@ -191,12 +191,12 @@ namespace mpls2pda
         }
         return res;
     }
-
+    
     Builder::labelset_t Builder::find_label(uint64_t label, uint64_t mask)
     {
         return _network.get_labels(label, mask);
     }
-
+    
     filter_t Builder::discard_id()
     {
         throw base_error("discard matching is not yet implemented");

@@ -114,6 +114,7 @@
 %left PLUS 
 %left STAR 
 %left QUESTION
+%left COMMA
         
 %%
 %start query_list;
@@ -177,8 +178,6 @@ atom_list
     
 atom 
     : identifier HASH { builder.set_post(); } identifier { $$ = $1 && $4; builder.clear_post(); }// LINKS
-    | HASH { builder.set_post(); } identifier { $$ = std::move($3); builder.clear_post(); } // ingoing
-    | identifier HASH { $$ = std::move($1); } // outgoing
     ;
 
 identifier
@@ -187,6 +186,7 @@ identifier
     { $$ = $1 && $4; builder.clear_link(); }
     | "^" { $$ = builder.routing_id(); }
     | "!" { $$ = builder.discard_id(); }
+    | DOT { $$ = filter_t{}; }
     ;
 
 ip4
@@ -224,7 +224,7 @@ name
 label
     : number "/" number  { $$ = builder.find_label($1, $3); }
     | number  { $$ = builder.find_label($1, 1); }
-    | "ip" {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($3); }
+    | "ip" COLON {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($4); }
     ;
     
 

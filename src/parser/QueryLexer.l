@@ -37,7 +37,7 @@ using token = mpls2pda::Parser::token;
 %option yyclass="mpls2pda::Scanner"
 %x comment
 
-id    [a-zA-Z][a-zA-Z_0-9_$#\-]*
+id    [a-zA-Z][a-zA-Z_0-9_-]*
 hex   [0-9a-fA-F]
 int   [0-9]+
 float {int}*\.{int}+
