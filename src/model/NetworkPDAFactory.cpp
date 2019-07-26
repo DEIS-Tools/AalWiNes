@@ -49,7 +49,7 @@ namespace mpls2pda
             std::vector<NFA::state_t*> next{state};
             NFA::follow_epsilon(next);
             for (auto& n : next) {
-                auto res = add_state(n, router);
+                auto res = add_state(n, router, 0, 0, 0, 0, -2); // we start by going to -2, as we only initially can accept interface-labels
                 if (res.first)
                     _initial.push_back(res.second);
             }
@@ -165,11 +165,13 @@ namespace mpls2pda
         nstate_t s;
         _states.unpack(id, (unsigned char*) &s);
         std::vector<NetworkPDAFactory::PDAFactory::rule_t> result;
-        if (s._opid == -1) {
+        if (s._opid < 0) {
             if (s._router == nullptr) return result;
             // all clean! start pushing.
             for (auto& table : s._router->tables()) {
                 for (auto& entry : table.entries()) {
+                    if(entry.is_default()) continue; // we assume these are DROP
+                    if(entry.is_interface() && s._opid != -2) continue; // only accept interface-labels from initial -2 mode
                     for (auto& forward : entry._rules) {
                         if (forward._via == nullptr) continue; // drop/discard/lookup
                         for (auto& e : s._nfastate->_edges) {
@@ -281,8 +283,17 @@ namespace mpls2pda
                                     for (auto& n : next) {
                                         result.emplace_back(nr);
                                         auto& ar = result.back();
-                                        auto res = add_state(n, forward._via->target(), appmode);
-                                        ar._dest = res.second;
+                                        if(nr._op == NOOP && s._opid == -2 && entry.is_interface())
+                                        {
+                                            // special case, we forward the initial IP->MPLS to the next router
+                                            auto res = add_state(n, forward._via->target(), appmode, 0, 0, 0, -2); // we start by going to -2, as we only initially can accept interface-labels
+                                            ar._dest = res.second;
+                                        }
+                                        else
+                                        {
+                                            auto res = add_state(n, forward._via->target(), appmode);
+                                            ar._dest = res.second;
+                                        }
                                     }
                                 }
                                 else {
@@ -381,7 +392,7 @@ namespace mpls2pda
                 // handle, lookup right states
                 nstate_t s;
                 _states.unpack(step._pdastate, (unsigned char*) &s);
-                if(s._opid != -1)
+                if(s._opid >= 0)
                 {
                     // Skip, we are just doing a bunch of ops here, printed elsewhere.
                 }
