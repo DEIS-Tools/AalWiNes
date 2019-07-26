@@ -29,7 +29,8 @@ namespace pdaaal
 
     Moped::~Moped()
     {
-        boost::filesystem::remove(_tmpfilepath);
+//        boost::filesystem::remove(_tmpfilepath);
+        std::cerr << "MODEL : " << _tmpfilepath << std::endl;
     }
 
     bool Moped::verify(const std::string& tmpfile, bool build_trace)

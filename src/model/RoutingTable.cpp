@@ -67,7 +67,7 @@ namespace mpls2pda
         }
     }
 
-    RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings)
+    RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool pfe_as_drop)
     {
         RoutingTable nr;
         if (node == nullptr)
@@ -160,13 +160,20 @@ namespace mpls2pda
                         r._type = ROUTE; // drops out of MPLS?
                     }
                     else if (strcmp(val, "indirect") == 0) {
-                        skipvia = false;
-                        // lookup in indirect
-                        nhid = nh->first_node("nh-index");
-                        if (!nhid) {
-                            std::stringstream e;
-                            e << "expected nh-index of indirect";
-                            throw base_error(e.str());
+                        if(pfe_as_drop)
+                        {
+                            r._type = DISCARD;
+                        }
+                        else
+                        {
+                            skipvia = false;
+                            // lookup in indirect
+                            nhid = nh->first_node("nh-index");
+                            if (!nhid) {
+                                std::stringstream e;
+                                e << "expected nh-index of indirect";
+                                throw base_error(e.str());
+                            }
                         }
                     }
                     else if (strcmp(val, "unicast") == 0) {
