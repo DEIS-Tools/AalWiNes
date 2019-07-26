@@ -162,6 +162,10 @@ namespace mpls2pda
 
     std::vector<NetworkPDAFactory::PDAFactory::rule_t> NetworkPDAFactory::rules(size_t id)
     {
+        if(_query.approximation() == Query::EXACT)
+        {
+            throw base_error("Exact analysis method not yet supported");
+        }
         nstate_t s;
         _states.unpack(id, (unsigned char*) &s);
         std::vector<NetworkPDAFactory::PDAFactory::rule_t> result;
