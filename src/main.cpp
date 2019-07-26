@@ -37,6 +37,7 @@
 #include <vector>
 #include <fstream>
 #include <memory.h>
+#include <boost/filesystem/path.hpp>
 
 namespace po = boost::program_options;
 using namespace mpls2pda;
@@ -52,6 +53,7 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
     std::vector<tp> configs;
     std::string line;
     std::ifstream data(network);
+    auto wd = boost::filesystem::path(network).parent_path();
     if (!data.is_open()) {
         std::cerr << "Could not open " << network << std::endl;
         exit(-1);
@@ -128,7 +130,9 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
             warnings << "warning: No adjacency info for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
         }
         else {
-            std::ifstream stream(std::get<0>(configs[i]));
+            auto path = wd;
+            path.append(std::get<0>(configs[i]));
+            std::ifstream stream(path.string());
             if (!stream.is_open()) {
                 std::cerr << "error: Could not open adjacency-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
                 exit(-1);
@@ -148,14 +152,18 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
             warnings << "warning: No routingtables for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
         }
         else {
-            std::ifstream stream(std::get<1>(configs[i]));
+            auto path = wd;
+            path.append(std::get<1>(configs[i]));
+            std::ifstream stream(path.string());
             if (!stream.is_open()) {
                 std::cerr << "error: Could not open routing-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
                 exit(-1);
             }
             std::ifstream id;
             if (!std::get<2>(configs[i]).empty() && !skip_pfe) {
-                id.open(std::get<2>(configs[i]));
+                auto path = wd;
+                path.append(std::get<2>(configs[i]));
+                id.open(path.string());
             }
             try {
                 routers[i]->parse_routing(stream, id, interfaces, warnings, skip_pfe);
