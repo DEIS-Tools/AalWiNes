@@ -45,7 +45,7 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                  std::vector<const Interface*>& interfaces,
                  ptrie::map<Router*>& mapping,
                  const std::string& network,
-                 std::ostream& warnings, bool pfe_as_drop)
+                 std::ostream& warnings, bool skip_pre)
 {
     // lets start by creating empty router-objects for all the alias' we have
     using tp = std::tuple<std::string, std::string, std::string>;
@@ -154,11 +154,11 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                 exit(-1);
             }
             std::ifstream id;
-            if (!std::get<2>(configs[i]).empty() && !pfe_as_drop) {
+            if (!std::get<2>(configs[i]).empty() && !skip_pre) {
                 id.open(std::get<2>(configs[i]));
             }
             try {
-                routers[i]->parse_routing(stream, id, interfaces, warnings, pfe_as_drop);
+                routers[i]->parse_routing(stream, id, interfaces, warnings, skip_pre);
             }
             catch (base_error& ex) {
                 std::cerr << ex.what() << "\n";
@@ -205,12 +205,12 @@ int main(int argc, const char** argv)
 
 
     std::string junos_config;
-    bool pfe_as_drop = false;
+    bool skip_pre = false;
     input.add_options()
             ("juniper,j", po::value<std::string>(&junos_config),
             "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
-            ("pfe-as-drop", po::bool_switch(&pfe_as_drop),
-            "Treat \"indirect\" cases of juniper-routing as package-drops.")
+            ("skip-pfe", po::bool_switch(&skip_pre),
+            "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
             ;    
 
     std::string query_file;
@@ -282,7 +282,7 @@ int main(int argc, const char** argv)
         std::vector<std::unique_ptr < Router>> routers;
         std::vector<const Interface*> interfaces;
         if (junos_config.size() > 0)
-            parse_junos(routers, interfaces, mapping, junos_config, warnings, pfe_as_drop);
+            parse_junos(routers, interfaces, mapping, junos_config, warnings, skip_pre);
 
         for (auto& r : routers) {
             r->pair_interfaces(interfaces);

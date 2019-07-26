@@ -96,7 +96,7 @@ namespace mpls2pda {
         RoutingTable(const RoutingTable& orig) = default;
         virtual ~RoutingTable() = default;
         RoutingTable(RoutingTable&&) = default;
-        static RoutingTable parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& , std::ostream& warnings, bool pfe_as_drop);
+        static RoutingTable parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& , std::ostream& warnings, bool skip_pre);
 
         RoutingTable& operator=(const RoutingTable&) = default;
         RoutingTable& operator=(RoutingTable&&) = default;

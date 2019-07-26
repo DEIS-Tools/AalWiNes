@@ -201,7 +201,7 @@ Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, 
     return _interfaces.back().get();
 }
 
-void Router::parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool pfe_as_drop)
+void Router::parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool skip_pre)
 {
     rapidxml::xml_document<> doc;
     std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
@@ -306,7 +306,7 @@ void Router::parse_routing(std::istream& data, std::istream& indirect, std::vect
         }
         while (n) {
             try {
-                _tables.emplace_back(RoutingTable::parse(n, indir, this, all_interfaces, warnings, pfe_as_drop));
+                _tables.emplace_back(RoutingTable::parse(n, indir, this, all_interfaces, warnings, skip_pre));
             }
             catch (base_error& ex) {
                 std::stringstream e;
