@@ -45,7 +45,7 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                  std::vector<const Interface*>& interfaces,
                  ptrie::map<Router*>& mapping,
                  const std::string& network,
-                 std::ostream& warnings, bool skip_pre)
+                 std::ostream& warnings, bool skip_pfe)
 {
     // lets start by creating empty router-objects for all the alias' we have
     using tp = std::tuple<std::string, std::string, std::string>;
@@ -154,11 +154,11 @@ void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
                 exit(-1);
             }
             std::ifstream id;
-            if (!std::get<2>(configs[i]).empty() && !skip_pre) {
+            if (!std::get<2>(configs[i]).empty() && !skip_pfe) {
                 id.open(std::get<2>(configs[i]));
             }
             try {
-                routers[i]->parse_routing(stream, id, interfaces, warnings, skip_pre);
+                routers[i]->parse_routing(stream, id, interfaces, warnings, skip_pfe);
             }
             catch (base_error& ex) {
                 std::cerr << ex.what() << "\n";
@@ -205,11 +205,11 @@ int main(int argc, const char** argv)
 
 
     std::string junos_config;
-    bool skip_pre = false;
+    bool skip_pfe = false;
     input.add_options()
             ("juniper,j", po::value<std::string>(&junos_config),
             "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
-            ("skip-pfe", po::bool_switch(&skip_pre),
+            ("skip-pfe", po::bool_switch(&skip_pfe),
             "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
             ;    
 
@@ -282,7 +282,7 @@ int main(int argc, const char** argv)
         std::vector<std::unique_ptr < Router>> routers;
         std::vector<const Interface*> interfaces;
         if (junos_config.size() > 0)
-            parse_junos(routers, interfaces, mapping, junos_config, warnings, skip_pre);
+            parse_junos(routers, interfaces, mapping, junos_config, warnings, skip_pfe);
 
         for (auto& r : routers) {
             r->pair_interfaces(interfaces);
@@ -339,7 +339,7 @@ int main(int argc, const char** argv)
                     // moped
                     Moped moped;
                     auto result = moped.verify(pda, get_trace, factory.label_writer());
-                    std::cout << "\t\"Q1\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
+                    std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
                     std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
                     if(get_trace && result)
                     {

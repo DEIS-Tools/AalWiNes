@@ -224,7 +224,7 @@ name
 label
     : number "/" number  { $$ = builder.find_label($1, $3); }
     | number  { $$ = builder.find_label($1, 1); }
-    | "ip" COLON {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($4); }
+    | COLON {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($3); }
     ;
     
 

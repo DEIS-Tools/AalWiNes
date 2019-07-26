@@ -66,13 +66,13 @@ namespace mpls2pda
                 }
                 else if (!e._negated) {
                     for (auto s : e._symbols) {
-                        Interface* interface = reinterpret_cast<Interface*> (s);
+                        auto interface = _network.all_interfaces()[(s+1)*-1];
                         add_initial(e._destination, interface->target());
                     }
                 }
                 else {
                     for (auto inf : _network.all_interfaces()) {
-                        Query::label_t iid = reinterpret_cast<Query::label_t> (inf);
+                        auto iid = Query::label_t{((ssize_t)inf->global_id() + 1) * -1};
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                         if (lb == std::end(e._symbols) || *lb != iid) {
                             add_initial(e._destination, inf->target());
@@ -192,7 +192,7 @@ namespace mpls2pda
                             {
                                 continue;
                             }
-                            auto iid = reinterpret_cast<Query::label_t> (forward._via);
+                            auto iid = Query::label_t{((ssize_t)forward._via->global_id() + 1) * -1};
                             auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                             bool found = lb != std::end(e._symbols) && *lb == iid;
 

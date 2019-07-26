@@ -87,7 +87,7 @@ namespace mpls2pda {
                     }
                     if(filter._link(fname.get(), fip, fip6, tname.get(), tip, tip6, tr))
                     {
-                        res.insert(reinterpret_cast<size_t>(i.get())); // TODO: little hacksy, but we have uniform types in the parser
+                        res.insert(((ssize_t)i->global_id() + 1) * -1 ); // TODO: little hacksy, but we have uniform types in the parser
                     }
                 }
             }
@@ -106,7 +106,7 @@ namespace mpls2pda {
                 {
                     auto mpls = entry.first->as_mpls();
                     if((mpls / mask) == (label / mask))
-                        res.insert(reinterpret_cast<ssize_t>(entry.first->_top_label));
+                        res.insert(entry.first->_top_label);
                 }
             }
         }
@@ -119,19 +119,12 @@ namespace mpls2pda {
         // possibly same thing if using interfaces instead.
         std::unordered_set<Query::label_t> res;
         auto ifaces = interfaces(filter);
-        for(auto& pr : _label_map)
+        for(auto& inf : _all_interfaces)
         {
-            for(auto& entry : pr.second)
-            {
-                if(entry.first->is_interface())
-                {
-                    auto iid = entry.first->as_interface();
-                    Interface* inf = entry.second->interface_no(iid);
-                    if(inf->is_virtual()) continue;
-                    if(ifaces.count(reinterpret_cast<ssize_t>(inf)) > 0)
-                        res.insert(reinterpret_cast<ssize_t>(entry.first->_top_label));
-                }
-            }
+            if(inf->is_virtual()) continue;
+            auto ifid = Query::label_t{(((ssize_t)inf->global_id()) + 1)*-1};
+            if(ifaces.count(ifid) > 0)
+                res.insert(ifid);
         }
         return res;
     }

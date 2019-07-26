@@ -655,7 +655,7 @@ namespace pdaaal {
             {
                 auto nm = ait;
                 while(nm != std::end(all_labels) && *nm < *fit) ++nm;
-                assert(*nm == *fit);
+                // assert(*nm == *fit); TODO, check if this is ok
                 for(;ait != nm; ++ait)
                 {
                     while(lid != std::end(_labels) && *lid < *ait) ++lid;

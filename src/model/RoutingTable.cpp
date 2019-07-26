@@ -67,7 +67,7 @@ namespace mpls2pda
         }
     }
 
-    RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool skip_pre)
+    RoutingTable RoutingTable::parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool skip_pfe)
     {
         RoutingTable nr;
         if (node == nullptr)
@@ -133,7 +133,6 @@ namespace mpls2pda
                 entry._rules.emplace_back();
                 auto& r = entry._rules.back();
                 r._weight = parse_weight(nh);
-                weights[r._weight] = 0;
                 auto ops = nh->first_node("nh-type");
                 bool skipvia = true;
                 rapidxml::xml_node<>* nhid = nullptr;
@@ -160,9 +159,10 @@ namespace mpls2pda
                         r._type = ROUTE; // drops out of MPLS?
                     }
                     else if (strcmp(val, "indirect") == 0) {
-                        if(skip_pre)
+                        if(skip_pfe)
                         {
-                            r._type = DISCARD;
+                            entry._rules.pop_back(); // So is the P-rex semantics?
+                            continue;
                         }
                         else
                         {
@@ -216,6 +216,7 @@ namespace mpls2pda
                         warnings << std::endl;
                     }
                 }
+                weights[r._weight] = 0;
             }
             while ((nh = nh->next_sibling("nh")));
             
