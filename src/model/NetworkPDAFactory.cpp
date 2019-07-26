@@ -405,7 +405,20 @@ namespace mpls2pda
                                         continue; // not matching on pre
                                     for(auto& r : entry._rules)
                                     {
-                                        if(((ssize_t)r._weight) <= _query.number_of_failures()) // TODO, fix for approximations here!
+                                        bool ok = false;
+                                        switch(_query.approximation())
+                                        {
+                                        case Query::UNDER:
+                                            assert(next._appmode >= s._appmode);
+                                            ok = ((ssize_t)r._weight) == (next._appmode - s._appmode);
+                                            break;
+                                        case Query::OVER:
+                                            ok = ((ssize_t)r._weight) <= _query.number_of_failures();
+                                            break;
+                                        case Query::EXACT:
+                                            throw base_error("Tracing for EXACT not yet implemented");
+                                        }
+                                        if(ok) // TODO, fix for approximations here!
                                         {
                                             if(r._ops.size() > 1) continue; // would have been handled in other case
 
