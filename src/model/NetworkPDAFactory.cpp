@@ -353,6 +353,23 @@ namespace mpls2pda
         return result;
     }
 
+    void NetworkPDAFactory::print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
+        stream << "{\"pre\":";
+        if(entry._top_label < 0)
+        {
+            auto inf = _network.all_interfaces()[entry.as_interface()];
+            auto iname = inf->source()->interface_name(inf->id());
+            stream << "\"" << iname.get() << "\"";
+        }
+        else
+        {
+            RoutingTable::entry_t::print_label(entry._top_label, stream, true);
+        }
+        stream << ",rule\":";
+        rule.print_json(stream);
+        stream << "}";
+    }
+
     void NetworkPDAFactory::write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>&& trace)
     {
         bool first = true;
@@ -385,7 +402,8 @@ namespace mpls2pda
                         first_symbol = false;
                     }                    
                     stream << "]}";
-                    if(sno != trace.size() - 1 && trace[sno + 1]._pdastate < _num_pda_states)
+                    
+                    if(sno != trace.size() - 1 && trace[sno + 1]._pdastate < _num_pda_states && !step._stack.empty())
                     {
                         stream << ",\n\t\t\t";
                         // peek at next element, we want to write the ops here
@@ -394,55 +412,71 @@ namespace mpls2pda
                         if(next._opid != -1)
                         {
                             // we get the rule we use, print
-                            stream << "{\"pre\":";
-                            auto& entry  = s._router->tables()[next._tid].entries()[next._eid];
-                            if(entry._top_label < 0)
-                            {
-                                auto inf = _network.all_interfaces()[entry.as_interface()];
-                                auto iname = inf->source()->interface_name(inf->id());
-                                stream << "\"" << iname.get() << "\"";
-                            }
-                            else
-                            {
-                                RoutingTable::entry_t::print_label(entry._top_label, stream, true);
-                            }
-                            stream << ",rule\":";
-                            auto& rule = entry._rules[next._rid];
-                            rule.print_json(stream);
-                            stream << "}";
+                            auto& entry = next._router->tables()[next._tid].entries()[next._eid];
+                            print_trace_rule(stream, next._router, entry, entry._rules[next._rid]);
                         }
-                        else
+                        else 
                         {
                             // we have to guess which rule we used!
                             // run through the rules and find a match!
-                            /*for(auto& table : s._router->tables())
+                            auto& nstep = trace[sno + 1];
+                            bool found = false;
+                            for(auto& table : s._router->tables())
                             {
+                                if(found) break;
                                 for(auto& entry : table.entries())
                                 {
-                                    if(!step._stack.front().first && step._stack.front().second = entry._top_label)
+                                    if(found) break;
+                                    if(entry.is_default())
+                                        continue;
+                                    if(!step._stack.front().first && step._stack.front().second != entry._top_label)
                                         continue; // not matching on pre
                                     for(auto& r : entry._rules)
                                     {
-                                        if(r._weight <= _query.number_of_failures()) // TODO, fix for approximations here!
+                                        if(((ssize_t)r._weight) <= _query.number_of_failures()) // TODO, fix for approximations here!
                                         {
                                             if(r._ops.size() > 1) continue; // would have been handled in other case
-                                            if(r._via->target() == next._router)
+
+                                            if(r._via && r._via->target() == next._router)
                                             {
-                                                if(r._ops.empty())
+                                                if(r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP)
                                                 {
-                                                    if()
-                                                    // NOOP
+                                                    if(step._stack.size() == nstep._stack.size() &&
+                                                       nstep._stack.front().second == (r._ops.empty() ? entry._top_label : r._ops[0]._op_label) &&
+                                                       !nstep._stack.front().first)
+                                                    {
+                                                        print_trace_rule(stream, s._router, entry, r);
+                                                        found = true;
+                                                        break;
+                                                    }
                                                 }
                                                 else
                                                 {
-                                                    switch()
+                                                    assert(r._ops.size() == 1);
+                                                    assert(r._ops[0]._op == RoutingTable::PUSH || r._ops[0]._op == RoutingTable::POP);
+                                                    if(r._ops[0]._op == RoutingTable::POP && nstep._stack.size() == step._stack.size() - 1)
+                                                    {
+                                                        print_trace_rule(stream, s._router, entry, r);
+                                                        found = true;
+                                                        break;
+                                                    }
+                                                    else if(r._ops[0]._op == RoutingTable::PUSH && nstep._stack.size() == step._stack.size() + 1 &&
+                                                            r._ops[0]._op_label == nstep._stack.front().second && !nstep._stack.front().first)
+                                                    {
+                                                        print_trace_rule(stream, s._router, entry, r);
+                                                        found = true;
+                                                        break;                                                        
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }*/
-                            stream << "[GUESS]";
+                            }
+                            if(!found)
+                            {
+                                stream << "{\"pre\":\"unknown\"}";
+                            }
                         }
                     }
                     first = false;                    

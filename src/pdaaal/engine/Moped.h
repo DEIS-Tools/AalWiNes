@@ -64,7 +64,6 @@ namespace pdaaal {
         for(size_t sid = 0; sid < _raw_trace.size(); ++sid)
         {
             auto& s = _raw_trace[sid];
-            std::cerr << s << std::endl;
             if(s[0] != 'S')
             {
                 error << "Could not find state in trace-line : " << s;

@@ -288,7 +288,8 @@ namespace mpls2pda
                             ++j;
                         }
                         auto n = ostr.substr(i, (j - i));
-                        _ops.back()._op_label = 1 + std::atoi(n.c_str()); // offset by one
+                        auto olabel = std::atoi(n.c_str());
+                        _ops.back()._op_label = 1 + olabel; // offset by one
                         i = j;
                         parse_label = false;
                         _ops.emplace_back();

@@ -57,6 +57,7 @@ namespace mpls2pda
         std::function<Query::label_t(const char*, const char*)> label_reader() const;
         
         void write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>&& trace);
+
         
     protected:
         const std::vector<size_t>& initial() override;
@@ -65,6 +66,8 @@ namespace mpls2pda
         std::vector<rule_t> rules(size_t ) override;
 
     private:
+        void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;
+
         void construct_initial();
         std::pair<bool,size_t> add_state(NFA::state_t* state, const Router* router, int32_t mode = 0, int32_t tid = 0, int32_t eid = 0, int32_t fid = 0, int32_t op = -1);
         int32_t set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward);
