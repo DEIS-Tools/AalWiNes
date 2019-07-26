@@ -486,27 +486,36 @@ namespace pdaaal {
             
             forwards_prune();
             backwards_prune();
-            
+
             size_t after_cnt = size();
             return std::make_pair(cnt, after_cnt);
         }
        
         size_t size() const {
             size_t count = 0;
-            for(auto& state : _states)
+            for(size_t sno = 0; sno < _states.size(); ++sno)
             {
-                for(auto& rule : state._rules)
+                auto& state = _states[sno];
+                if(sno == 0)
                 {
-                    if(rule._precondition._wildcard)
+                    // initial, no precondition.
+                    count += state._rules.size();
+                }
+                else
+                {
+                    for(auto& rule : state._rules)
                     {
-                        if(state._pre_is_dot)
-                            ++count;
+                        if(rule._precondition._wildcard)
+                        {
+                            if(state._pre_is_dot)
+                                ++count;
+                            else
+                                count += _all_labels.size();
+                        }
                         else
-                            count += _all_labels.size();
-                    }
-                    else
-                    {
-                        count += rule._precondition._labels.size();
+                        {
+                            count += rule._precondition._labels.size();
+                        }
                     }
                 }
             }
