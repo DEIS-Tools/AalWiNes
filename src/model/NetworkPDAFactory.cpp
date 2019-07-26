@@ -102,16 +102,16 @@ namespace mpls2pda
                 d = op == -1 ? state->_accepting : false;
             }
         }
-/*                if(res.first) std::cerr << "## NEW " << std::endl;
-                std::string rn;
-                if(router)
-                    rn = router->name();
-                else
-                    rn = "SINK";
-                std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
-                std::cerr << "\tID " << res.second << std::endl;
-                if(_states.get_data(res.second))
-                    std::cerr << "\t\tACCEPTING !" << std::endl;*/
+        /*if(res.first) std::cerr << "## NEW " << std::endl;
+        std::string rn;
+        if(router)
+            rn = router->name();
+        else
+            rn = "SINK";
+        std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
+        std::cerr << "\tID " << res.second << std::endl;
+        if(_states.get_data(res.second))
+            std::cerr << "\t\tACCEPTING !" << std::endl;*/
 
         return res;
     }
@@ -170,49 +170,33 @@ namespace mpls2pda
             // all clean! start pushing.
             for (auto& table : s._router->tables()) {
                 for (auto& entry : table.entries()) {
-                    if(entry.is_default()) continue; // we assume these are DROP
-                    if(entry.is_interface() && s._opid != -2) continue; // only accept interface-labels from initial -2 mode
+                    if(entry.is_default()) 
+                    {
+                        continue; // we assume these are DROP
+                    }
+                    if(entry.is_interface() && s._opid != -2)
+                    {
+                        continue; // only accept interface-labels from initial -2 mode
+                    }
                     for (auto& forward : entry._rules) {
-                        if (forward._via == nullptr) continue; // drop/discard/lookup
+                        if (forward._via == nullptr || forward._via->target() == nullptr)
+                        {
+                            continue; // drop/discard/lookup
+                        }
                         for (auto& e : s._nfastate->_edges) {
                             if (e.empty(_network.all_interfaces().size()))
+                            {
                                 continue;
+                            }
                             auto iid = reinterpret_cast<Query::label_t> (forward._via);
                             auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                             bool found = lb != std::end(e._symbols) && *lb == iid;
 
                             if (found != (!e._negated)) {
-                                /*                                auto name = forward._via->source()->interface_name( forward._via->id());
-                                                                std::cerr << "IID " << iid << std::endl;
-                                                                std::cerr << "COLD NOT FIND " <<  forward._via->source()->name() << "." << name.get() << " (" << forward._via << ") " << " IN [\n";
-                                                                if(e._negated) std::cerr << "NEG" << std::endl;
-                                                                for(auto& n : e._symbols)
-                                                                {
-                                                                    Interface* inf = reinterpret_cast<Interface*>(n);
-                                                                    auto rn = inf->source()->interface_name(inf->id());
-                                                                    std::cerr << "\t" << inf->source()->name() << "." << rn.get() << " (" << inf << ")" << reinterpret_cast<ssize_t>(inf) << std::endl;
-                                                                }
-                                                                std::cerr << "];\n";
-                                                                std::cerr << std::endl;*/
+                                continue;
                             }
                             else {
                                 rule_t nr;
-                                /*
-                                std::stringstream ss;
-                                auto name = forward._via->source()->interface_name( forward._via->id());
-                                ss << s._router->name() << "." << name.get() << " -- [";
-                                RoutingTable::entry_t::print_label(entry._top_label, ss, false);
-                                ss << "| ";
-                                for(auto& o : forward._ops)
-                                {
-                                    o.print_json(ss, false);
-                                    ss << " ";
-                                }
-                                ss << "]";
-                                ss << " --> ";
-                                if(forward._via != nullptr && forward._via->target() != nullptr) ss << forward._via->target()->name();
-                                else ss << "SINK";
-                                nr._verbose = ss.str();*/
                                 nr._pre = entry._top_label;
                                 auto appmode = s._appmode;
                                 if (!forward._via->is_virtual()) {
@@ -245,33 +229,6 @@ namespace mpls2pda
                                     }
                                 }
                                 else {
-/*                                    std::stringstream ss;
-                                    if(nr._pre < 0)
-                                    {
-                                        auto ino = (nr._pre + 1) * -1;
-                                        const Interface* inf = _network.all_interfaces()[ino];
-                                        ss << "Cannot forward interface-label on ";
-                                        if(inf->source())
-                                            ss << inf->source()->name();
-                                        else
-                                            ss << "SINK";
-                                        ss << "\n";
-                                        ss << "Routing-table: " << table.name() << "\n";
-                                        if(inf->source())
-                                        {
-                                            ss << "\n";
-                                            auto iname = inf->source()->interface_name(inf->id());
-                                            ss << "Interface : ";
-                                            inf->print_json(ss, iname.get());
-                                        }
-                                        else if(inf->target())
-                                        {
-                                            std::cerr << "TARGET " << inf->target()->name() << "\n";
-                                        }
-                                        entry.print_json(ss);
-                                        throw base_error(ss.str());
-                                    }*/
-                                    // Probably shouldnt happen?
                                     nr._op = NOOP;
                                 }
                                 if (forward._ops.size() <= 1) {

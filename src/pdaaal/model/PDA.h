@@ -483,6 +483,10 @@ namespace pdaaal {
                 if(state._rules.empty())
                     state._pre.clear();
             }
+            
+            forwards_prune();
+            backwards_prune();
+            
             size_t after_cnt = size();
             return std::make_pair(cnt, after_cnt);
         }
