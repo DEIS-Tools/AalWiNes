@@ -249,6 +249,9 @@ namespace mpls2pda
                                             // special case, we forward the initial IP->MPLS to the next router
                                             auto res = add_state(n, forward._via->target(), appmode, 0, 0, 0, -2); // we start by going to -2, as we only initially can accept interface-labels
                                             ar._dest = res.second;
+                                            // we swap to receivers label
+                                            ar._op = SWAP;
+                                            ar._op_label = Query::label_t{((int)forward._via->match()->global_id() + 1) * -1};
                                         }
                                         else
                                         {
