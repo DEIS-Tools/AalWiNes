@@ -28,6 +28,8 @@
 #include "pdaaal/model/PDAFactory.h"
 #include "pdaaal/engine/Moped.h"
 
+#include "utils/stopwatch.h"
+
 #include <ptrie_map.h>
 
 #include <boost/program_options.hpp>
@@ -284,7 +286,8 @@ int main(int argc, const char** argv)
     
     std::stringstream dummy;
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
-
+    
+    stopwatch parsingwatch;
     Network network = [&] {
         ptrie::map<Router*> mapping;
         std::vector<std::unique_ptr < Router>> routers;
@@ -298,6 +301,7 @@ int main(int argc, const char** argv)
 
         return Network(std::move(mapping), std::move(routers), std::move(interfaces));
     }();
+    parsingwatch.stop();
     
     if (print_dot) {
         network.print_dot(std::cout);
@@ -309,6 +313,7 @@ int main(int argc, const char** argv)
 
     if(!query_file.empty())
     {
+        stopwatch queryparsingwatch;
         Builder builder(network);
         {
             std::ifstream qstream(query_file);
@@ -326,16 +331,26 @@ int main(int argc, const char** argv)
                 exit(-1);
             }
         }
+        queryparsingwatch.stop();
         
         size_t query_no = 0;
         if(!dump_to_moped)
+        {
             std::cout << "{\n";
+            std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration() / 1000) 
+                      << "\", \"query-parsing-time\":" << (queryparsingwatch.duration() / 1000) << "\",\n";
+            std::cout << "\t\"answers\":{\n";
+        }
         for(auto& q : builder._result)
         {
             ++query_no;
+            stopwatch compilation_time;
             NetworkPDAFactory factory(q, network);
             auto pda = factory.compile();
+            compilation_time.stop();
+            stopwatch reduction_time;
             auto reduction = pda.reduce(tos);
+            reduction_time.stop();
             if(dump_to_moped)
             {
                 Moped::dump_pda(pda, std::cout, factory.label_writer());
@@ -346,7 +361,9 @@ int main(int argc, const char** argv)
                 {
                     // moped
                     Moped moped;
+                    stopwatch verification_time;
                     auto result = moped.verify(pda, get_trace, factory.label_writer());
+                    verification_time.stop();
                     std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
                     std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
                     if(get_trace && result)
@@ -355,6 +372,9 @@ int main(int argc, const char** argv)
                         factory.write_json_trace(std::cout, moped.get_trace(factory.label_reader()));                    
                         std::cout << "\n\t\t]";
                     }
+                    std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration() / 1000.0)
+                              << ",\n\t\t\"reduction-time\":" << (reduction_time.duration() / 1000.0)
+                              << ",\n\t\t\"verification-time\":" << (verification_time.duration() / 1000.0);
                     std::cout << "\n\t}";
                     if(query_no != builder._result.size())
                         std::cout << ",";
@@ -368,7 +388,9 @@ int main(int argc, const char** argv)
             }
         }
         if(!dump_to_moped)
-            std::cout << "\n}" << std::endl;
+        {
+            std::cout << "\n}}" << std::endl;
+        }
     }
     return 0;
 }
