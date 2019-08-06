@@ -204,12 +204,14 @@ int main(int argc, const char** argv)
     bool no_parser_warnings = false;
     bool silent = false;
     bool dump_to_moped = false;
+    bool no_timing = false;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
             ("json", po::bool_switch(&dump_json), "A json output will be printed to cout when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
+            ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
             ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
     ;
 
@@ -337,8 +339,11 @@ int main(int argc, const char** argv)
         if(!dump_to_moped)
         {
             std::cout << "{\n";
-            std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration() / 1000) 
-                      << "\", \"query-parsing-time\":" << (queryparsingwatch.duration() / 1000) << ",\n";
+            if(!no_timing)
+            {
+                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration() / 1000) 
+                          << "\", \"query-parsing-time\":" << (queryparsingwatch.duration() / 1000) << ",\n";
+            }
             std::cout << "\t\"answers\":{\n";
         }
         for(auto& q : builder._result)
@@ -372,9 +377,12 @@ int main(int argc, const char** argv)
                         factory.write_json_trace(std::cout, moped.get_trace(factory.label_reader()));                    
                         std::cout << "\n\t\t]";
                     }
-                    std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration() / 1000.0)
-                              << ",\n\t\t\"reduction-time\":" << (reduction_time.duration() / 1000.0)
-                              << ",\n\t\t\"verification-time\":" << (verification_time.duration() / 1000.0);
+                    if(!no_timing)
+                    {
+                        std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration() / 1000.0)
+                                  << ",\n\t\t\"reduction-time\":" << (reduction_time.duration() / 1000.0)
+                                 << ",\n\t\t\"verification-time\":" << (verification_time.duration() / 1000.0);
+                    }
                     std::cout << "\n\t}";
                     if(query_no != builder._result.size())
                         std::cout << ",";
