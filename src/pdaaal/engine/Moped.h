@@ -48,6 +48,7 @@ namespace pdaaal {
     template<typename T>
     bool Moped::verify(const PDA<T>& pda, bool build_trace, std::function<void(std::ostream&, const T&) > labelprinter)
     {
+        _raw_trace.clear();
         std::fstream file;
         file.open(_tmpfilepath, std::fstream::out);
         dump_pda(pda, file, labelprinter);

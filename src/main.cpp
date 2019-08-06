@@ -341,11 +341,12 @@ int main(int argc, const char** argv)
             std::cout << "{\n";
             if(!no_timing)
             {
-                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration() / 1000) 
-                          << "\", \"query-parsing-time\":" << (queryparsingwatch.duration() / 1000) << ",\n";
+                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration()) 
+                          << "\", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
             }
             std::cout << "\t\"answers\":{\n";
         }
+        Moped moped;
         for(auto& q : builder._result)
         {
             ++query_no;
@@ -365,7 +366,6 @@ int main(int argc, const char** argv)
                 if(engine == 1)
                 {
                     // moped
-                    Moped moped;
                     stopwatch verification_time;
                     auto result = moped.verify(pda, get_trace, factory.label_writer());
                     verification_time.stop();
@@ -379,9 +379,9 @@ int main(int argc, const char** argv)
                     }
                     if(!no_timing)
                     {
-                        std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration() / 1000.0)
-                                  << ",\n\t\t\"reduction-time\":" << (reduction_time.duration() / 1000.0)
-                                 << ",\n\t\t\"verification-time\":" << (verification_time.duration() / 1000.0);
+                        std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
+                                  << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
+                                 << ",\n\t\t\"verification-time\":" << (verification_time.duration());
                     }
                     std::cout << "\n\t}";
                     if(query_no != builder._result.size())

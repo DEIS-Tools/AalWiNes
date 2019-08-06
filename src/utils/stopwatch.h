@@ -20,36 +20,38 @@
 
 #include <ctime>
 #include <sstream>
-
+#include <chrono>
 
 class stopwatch {
+    using clock = std::chrono::high_resolution_clock;
     bool _running = false;
-    clock_t _start;
-    clock_t _stop;
+    
+    clock::time_point _start;
+    clock::time_point _stop;
 
 public:
-    double started() const { return _start; }
-    double stopped() const { return _stop; }
+    auto started() const { return _start; }
+    auto stopped() const { return _stop; }
     bool running() const { return _running; }
-    stopwatch(bool r = true) : _running(r), _start(clock()), _stop(clock()){}
+    stopwatch(bool r = true) : _running(r), _start(clock::now()), _stop(clock::now()){}
     void start() {
         if(!_running)
         {
             _running = true;
-            _start = clock() - (_stop - _start);
+            _start = clock::now() - (_stop - _start);
         }
     }
     void stop() {
         if(_running)
         {
-            _stop = clock();
+            _stop = clock::now();
             _running = false;
         }
     }
-    double duration() const { return ( (double(_stop - _start))*1000)/CLOCKS_PER_SEC; }
+    double duration() const { return std::chrono::duration_cast<std::chrono::duration<double>>(_stop-_start).count(); }
 
     std::ostream &operator<<(std::ostream &os){
-        os << duration() << " ms";
+        os << duration() << " s";
         return os;
     }
 };
