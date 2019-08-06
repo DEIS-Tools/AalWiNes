@@ -131,7 +131,12 @@ namespace mpls2pda {
 
     std::unordered_set<Query::label_t> Network::all_labels()
     {
+
         std::unordered_set<Query::label_t> res;
+        for(auto& i : _all_interfaces)
+        {
+            res.insert((i->global_id() + 1)*-1);
+        }
         res.reserve(_label_map.size());
         for(auto& r : _routers)
         {

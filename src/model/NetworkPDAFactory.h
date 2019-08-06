@@ -46,8 +46,8 @@ namespace mpls2pda
             int32_t _tid = 0;
             int32_t _eid = 0;
             int32_t _rid = 0;
-            NFA::state_t* _nfastate;
-            const Router* _router;
+            NFA::state_t* _nfastate = nullptr;
+            const Router* _router = nullptr;
         };
     public:
         NetworkPDAFactory(Query& q, Network& network);

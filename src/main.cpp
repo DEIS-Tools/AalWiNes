@@ -233,7 +233,7 @@ int main(int argc, const char** argv)
             "A file containing valid queries over the input network.")
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
-            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack")
+            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=internal")
             ;    
     
@@ -250,7 +250,7 @@ int main(int argc, const char** argv)
         return 1;
     }
     
-    if(tos > 2)
+    if(tos > 3)
     {
         std::cerr << "Unknown value for --tos-reduction : " << tos << std::endl;
         exit(-1);
@@ -338,7 +338,7 @@ int main(int argc, const char** argv)
         {
             std::cout << "{\n";
             std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration() / 1000) 
-                      << "\", \"query-parsing-time\":" << (queryparsingwatch.duration() / 1000) << "\",\n";
+                      << "\", \"query-parsing-time\":" << (queryparsingwatch.duration() / 1000) << ",\n";
             std::cout << "\t\"answers\":{\n";
         }
         for(auto& q : builder._result)

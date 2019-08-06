@@ -374,6 +374,83 @@ namespace pdaaal {
             }
         }
     public:
+
+        void target_tos_prune(){
+            for(size_t s = 1; s < _states.size(); ++s)
+            {
+                if(_states[s]._pre_is_dot) continue;
+                std::unordered_set<T> usefull_tos;
+                bool cont = false;
+                for(auto& r : _states[s]._rules)
+                {
+                    if(!r._precondition._wildcard)
+                    {
+                        usefull_tos.insert(r._precondition._labels.begin(), r._precondition._labels.end());
+                        if(usefull_tos.size() == _all_labels.size())
+                        {
+                            cont = true;
+                            break;
+                        }
+                    }
+                    else if(_states[s]._pre_is_dot)
+                    {
+                        cont = true;
+                        break;
+                    }
+                }
+                if(cont) continue;
+                for(auto& pres : _states[s]._pre)
+                {
+                    auto& state = _states[pres];
+                    for(auto& r : state._rules)
+                    {
+                        if(r._to == s)
+                        {
+                            switch(r._op_label)
+                            {
+                                case SWAP:
+                                case PUSH:
+                                    if(usefull_tos.count(r._op_label) == 0 && !r._precondition._labels.empty())
+                                    {
+                                        r._precondition._labels.clear();
+                                        r._dot_label = false;
+                                    }
+                                    break;
+                                case NOOP:
+                                {
+                                    auto it = r._precondition._labels.begin();
+                                    auto wit = it;
+                                    auto uit = usefull_tos.begin();
+                                    while(it != r._precondition._labels.end())
+                                    {
+                                        while(uit != std::end(usefull_tos) && *uit < *it) ++it;
+                                        if(uit != std::end(usefull_tos) && *uit == *it)
+                                        {
+                                            *wit = *it;
+                                            ++wit;
+                                            ++it;
+                                        }
+                                        else
+                                        {
+                                            ++it;
+                                        }
+                                    }
+                                    if(wit != it)
+                                    {
+                                        r._precondition._labels.resize(wit - r._precondition._labels.begin());
+                                    }
+                                    break;
+                                }
+                                case POP:
+                                    // we cant really prune this one.
+                                    // it fans out if we try; i.e. no local computation.
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
         std::pair<size_t, size_t> reduce(int aggresivity)
         {
@@ -387,7 +464,7 @@ namespace pdaaal {
                 size_t after_cnt = size();
                 return std::make_pair(cnt, after_cnt);
             }
-            auto ds = (aggresivity == 2);
+            auto ds = (aggresivity >= 2);
             std::vector<tos_t> approximation(_states.size());
             
             // initialize
@@ -410,7 +487,7 @@ namespace pdaaal {
                         ss._tos.insert(lb, r._op_label);
                 }
             }
-            
+                      
             // saturate
             while(!waiting.empty())
             {
@@ -486,7 +563,14 @@ namespace pdaaal {
             
             forwards_prune();
             backwards_prune();
-
+            if(aggresivity == 3)
+            {
+                // it could potentially work cyclic; not sure if it has any effect.
+                target_tos_prune();
+                forwards_prune();
+                backwards_prune();
+            }
+            
             size_t after_cnt = size();
             return std::make_pair(cnt, after_cnt);
         }
@@ -557,8 +641,11 @@ namespace pdaaal {
                 auto ait = _all_labels.begin();
                 for(; lid != labels.end(); ++lid)
                 {
-                    while(*ait < *lid)
+                    while(*ait < *lid && ait != std::end(_all_labels))
+                    {
                         add_rule(from, to, op, false, *ait, negated_pre, pre);
+                        ++ait;
+                    }
                     assert(*ait == *lid);
                     ++ait;
                     assert(ait == std::end(_all_labels) || *ait != *lid);
