@@ -3,7 +3,7 @@ project(mpls2pda C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-find_package(FLEX 2.6.0 REQUIRED)
+find_package(FLEX 2.5.0 REQUIRED)
 find_package(BISON 3.0.0 REQUIRED)
 
 flex_target(flexer "parser/QueryLexer.l"  "${CMAKE_CURRENT_SOURCE_DIR}/parser/generated_QueryLexer.cc")
