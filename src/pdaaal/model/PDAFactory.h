@@ -144,21 +144,17 @@ namespace pdaaal {
                             seen.insert(n);
                             waiting.push_back(n);
                         }
-                    }
-                }
-
-                // if the construction-header is accepting, glue with next component
-                if (top->_accepting) {
-                    // TODO there is some nice and easy pruning to be done here
-                    // by just considering "next step".
-                    // for now, just glue with "no-op"
-                    for (auto s : initial()) {
-                        result.add_wildcard(nfa_id(top), s, PDA<T>::NOOP, true, empty);
-                    }
-                    // we can pass directly to destruction
-                    if (empty_accept()) {
-                        for (auto s : _des_stack.initial()) {
-                           result.add_wildcard(nfa_id(top), nfa_id(s), PDA<T>::NOOP, true, empty);
+                        if(n->_accepting)
+                        {
+                            for (auto s : initial()) {
+                                result.add_rules(nfa_id(top), s, PDA<T>::PUSH, e._negated, e._symbols, false, pre);
+                            }
+                            // we can pass directly to destruction
+                            if (empty_accept()) {
+                                for (auto s : _des_stack.initial()) {
+                                   result.add_rules(nfa_id(top), nfa_id(s), PDA<T>::PUSH, e._negated, e._symbols, false, pre);
+                                }
+                            }                            
                         }
                     }
                 }
