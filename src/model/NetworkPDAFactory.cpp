@@ -108,7 +108,7 @@ namespace mpls2pda
             rn = router->name();
         else
             rn = "SINK";
-        std::cerr << "ADDED STATE " << state << " R " << rn << " M" << mode << " T" << table << " F" << fid << " O" << op << std::endl;
+        std::cerr << "ADDED STATE " << state << " R " << rn << "(" << router << ")" << " M" << mode << " T" << table << " F" << fid << " O" << op << " E" << eid << std::endl;
         std::cerr << "\tID " << res.second << std::endl;
         if(_states.get_data(res.second))
             std::cerr << "\t\tACCEPTING !" << std::endl;*/

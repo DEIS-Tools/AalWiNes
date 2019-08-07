@@ -29,10 +29,10 @@ namespace pdaaal {
     class PDA {
     public:
         enum op_t {
-            PUSH, 
-            POP, 
-            SWAP, 
-            NOOP
+            PUSH = 0, 
+            POP = 1, 
+            SWAP = 2, 
+            NOOP = 3
         };
         struct tracestate_t {
             size_t _pdastate = 0;
@@ -51,10 +51,10 @@ namespace pdaaal {
         };
 
         struct rule_t {
-            size_t _to;
+            size_t _to = 0;
             op_t _operation = NOOP;
-            T _op_label;
-            bool _dot_label;
+            T _op_label = T{};
+            bool _dot_label = false;
             bool is_terminal() const 
             {
                 return _to == 0;
@@ -94,7 +94,7 @@ namespace pdaaal {
             std::vector<T> _stack; // TODO: some symbolic representation would be better here
             bool _top_dot = false;
             bool _stack_dot = false;
-            bool _in_waiting = false;
+            int _in_waiting = 0;
             bool wildcard_top(const std::vector<T>& all_labels) const {
                 return _top_dot || _tos.size() == all_labels.size();
             }
@@ -104,16 +104,20 @@ namespace pdaaal {
 
             bool active(const tos_t& prev, const rule_t& rule, const std::vector<T>& all_labels)
             {
-                if(rule._precondition.empty()) return false;
-                if(!rule._precondition._wildcard && !prev.wildcard_top(all_labels))
+                if( (!prev._top_dot && prev._tos.empty()) ||
+                    (rule._precondition.empty()))
+                {
+                    return false;
+                }
+                if(!prev.wildcard_top(all_labels))
                 {
                     auto rit = rule._precondition._labels.begin();
                     bool match = false;
                     for(auto& s : prev._tos)
                     {
+                        while(rit != std::end(rule._precondition._labels) && *rit < s) ++rit;
                         if(rit == std::end(rule._precondition._labels)) break;
                         if(*rit == s){ match = true; break; }
-                        while(rit != std::end(rule._precondition._labels) && *rit < s) ++rit;
                     }
                     return match;
                 }
@@ -164,7 +168,10 @@ namespace pdaaal {
             
             bool merge_pop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, bool expand_dot)
             {
-                if(!active(prev, rule, all_labels)) return false;
+                if(!active(prev, rule, all_labels))
+                {
+                    return false;
+                }
                 bool changed = false;
                 if(!dual_stack)
                 {
@@ -392,21 +399,18 @@ namespace pdaaal {
                             break;
                         }
                     }
-                    else if(_states[s]._pre_is_dot)
-                    {
-                        cont = true;
-                        break;
-                    }
                 }
                 if(cont) continue;
+//                std::cerr << "S" << s << std::endl;
                 for(auto& pres : _states[s]._pre)
                 {
+//                    std::cerr << "\t PRE S" << pres << std::endl;
                     auto& state = _states[pres];
                     for(auto& r : state._rules)
                     {
                         if(r._to == s)
                         {
-                            switch(r._op_label)
+                            switch(r._operation)
                             {
                                 case SWAP:
                                 case PUSH:
@@ -473,10 +477,10 @@ namespace pdaaal {
                 if(r._to == 0) continue;
                 if(r._precondition.empty()) continue;
                 auto& ss = approximation[r._to];
-                if(!ss._in_waiting)
+                if(ss._in_waiting == 0)
                 {
                     waiting.push(r._to);
-                    ss._in_waiting = true;
+                    ss._in_waiting = -1;
                 }
                 assert(r._operation == PUSH);
                 if(r._dot_label) ss._top_dot = true;
@@ -494,7 +498,6 @@ namespace pdaaal {
                 auto el = waiting.front();
                 waiting.pop();
                 auto& ss = approximation[el];
-                ss._in_waiting = false;
                 auto& state = _states[el];
                 auto fit = state._rules.begin();
                 while(fit != std::end(state._rules))
@@ -525,14 +528,15 @@ namespace pdaaal {
                             throw base_error("Unknown PDA operation");
                             break;
                     }
-                    if(change)
+                    if(change || ss._in_waiting == -1)
                     {
-                        if(!to._in_waiting)
+                        if(to._in_waiting >= 0)
                         {
-                            to._in_waiting = true;
+                            to._in_waiting = to._in_waiting == 0 ? -1 : -2;
                             waiting.push(fit->_to);
                         }
                     }
+                    ss._in_waiting = 1;
                     ++fit;
                 }
             }
@@ -543,22 +547,71 @@ namespace pdaaal {
                 auto& app = approximation[i];
                 auto& state = _states[i];
                 size_t br = 0;
+/*                std::cerr << "[" << i << "] \n";
+                std::cerr << "\t" << (app._top_dot ? "DOT + [" : "[");
+                if(app._tos.size() == _all_labels.size())
+                    std::cerr << "ALL";
+                else
+                {
+                    for(auto& l : app._tos)
+                    {
+                        std::cerr << l << ", ";
+                    }
+                }
+                std::cerr << "]\n";
+                std::cerr << "\t" << (app._stack_dot ? "DOT + [" : "[");
+                if(app._stack.size() == _all_labels.size())
+                    std::cerr << "ALL";
+                else
+                {
+                    for(auto& l : app._stack)
+                    {
+                        std::cerr << l << ", ";
+                    }
+                }
+                std::cerr << "]\n";*/
                 for(size_t r = 0; r < state._rules.size(); ++r)
                 {
                     // check rule
                     auto& rule = state._rules[r];
+ /*                   std::cerr << "PRE \n\t";
+                    for(auto& p : rule._precondition._labels)
+                    {
+                        std::cerr << p << ",";
+                    }
+                    std::cerr << "\n\t";
+                    if(rule._precondition._wildcard)
+                            std::cerr << "Wildcard\n\t";
+                    for(auto& l : rule._precondition._labels)
+                        std::cerr << l << ",";
+                    std::cerr << std::endl;*/
                     if(rule._to == 0 || rule._precondition.intersect(app, _all_labels))
                     {
+/*                        std::cerr << "Keep rule on [[" << i << "]] with oplabel " << rule._op_label << " AND OP " << rule._operation << std::endl;
+                        if(rule._precondition._wildcard)
+                            std::cerr << "\tWildcard\n";
+                        std::cerr << "\t" << rule._precondition._labels.size() << std::endl;*/
                         if(br != r)
                         {
-                            state._rules[br] = std::move(state._rules[r]);
+                            std::swap(state._rules[br], state._rules[r]);
                         }
                         ++br;
                     }
+/*                    else
+                    {
+                        std::cerr << "Remove rule on [[" << i << "]] with oplabel " << rule._op_label << " AND OP " << rule._operation << std::endl;
+                    }*/
                 }
                 state._rules.resize(br);
                 if(state._rules.empty())
+                {
+//                    std::cerr << "CLEAR S" << i << " !!" << std::endl;
                     state._pre.clear();
+                }
+/*                else
+                {
+                    std::cerr << "NS S" << i << std::endl; 
+                }*/
             }
             
             forwards_prune();
@@ -792,6 +845,7 @@ namespace pdaaal {
     {
         if(tos._tos.size() == all_labels.size())
         {
+//            std::cerr << "EMPY 1" << std::endl;
             return !empty();
         }
         if(_wildcard)
@@ -810,8 +864,7 @@ namespace pdaaal {
                 if(fit == std::end(tos._tos)) break;
                 if(*fit == _labels[nl])
                 {
-                    if(nl != bit)
-                        _labels[bit] = _labels[nl];
+                    _labels[bit] = _labels[nl];
                     ++bit;
                 }
             }
