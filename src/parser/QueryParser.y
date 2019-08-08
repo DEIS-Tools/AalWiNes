@@ -1,8 +1,8 @@
 %skeleton "lalr1.cc" /* -*- C++ -*- */
-%require "3.0.0"
+%require "3.0.5"
 %defines
 %define api.namespace {mpls2pda}
-%define api.parser.class {Parser}
+%define parser_class_name {Parser}
 %define api.token.constructor
 %define api.value.type variant
 %define parse.assert
