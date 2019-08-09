@@ -208,7 +208,7 @@ namespace pdaaal {
                     continue;
                 }
                 if (r._precondition.empty()) continue;
-                if (state._pre_is_dot && (r._precondition._wildcard || r._operation == PDA<T>::POP || r._operation == PDA<T>::SWAP)) {
+                if (state._pre_is_dot && (r._precondition.wildcard() || r._operation == PDA<T>::POP || r._operation == PDA<T>::SWAP)) {
                     // we can make a DOT -> DOT rule but only if both pre and post are "DOT" -- 
                     // or as the case with POP and SWAP; TOS can be anything 
                     s << "S" << sid << "<DOT> --> ";
@@ -218,8 +218,8 @@ namespace pdaaal {
                     s << ">\n";
                 } else if (state._pre_is_dot) {
                     // we effectively settle the state of the DOT symbol here
-                    assert(!r._precondition._wildcard);
-                    for (auto& symbol : r._precondition._labels) {
+                    assert(!r._precondition.wildcard());
+                    for (auto& symbol : r._precondition.labels()) {
                         std::stringstream ss;
                         labelprinter(ss, symbol);
                         s << "S" << sid << "<DOT> --> ";
@@ -231,7 +231,7 @@ namespace pdaaal {
                 } else {
                     assert(!state._pre_is_dot);
                     bool post_settle = false;
-                    auto& symbols = r._precondition._wildcard ? pda.labelset() : r._precondition._labels;
+                    auto& symbols = r._precondition.wildcard() ? pda.labelset() : r._precondition.labels();
                     for (auto& symbol : symbols) {
                         std::stringstream ss;
                         std::stringstream postss;
@@ -244,7 +244,7 @@ namespace pdaaal {
                         s << "S" << sid << "<";
                         labelprinter(s, symbol);
                         s << ">" << postss.str();
-                        if (r._precondition._wildcard && (r._operation == PDA<T>::NOOP || r._operation == PDA<T>::POP || r._operation == PDA<T>::PUSH)) {
+                        if (r._precondition.dot() && r._operation == PDA<T>::POP) {
                             // we do not need to settle the DOT yet
                             post_settle = true;
                         } else {
@@ -263,7 +263,6 @@ namespace pdaaal {
             }
         }
     }
-
 }
 
 #endif /* MOPED_H */
