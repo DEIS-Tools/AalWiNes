@@ -427,7 +427,7 @@ namespace pdaaal {
                                     auto uit = usefull_tos.begin();
                                     while(it != r._precondition._labels.end())
                                     {
-                                        while(uit != std::end(usefull_tos) && *uit < *it) ++it;
+                                        while(uit != std::end(usefull_tos) && *uit < *it) ++uit;
                                         if(uit != std::end(usefull_tos) && *uit == *it)
                                         {
                                             *wit = *it;
