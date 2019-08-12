@@ -64,6 +64,7 @@ namespace mpls2pda {
 
         struct entry_t {
             label_t _top_label = std::numeric_limits<label_t>::min();
+            const Interface* _ingoing = nullptr;
             bool _decreasing = false;
             std::vector<forward_t> _rules;
             bool operator==(const entry_t& other) const;
@@ -105,6 +106,7 @@ namespace mpls2pda {
             return _entries.empty();
         }
         bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
+        bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
         const std::vector<entry_t>& entries() const {

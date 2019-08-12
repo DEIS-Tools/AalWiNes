@@ -43,11 +43,10 @@ namespace mpls2pda
         struct nstate_t {
             int32_t _appmode = 0; // mode of approximation
             int32_t _opid = -1; // which operation is the first in the rule (-1=cleaned up).
-            int32_t _tid = 0;
-            int32_t _eid = 0;
-            int32_t _rid = 0;
+            int32_t _eid = 0; // which entry we are going for
+            int32_t _rid = 0; // which rule in that entry
             NFA::state_t* _nfastate = nullptr;
-            const Router* _router = nullptr;
+            const Interface* _inf = nullptr;
         };
     public:
         NetworkPDAFactory(Query& q, Network& network);
@@ -69,7 +68,7 @@ namespace mpls2pda
         void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;
 
         void construct_initial();
-        std::pair<bool,size_t> add_state(NFA::state_t* state, const Router* router, int32_t mode = 0, int32_t tid = 0, int32_t eid = 0, int32_t fid = 0, int32_t op = -1);
+        std::pair<bool,size_t> add_state(NFA::state_t* state, const Interface* router, int32_t mode = 0, int32_t eid = 0, int32_t fid = 0, int32_t op = -1);
         int32_t set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward);
         Network& _network;
         Query& _query;

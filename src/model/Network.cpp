@@ -32,9 +32,9 @@ namespace mpls2pda {
     {
         for(auto& r : _routers)
         {
-            for(auto& t : r->tables())
+            for(auto& inf : r->interfaces())
             {
-                for(auto& e : t.entries())
+                for(auto& e : inf->table().entries())
                 {
                     _label_map[e._top_label].emplace_back(&e, r.get());
                 }
@@ -140,9 +140,9 @@ namespace mpls2pda {
         res.reserve(_label_map.size());
         for(auto& r : _routers)
         {
-            for(auto& t : r->tables())
+            for(auto& inf : r->interfaces())
             {
-                for(auto& e : t.entries())
+                for(auto& e : inf->table().entries())
                 {
                     if(e.is_default()) continue;
                     res.insert(e._top_label);
@@ -174,18 +174,6 @@ namespace mpls2pda {
             r->print_dot(s);
         }
         s << "}" << std::endl;
-    }
-
-    void Network::print_json(std::ostream& s)
-    {
-        s << "{\n";
-        for (size_t i = 0; i < _routers.size(); ++i) {
-            if (i != 0)
-                s << ",\n";
-            s << "\"" << _routers[i]->name() << "\":";
-            _routers[i]->print_json(s);
-        }
-        s << "\n}\n";
     }
 
 }

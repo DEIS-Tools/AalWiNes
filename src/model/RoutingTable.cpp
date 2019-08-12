@@ -118,7 +118,7 @@ namespace mpls2pda
             }
             else {
                 auto inf = parent->get_interface(all_interfaces, tl);
-                entry._top_label = (-1 * (int64_t) inf->global_id()) - 1;
+                entry._ingoing = inf;
             }
 
             auto nh = rule->first_node("nh");
@@ -312,6 +312,39 @@ namespace mpls2pda
         _ops.pop_back();
     }
 
+    bool RoutingTable::merge(const RoutingTable& other, Interface& parent, std::ostream& warnings)
+    {
+        bool all_fine = true;
+        auto iit = _entries.begin();
+        for (auto oit = other._entries.begin(); oit != other._entries.end(); ++oit) {
+            if(oit->_ingoing != nullptr && oit->_ingoing != &parent) continue;
+            auto& e = (*oit);
+            while (iit != std::end(_entries) && (*iit) < e)
+                ++iit;
+            if (iit == std::end(_entries))
+            {
+                _entries.insert(_entries.end(), oit, std::end(other._entries));
+                return all_fine;
+            }
+            else if ((*iit) == e) {
+                if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
+                    e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
+                    continue;
+                warnings << "\t\tOverlap on label ";
+                entry_t::print_label(e._top_label, warnings);
+                warnings << " for router " << parent.source()->name() << std::endl;
+                all_fine = false;
+                iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
+            }
+            else
+            {
+                assert((*iit) < e);
+                iit = _entries.insert(iit, e);
+            }
+        }
+        return all_fine;        
+    }
+    
     bool RoutingTable::overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const
     {
         auto oit = other._entries.begin();

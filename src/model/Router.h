@@ -45,6 +45,14 @@ public:
         return _parent;
     }
     
+    RoutingTable& table() {
+        return _table;
+    }
+    
+    const RoutingTable& table() const {
+        return _table;
+    }
+    
     bool is_virtual() const {
         return _parent == _target;
     }
@@ -59,7 +67,6 @@ public:
     uint32_t ip4() const { return _ip; }
     uint64_t ip6() const { return _ip6; }
     
-    void print_json(std::ostream&, const char* name) const;
     void make_pairing(Router* parent, std::vector<const Interface*>& all_interfaces);
     Interface* match() const { return _matching; }
 private:
@@ -70,6 +77,7 @@ private:
     uint32_t _ip = 0; // two special values; unknown = uint32_t::max, virtual = 0
     uint64_t _ip6 = 0;
     Router* _parent = nullptr;
+    RoutingTable _table;
 };
 
 class Router {
@@ -98,13 +106,10 @@ public:
     }
     std::unique_ptr<char[] > interface_name(size_t i);
     void pair_interfaces(std::vector<const Interface*>&);
-    void print_json(std::ostream& s);
-    const std::vector<RoutingTable>& tables() const {return _tables; }
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;
     std::vector<std::unique_ptr<Interface>> _interfaces;
-    std::vector<RoutingTable> _tables;
     ptrie::map<Interface*> _interface_map;
     size_t _inamelength = 0; // for printing
     bool _has_config = false;

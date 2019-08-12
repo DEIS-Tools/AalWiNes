@@ -49,7 +49,6 @@ public:
     std::unordered_set<Query::label_t> all_labels();
     const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);
-    void print_json(std::ostream& s);
 private:
     // NO TOUCHEE AFTER INIT!
     ptrie::map<Router*> _mapping;

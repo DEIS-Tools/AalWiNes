@@ -35,7 +35,7 @@ namespace mpls2pda
     {
         // add special NULL state initially
         NFA::state_t* ns = nullptr;
-        Router* nr = nullptr;
+        Interface* nr = nullptr;
         add_state(ns, nr);
         construct_initial();
         _path.compile();
@@ -44,12 +44,12 @@ namespace mpls2pda
     void NetworkPDAFactory::construct_initial()
     {
         // there is potential for some serious pruning here!
-        auto add_initial = [&, this](NFA::state_t* state, const Router * router)
+        auto add_initial = [&, this](NFA::state_t* state, const Interface * inf)
         {
             std::vector<NFA::state_t*> next{state};
             NFA::follow_epsilon(next);
             for (auto& n : next) {
-                auto res = add_state(n, router, 0, 0, 0, 0, -2); // we start by going to -2, as we only initially can accept interface-labels
+                auto res = add_state(n, inf, 0, 0, 0, -1); // we start by going to -2, as we only initially can accept IP-labels
                 if (res.first)
                     _initial.push_back(res.second);
             }
@@ -60,14 +60,14 @@ namespace mpls2pda
             // i.e. we have to move straight to the next state
             for (auto& e : i->_edges) {
                 if (e.wildcard(_network.all_interfaces().size())) {
-                    for (size_t r = 0; r < _network.size(); ++r) {
-                        add_initial(e._destination, _network.get_router(r));
+                    for (auto inf : _network.all_interfaces()) {
+                        add_initial(e._destination, inf);
                     }
                 }
                 else if (!e._negated) {
                     for (auto s : e._symbols) {
                         auto interface = _network.all_interfaces()[(s+1)*-1];
-                        add_initial(e._destination, interface->target());
+                        add_initial(e._destination, interface);
                     }
                 }
                 else {
@@ -75,7 +75,7 @@ namespace mpls2pda
                         auto iid = Query::label_t{((ssize_t)inf->global_id() + 1) * -1};
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                         if (lb == std::end(e._symbols) || *lb != iid) {
-                            add_initial(e._destination, inf->target());
+                            add_initial(e._destination, inf);
                         }
                     }
                 }
@@ -83,15 +83,14 @@ namespace mpls2pda
         }
     }
 
-    std::pair<bool, size_t> NetworkPDAFactory::add_state(NFA::state_t* state, const Router* router, int32_t mode, int32_t table, int32_t eid, int32_t fid, int32_t op)
+    std::pair<bool, size_t> NetworkPDAFactory::add_state(NFA::state_t* state, const Interface* inf, int32_t mode, int32_t eid, int32_t fid, int32_t op)
     {
         nstate_t ns;
         ns._appmode = mode;
         ns._nfastate = state;
         ns._opid = op;
-        ns._router = router;
+        ns._inf = inf;
         ns._rid = fid;
-        ns._tid = table;
         ns._eid = eid;
         auto res = _states.insert((unsigned char*) &ns, sizeof (ns));
         if (res.first) {
@@ -170,111 +169,109 @@ namespace mpls2pda
         _states.unpack(id, (unsigned char*) &s);
         std::vector<NetworkPDAFactory::PDAFactory::rule_t> result;
         if (s._opid < 0) {
-            if (s._router == nullptr) return result;
+            if (s._inf == nullptr) return result;
             // all clean! start pushing.
-            for (auto& table : s._router->tables()) {
-                for (auto& entry : table.entries()) {
-                    if(entry.is_default()) 
+            for (auto& entry : s._inf->table().entries()) {
+                if(entry.is_default()) 
+                {
+                    continue; // we assume these are DROP
+                }
+                if(entry.is_interface() && s._opid != -2)
+                {
+                    continue; // only accept interface-labels from initial -2 mode
+                }
+                for (auto& forward : entry._rules) {
+                    if (forward._via == nullptr || forward._via->target() == nullptr)
                     {
-                        continue; // we assume these are DROP
+                        continue; // drop/discard/lookup
                     }
-                    if(entry.is_interface() && s._opid != -2)
-                    {
-                        continue; // only accept interface-labels from initial -2 mode
-                    }
-                    for (auto& forward : entry._rules) {
-                        if (forward._via == nullptr || forward._via->target() == nullptr)
+                    for (auto& e : s._nfastate->_edges) {
+                        if (e.empty(_network.all_interfaces().size()))
                         {
-                            continue; // drop/discard/lookup
+                            continue;
                         }
-                        for (auto& e : s._nfastate->_edges) {
-                            if (e.empty(_network.all_interfaces().size()))
-                            {
-                                continue;
-                            }
-                            auto iid = Query::label_t{((ssize_t)forward._via->global_id() + 1) * -1};
-                            auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
-                            bool found = lb != std::end(e._symbols) && *lb == iid;
+                        auto iid = Query::label_t{((ssize_t)forward._via->global_id() + 1) * -1};
+                        auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
+                        bool found = lb != std::end(e._symbols) && *lb == iid;
 
-                            if (found != (!e._negated)) {
-                                continue;
+                        if (found != (!e._negated)) {
+                            continue;
+                        }
+                        else {
+                            rule_t nr;
+                            nr._pre = entry._top_label;
+                            auto appmode = s._appmode;
+                            if (!forward._via->is_virtual()) {
+                                appmode = set_approximation(s, forward);
+                                if (appmode == std::numeric_limits<int32_t>::max())
+                                    continue;
                             }
-                            else {
-                                rule_t nr;
-                                nr._pre = entry._top_label;
-                                auto appmode = s._appmode;
-                                if (!forward._via->is_virtual()) {
-                                    appmode = set_approximation(s, forward);
-                                    if (appmode == std::numeric_limits<int32_t>::max())
-                                        continue;
-                                }
-                                if (forward._ops.size() > 0) {
-                                    switch (forward._ops[0]._op) {
-                                    case RoutingTable::POP:
-                                        nr._op = POP;
-                                        assert(!entry.is_interface());
-                                        break;
-                                    case RoutingTable::PUSH:
-                                        if (entry.is_interface()) {
-                                            nr._op = SWAP;
-                                            nr._op_label = forward._ops[0]._op_label;
-                                        }
-                                        else {
-                                            nr._op = PUSH;
-                                            assert(forward._ops[0]._op_label >= 0);
-                                            nr._op_label = forward._ops[0]._op_label;
-                                        }
-                                        break;
-                                    case RoutingTable::SWAP:
+                            if (forward._ops.size() > 0) {
+                                switch (forward._ops[0]._op) {
+                                case RoutingTable::POP:
+                                    nr._op = POP;
+                                    assert(!entry.is_interface());
+                                    break;
+                                case RoutingTable::PUSH:
+                                    if (entry.is_interface()) {
                                         nr._op = SWAP;
                                         nr._op_label = forward._ops[0]._op_label;
-                                        assert(!entry.is_interface());
-                                        break;
                                     }
-                                }
-                                else {
-                                    nr._op = NOOP;
-                                }
-                                if (forward._ops.size() <= 1) {
-                                    std::vector<NFA::state_t*> next{e._destination};
-                                    if (forward._via->is_virtual())
-                                        next = {s._nfastate};
-                                    else
-                                        NFA::follow_epsilon(next);
-                                    for (auto& n : next) {
-                                        result.emplace_back(nr);
-                                        auto& ar = result.back();
-                                        if(nr._op == NOOP && s._opid == -2 && entry.is_interface())
-                                        {
-                                            // special case, we forward the initial IP->MPLS to the next router
-                                            auto res = add_state(n, forward._via->target(), appmode, 0, 0, 0, -2); // we start by going to -2, as we only initially can accept interface-labels
-                                            ar._dest = res.second;
-                                            // we swap to receivers label
-                                            ar._op = SWAP;
-                                            ar._op_label = Query::label_t{((int)forward._via->match()->global_id() + 1) * -1};
-                                        }
-                                        else
-                                        {
-                                            auto res = add_state(n, forward._via->target(), appmode);
-                                            ar._dest = res.second;
-                                        }
+                                    else {
+                                        nr._op = PUSH;
+                                        assert(forward._ops[0]._op_label >= 0);
+                                        nr._op_label = forward._ops[0]._op_label;
                                     }
+                                    break;
+                                case RoutingTable::SWAP:
+                                    nr._op = SWAP;
+                                    nr._op_label = forward._ops[0]._op_label;
+                                    assert(!entry.is_interface());
+                                    break;
                                 }
-                                else {
-                                    std::vector<NFA::state_t*> next{e._destination};
-                                    if (forward._via->is_virtual())
-                                        next = {s._nfastate};
+                            }
+                            else {
+                                nr._op = NOOP;
+                            }
+                            if (forward._ops.size() <= 1) {
+                                std::vector<NFA::state_t*> next{e._destination};
+                                if (forward._via->is_virtual())
+                                    next = {s._nfastate};
+                                else
+                                    NFA::follow_epsilon(next);
+                                for (auto& n : next) {
+                                    result.emplace_back(nr);
+                                    auto& ar = result.back();
+                                    if(nr._op == NOOP && s._opid == -2 && entry.is_interface())
+                                    {
+                                        assert(false);
+                                        // special case, we forward the initial IP->MPLS to the next router
+                                        auto res = add_state(n, forward._via->match(), appmode, 0, 0, -1);
+                                        ar._dest = res.second;
+                                        // we swap to receivers label
+                                        ar._op = SWAP;
+                                        ar._op_label = Query::label_t{((int)forward._via->match()->global_id() + 1) * -1};
+                                    }
                                     else
-                                        NFA::follow_epsilon(next);
-                                    for (auto& n : next) {
-                                        result.emplace_back(nr);
-                                        auto& ar = result.back();
-                                        auto tid = ((&table) - s._router->tables().data());
-                                        auto eid = ((&entry) - table.entries().data());
-                                        auto rid = ((&forward) - entry._rules.data());
-                                        auto res = add_state(n, s._router, appmode, tid, eid, rid, 0);
+                                    {
+                                        auto res = add_state(n, forward._via->match(), appmode);
                                         ar._dest = res.second;
                                     }
+                                }
+                            }
+                            else {
+                                std::vector<NFA::state_t*> next{e._destination};
+                                if (forward._via->is_virtual())
+                                    next = {s._nfastate};
+                                else
+                                    NFA::follow_epsilon(next);
+                                for (auto& n : next) {
+                                    result.emplace_back(nr);
+                                    auto& ar = result.back();
+                                    auto eid = ((&entry) - s._inf->table().entries().data());
+                                    auto rid = ((&forward) - entry._rules.data());
+                                    auto res = add_state(n, s._inf, appmode, eid, rid, 0);
+                                    ar._dest = res.second;
                                 }
                             }
                         }
@@ -283,11 +280,11 @@ namespace mpls2pda
             }
         }
         else {
-            auto& r = s._router->tables()[s._tid].entries()[s._eid]._rules[s._rid];
+            auto& r = s._inf->table().entries()[s._eid]._rules[s._rid];
             result.emplace_back();
             auto& nr = result.back();
             auto& act = r._ops[s._opid + 1];
-            nr._pre = s._router->tables()[s._tid].entries()[s._eid]._top_label;
+            nr._pre = s._inf->table().entries()[s._eid]._top_label;
             for (auto pid = 0; pid <= s._opid; ++pid) {
                 switch (r._ops[pid]._op) {
                 case PUSH:
@@ -317,11 +314,11 @@ namespace mpls2pda
                 break;
             }
             if (s._opid + 2 == (int) r._ops.size()) {
-                auto res = add_state(s._nfastate, r._via->target());
+                auto res = add_state(s._nfastate, r._via);
                 nr._dest = res.second;
             }
             else {
-                auto res = add_state(s._nfastate, s._router, s._appmode, s._tid, s._eid, s._rid, s._opid + 1);
+                auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
                 nr._dest = res.second;
             }
         }
@@ -364,7 +361,7 @@ namespace mpls2pda
                 {
                     if(!first)
                         stream << ",\n";
-                    stream << "\t\t\t{\"router\":\"" << s._router->name() << "\",\"stack\":[";
+                    stream << "\t\t\t{\"router\":\"" << s._inf->source()->name() << "\",\"stack\":[";
                     bool first_symbol = true;
                     for(auto& symbol : step._stack)
                     {
@@ -387,8 +384,8 @@ namespace mpls2pda
                         if(next._opid != -1)
                         {
                             // we get the rule we use, print
-                            auto& entry = next._router->tables()[next._tid].entries()[next._eid];
-                            print_trace_rule(stream, next._router, entry, entry._rules[next._rid]);
+                            auto& entry = next._inf->table().entries()[next._eid];
+                            print_trace_rule(stream, next._inf->source(), entry, entry._rules[next._rid]);
                         }
                         else 
                         {
@@ -396,65 +393,61 @@ namespace mpls2pda
                             // run through the rules and find a match!
                             auto& nstep = trace[sno + 1];
                             bool found = false;
-                            for(auto& table : s._router->tables())
+                            for(auto& entry : s._inf->table().entries())
                             {
                                 if(found) break;
-                                for(auto& entry : table.entries())
+                                if(entry.is_default())
+                                    continue;
+                                if(!step._stack.front().first && step._stack.front().second != entry._top_label)
+                                    continue; // not matching on pre
+                                for(auto& r : entry._rules)
                                 {
-                                    if(found) break;
-                                    if(entry.is_default())
-                                        continue;
-                                    if(!step._stack.front().first && step._stack.front().second != entry._top_label)
-                                        continue; // not matching on pre
-                                    for(auto& r : entry._rules)
+                                    bool ok = false;
+                                    switch(_query.approximation())
                                     {
-                                        bool ok = false;
-                                        switch(_query.approximation())
-                                        {
-                                        case Query::UNDER:
-                                            assert(next._appmode >= s._appmode);
-                                            ok = ((ssize_t)r._weight) == (next._appmode - s._appmode);
-                                            break;
-                                        case Query::OVER:
-                                            ok = ((ssize_t)r._weight) <= _query.number_of_failures();
-                                            break;
-                                        case Query::EXACT:
-                                            throw base_error("Tracing for EXACT not yet implemented");
-                                        }
-                                        if(ok) // TODO, fix for approximations here!
-                                        {
-                                            if(r._ops.size() > 1) continue; // would have been handled in other case
+                                    case Query::UNDER:
+                                        assert(next._appmode >= s._appmode);
+                                        ok = ((ssize_t)r._weight) == (next._appmode - s._appmode);
+                                        break;
+                                    case Query::OVER:
+                                        ok = ((ssize_t)r._weight) <= _query.number_of_failures();
+                                        break;
+                                    case Query::EXACT:
+                                        throw base_error("Tracing for EXACT not yet implemented");
+                                    }
+                                    if(ok) // TODO, fix for approximations here!
+                                    {
+                                        if(r._ops.size() > 1) continue; // would have been handled in other case
 
-                                            if(r._via && r._via->target() == next._router)
+                                        if(r._via && r._via->match() == next._inf)
+                                        {
+                                            if(r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP)
                                             {
-                                                if(r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP)
+                                                if(step._stack.size() == nstep._stack.size() &&
+                                                   nstep._stack.front().second == (r._ops.empty() ? entry._top_label : r._ops[0]._op_label) &&
+                                                   !nstep._stack.front().first)
                                                 {
-                                                    if(step._stack.size() == nstep._stack.size() &&
-                                                       nstep._stack.front().second == (r._ops.empty() ? entry._top_label : r._ops[0]._op_label) &&
-                                                       !nstep._stack.front().first)
-                                                    {
-                                                        print_trace_rule(stream, s._router, entry, r);
-                                                        found = true;
-                                                        break;
-                                                    }
+                                                    print_trace_rule(stream, s._inf->source(), entry, r);
+                                                    found = true;
+                                                    break;
                                                 }
-                                                else
+                                            }
+                                            else
+                                            {
+                                                assert(r._ops.size() == 1);
+                                                assert(r._ops[0]._op == RoutingTable::PUSH || r._ops[0]._op == RoutingTable::POP);
+                                                if(r._ops[0]._op == RoutingTable::POP && nstep._stack.size() == step._stack.size() - 1)
                                                 {
-                                                    assert(r._ops.size() == 1);
-                                                    assert(r._ops[0]._op == RoutingTable::PUSH || r._ops[0]._op == RoutingTable::POP);
-                                                    if(r._ops[0]._op == RoutingTable::POP && nstep._stack.size() == step._stack.size() - 1)
-                                                    {
-                                                        print_trace_rule(stream, s._router, entry, r);
-                                                        found = true;
-                                                        break;
-                                                    }
-                                                    else if(r._ops[0]._op == RoutingTable::PUSH && nstep._stack.size() == step._stack.size() + 1 &&
-                                                            r._ops[0]._op_label == nstep._stack.front().second && !nstep._stack.front().first)
-                                                    {
-                                                        print_trace_rule(stream, s._router, entry, r);
-                                                        found = true;
-                                                        break;                                                        
-                                                    }
+                                                    print_trace_rule(stream, s._inf->source(), entry, r);
+                                                    found = true;
+                                                    break;
+                                                }
+                                                else if(r._ops[0]._op == RoutingTable::PUSH && nstep._stack.size() == step._stack.size() + 1 &&
+                                                        r._ops[0]._op_label == nstep._stack.front().second && !nstep._stack.front().first)
+                                                {
+                                                    print_trace_rule(stream, s._inf->source(), entry, r);
+                                                    found = true;
+                                                    break;                                                        
                                                 }
                                             }
                                         }
