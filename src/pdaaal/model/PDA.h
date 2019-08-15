@@ -292,10 +292,28 @@ namespace pdaaal {
             {
                 if(!seen[s])
                 {
-                    _states[s]._rules.clear();
-                    _states[s]._pre.clear();
+                    clear_state(s);
                 }
             }            
+        }
+
+        void clear_state(size_t s){
+            _states[s]._rules.clear();
+            for(auto& p : _states[s]._pre)
+            {
+                auto rit = _states[p]._rules.begin();
+                auto wit = rit;
+                for(;rit != std::end(_states[p]._rules);++rit)
+                {
+                    if(rit->_to != s && wit != rit)
+                    {
+                        *wit = *rit;
+                        ++wit;
+                    }
+                }
+                _states[p]._rules.resize(wit-std::begin(_states[p]._rules));
+            }
+            _states[s]._pre.clear();
         }
         
         void backwards_prune(){
@@ -321,8 +339,7 @@ namespace pdaaal {
             {
                 if(!seen[s])
                 {
-                    _states[s]._rules.clear();
-                    _states[s]._pre.clear();
+                    clear_state(s);
                 }
             }
         }
@@ -530,7 +547,7 @@ namespace pdaaal {
                 if(state._rules.empty())
                 {
 //                    std::cerr << "CLEAR S" << i << " !!" << std::endl;
-                    state._pre.clear();
+                    clear_state(i);
                 }
 /*                else
                 {
