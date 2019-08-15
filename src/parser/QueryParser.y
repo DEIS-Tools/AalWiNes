@@ -126,9 +126,9 @@ query_list
         | END// empty 
         ;
 query
-    : LT { builder.label_mode(); } cregex 
-      GT { builder.path_mode(); } cregex 
-      LT { builder.label_mode(); } cregex GT number mode
+    : LT { builder.label_mode(); builder.invert(true); } cregex 
+      GT { builder.path_mode(); builder.invert(false);} cregex 
+      LT { builder.label_mode(); builder.invert(false);} cregex GT number mode
     {
         $$ = Query(std::move($3), std::move($6), std::move($9), $11, $12);
     }
@@ -141,7 +141,16 @@ mode
     ;
     
 cregex
-    : regex cregex { $$ = std::move($1); $$.concat(std::move($2)); }
+    : regex cregex { 
+        if(builder.inverted())
+        {
+            $$ = std::move($2); $$.concat(std::move($1));
+        }
+        else
+        {
+            $$ = std::move($1); $$.concat(std::move($2)); 
+        }
+    }
     | regex { $$ = std::move($1); }
     | { $$ = NFA<Query::label_t>(true); }
     ;

@@ -49,7 +49,7 @@ namespace mpls2pda
             std::vector<NFA::state_t*> next{state};
             NFA::follow_epsilon(next);
             for (auto& n : next) {
-                auto res = add_state(n, inf, 0, 0, 0, -1); // we start by going to -2, as we only initially can accept IP-labels
+                auto res = add_state(n, inf, 0, 0, 0, -1);
                 if (res.first)
                     _initial.push_back(res.second);
             }
