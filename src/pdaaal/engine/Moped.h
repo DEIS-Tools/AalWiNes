@@ -130,7 +130,8 @@ namespace pdaaal {
                             if((fit - lit) == 3 && strncmp(lit, "DOT", 3) == 0)
                             {
                                 // TODO FIX
-                                trace.back()._stack.emplace_back(true, T{});
+                                assert(false);
+//                                trace.back()._stack.emplace_back(true, T{});
                             }
                             else
                             {
@@ -163,19 +164,11 @@ namespace pdaaal {
             assert(rule._to != 0);
             switch (rule._operation) {
                 case PDA<T>::SWAP:
-                    if (rule._dot_label)
-                        s << "DOT";
-                    else {
-                        labelprinter(s, rule._op_label);
-                    }
+                    labelprinter(s, rule._op_label);
                     break;
                 case PDA<T>::PUSH:
-                    if (rule._dot_label)
-                        s << "DOT ";
-                    else {
-                        labelprinter(s, rule._op_label);
-                        s << " ";
-                    }
+                    labelprinter(s, rule._op_label);
+                    s << " ";
                 case PDA<T>::NOOP:
                     s << noop;
                     break;
@@ -209,57 +202,17 @@ namespace pdaaal {
                     continue;
                 }
                 if (r._precondition.empty()) continue;
-                if (state._pre_is_dot && (r._precondition.wildcard() || r._operation == PDA<T>::POP || r._operation == PDA<T>::SWAP)) {
-                    // we can make a DOT -> DOT rule but only if both pre and post are "DOT" -- 
-                    // or as the case with POP and SWAP; TOS can be anything 
-                    s << "S" << sid << "<DOT> --> ";
+                auto& symbols = r._precondition.wildcard() ? pda.labelset() : r._precondition.labels();
+                for (auto& symbol : symbols) {
+                    s << "S" << sid << "<";
+                    std::stringstream ss;
+                    labelprinter(ss, symbol);
+                    s << ss.str();
+                    s << "> --> ";
                     s << "S" << r._to;
                     s << "<";
-                    write_op(s, r, "DOT");
+                    write_op(s, r, ss.str());
                     s << ">\n";
-                } else if (state._pre_is_dot) {
-                    // we effectively settle the state of the DOT symbol here
-                    assert(!r._precondition.wildcard());
-                    for (auto& symbol : r._precondition.labels()) {
-                        std::stringstream ss;
-                        labelprinter(ss, symbol);
-                        s << "S" << sid << "<DOT> --> ";
-                        s << "S" << r._to;
-                        s << "<";
-                        write_op(s, r, ss.str());
-                        s << ">\n";
-                    }
-                } else {
-                    assert(!state._pre_is_dot);
-                    bool post_settle = false;
-                    auto& symbols = r._precondition.wildcard() ? pda.labelset() : r._precondition.labels();
-                    for (auto& symbol : symbols) {
-                        std::stringstream ss;
-                        std::stringstream postss;
-                        labelprinter(ss, symbol);
-                        postss << " --> ";
-                        postss << "S" << r._to;
-                        postss << "<";
-                        write_op(postss, r, ss.str());
-                        postss << ">\n";
-                        s << "S" << sid << "<";
-                        labelprinter(s, symbol);
-                        s << ">" << postss.str();
-                        if (r._precondition.dot() && r._operation == PDA<T>::POP) {
-                            // we do not need to settle the DOT yet
-                            post_settle = true;
-                        } else {
-                            // settle the DOT
-                            s << "S" << sid << "<DOT> " << postss.str();
-                        }
-                    }
-                    if (post_settle) {
-                        s << "S" << sid << "<DOT> --> ";
-                        s << "S" << r._to;
-                        s << "<";
-                        write_op(s, r, "DOT");
-                        s << ">\n";
-                    }
                 }
             }
         }

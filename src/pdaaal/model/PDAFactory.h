@@ -38,13 +38,7 @@ namespace pdaaal {
     class PDAFactory {
     public:
         using nfastate_t = typename NFA<T>::state_t;
-
-        enum op_t {
-            PUSH,
-            POP,
-            SWAP,
-            NOOP
-        };
+        using op_t = typename PDA<T>::op_t;
 
         struct state_t {
             size_t _ptr;
@@ -53,7 +47,7 @@ namespace pdaaal {
     protected:
 
         struct rule_t {
-            op_t _op = POP;
+            op_t _op = PDA<T>::POP;
             T _pre;
             size_t _dest;
             T _op_label;
@@ -93,7 +87,8 @@ namespace pdaaal {
             // trivially empty
             if (cons_empty_accept && empty_accept() && des_empty_accept) {
                 std::vector<T> empty;
-                result.add_wildcard(0, 0, PDA<T>::NOOP, true, empty);
+                T lbl;
+                result.add_rule(0, 0, PDA<T>::NOOP, lbl ,true, empty);
             }
 
             // Destruct the stack!
@@ -191,20 +186,7 @@ namespace pdaaal {
                 for (rule_t& r : rules(top)) {
                     // translate rules into PDA rules
                     std::vector<T> pre{r._pre};
-                    switch (r._op) {
-                        case NOOP:
-                            result.add_wildcard(top, r._dest, PDA<T>::NOOP, false, pre);
-                            break;
-                        case POP:
-                            result.add_wildcard(top, r._dest, PDA<T>::POP, false, pre);
-                            break;
-                        case PUSH:
-                            result.add_rule(top, r._dest, PDA<T>::PUSH, false, r._op_label, false, pre);
-                            break;
-                        case SWAP:
-                            result.add_rule(top, r._dest, PDA<T>::SWAP, false, r._op_label, false, pre);
-                            break;
-                    }
+                    result.add_rule(top, r._dest, r._op, r._op_label, false, pre);
                     if (pdaseen.count(r._dest) == 0) {
                         pdaseen.insert(r._dest);
                         pdawaiting.push_back(r._dest);
@@ -214,13 +196,14 @@ namespace pdaaal {
             
             // we need to know the number of PDA states first to be able to 
             // correctly index the NFA-states
+            T none;
             for(auto a : accepting_states)
             {
                 // any label could really be on the top of the stack here
                 // do first step of DES
                 if (des_empty_accept) {
                     // empty accept in destruction, just go directly.
-                    result.add_wildcard(a, 0, PDA<T>::NOOP, true, empty);
+                    result.add_rule(a, 0, PDA<T>::NOOP, none, true, empty);
                 }
                 // link with destruction-header
                 for (auto ds : _des_stack.initial()) {
@@ -229,7 +212,7 @@ namespace pdaaal {
                         std::vector<nfastate_t*> next{e._destination};
                         NFA<T>::follow_epsilon(next);
                         for (auto n : next) {
-                            result.add_wildcard(a, nfa_id(n), PDA<T>::POP, e._negated, e._symbols);
+                            result.add_rule(a, nfa_id(n), PDA<T>::POP, none, e._negated, e._symbols);
                         }
                     }
                 }                
@@ -240,17 +223,18 @@ namespace pdaaal {
             std::vector<nfastate_t*> waiting_next = _des_stack.initial();
             std::unordered_set<nfastate_t*> seen_next(waiting_next.begin(), waiting_next.end());
             std::vector<T> empty;
+            T none;
             while (!waiting_next.empty()) {
                 auto top = waiting_next.back();
                 waiting_next.pop_back();
                 if (top->_accepting) {
-                    result.add_wildcard(nfa_id(top), 0, PDA<T>::NOOP, true, empty);
+                    result.add_rule(nfa_id(top), 0, PDA<T>::NOOP, none, true, empty);
                 }
                 for (auto& e : top->_edges) {
                     std::vector<nfastate_t*> next{e._destination};
                     NFA<T>::follow_epsilon(next);
                     for (auto n : next) {
-                        result.add_wildcard(nfa_id(top), nfa_id(n), PDA<T>::POP, e._negated, e._symbols);
+                        result.add_rule(nfa_id(top), nfa_id(n), PDA<T>::POP, none, e._negated, e._symbols);
                         if (seen_next.count(n) == 0) {
                             waiting_next.push_back(n);
                             seen_next.insert(n);

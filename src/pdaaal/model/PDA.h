@@ -29,10 +29,10 @@ namespace pdaaal {
     class PDA {
     public:
         enum op_t {
-            PUSH = 0, 
-            POP = 1, 
-            SWAP = 2, 
-            NOOP = 3
+            PUSH = 1, 
+            POP = 2, 
+            SWAP = 4, 
+            NOOP = 8
         };
         struct tracestate_t {
             size_t _pdastate = 0;
@@ -43,34 +43,26 @@ namespace pdaaal {
         struct pre_t {
         private:
             bool _wildcard = false;
-            bool _dot = true;
             std::vector<T> _labels;            
         public:
             bool wildcard() const { return _wildcard; }
-            bool dot() const { return _dot; }
             auto& labels() const { return _labels; }
             void merge(bool negated, const std::vector<T>& other, const std::vector<T>& all_labels);
             void clear() {
                 _wildcard = false;
-                _dot = false;
                 _labels.clear();
             }
             bool empty() const {
                 return !_wildcard && _labels.empty();
             }
             bool intersect(const tos_t& tos, const std::vector<T>& all_labels);
-            void noop_pre_filter(const std::unordered_set<T>& usefull, bool with_dot);
-            void set_dot(bool val)
-            {
-                _dot = val;
-            }
+            void noop_pre_filter(const std::unordered_set<T>& usefull);
         };
 
         struct rule_t {
             size_t _to = 0;
             op_t _operation = NOOP;
             T _op_label = T{};
-            bool _dot_label = false;
             bool is_terminal() const 
             {
                 return _to == 0;
@@ -78,8 +70,6 @@ namespace pdaaal {
             
             bool operator<(const rule_t& other) const
             {
-                if(_dot_label != other._dot_label)
-                    return _dot_label < other._dot_label;
                 if(_op_label != other._op_label)
                     return _op_label < other._op_label;
                 if(_to != _to)
@@ -89,7 +79,7 @@ namespace pdaaal {
             
             bool operator==(const rule_t& other) const
             {
-                return _to == other._to && _op_label == other._op_label && _operation == other._operation && _dot_label == other._dot_label;
+                return _to == other._to && _op_label == other._op_label && _operation == other._operation;
             }
             
             bool operator!=(const rule_t& other) const {
@@ -102,27 +92,22 @@ namespace pdaaal {
         struct state_t {
             std::vector<rule_t> _rules;
             std::vector<size_t> _pre;
-            bool _pre_is_dot = true;
         };
         
         struct tos_t {
             std::vector<T> _tos; // TODO: some symbolic representation would be better here
             std::vector<T> _stack; // TODO: some symbolic representation would be better here
-            bool _top_dot = false;
-            bool _stack_dot = false;
             int _in_waiting = 0;
 
             bool empty_tos() const {
-                return !_top_dot && _tos.empty();
+                return _tos.empty();
             } 
 
             bool active(const tos_t& prev, const rule_t& rule, const std::vector<T>& all_labels)
             {
                 if(rule._precondition.empty())
                     return false;
-                else if(prev._top_dot ||
-                        rule._precondition.dot() ||
-                        rule._precondition.wildcard())
+                else if(rule._precondition.wildcard())
                 {
                     return true;
                 }
@@ -143,7 +128,6 @@ namespace pdaaal {
             
             bool forward_stack(const tos_t& prev, const std::vector<T>& all_labels) {
                 bool changed = false;
-                if(prev._stack_dot && !_stack_dot) { _stack_dot = true; changed = true; }
                 if(_stack.size() != all_labels.size())
                 {
                     if(prev._stack.size() == all_labels.size())
@@ -180,8 +164,6 @@ namespace pdaaal {
                 bool changed = false;
                 if(!dual_stack)
                 {
-                    changed = !_top_dot ||  _tos.size() != all_labels.size();
-                    _top_dot = true;
                     _tos = all_labels;
                 }
                 else
@@ -189,11 +171,6 @@ namespace pdaaal {
                     // move stack->stack
                     changed |= forward_stack(prev, all_labels);
                     // move stack -> TOS
-                    if(!_top_dot && prev._stack_dot)
-                    {
-                        changed = true;
-                        _top_dot = true;
-                    }
                     if(_tos.size() != all_labels.size())
                     {
                         if(prev._stack.size() == all_labels.size())
@@ -222,18 +199,6 @@ namespace pdaaal {
             {
                 if(rule._precondition.empty()) return false;
                 bool changed = false;
-                if(_top_dot && _tos.size() == all_labels.size()) 
-                {
-                    assert(_top_dot);
-                    return false;
-                }
-                
-                if(prev._top_dot)
-                {
-                    changed = !_top_dot;
-                    _top_dot = true;
-                }
-                                
                 {
                     auto iit = _tos.begin();
                     for(auto& symbol : rule._precondition.wildcard() ? prev._tos : rule._precondition.labels())
@@ -257,12 +222,6 @@ namespace pdaaal {
                 if(!active(prev, rule, all_labels)) return false; // we know that there is a match!
                 bool changed = false;
 
-                if(rule._dot_label)
-                {
-                    changed = !_top_dot;
-                    _top_dot = true;
-                }
-
                 {
                     auto lb = std::lower_bound(_tos.begin(), _tos.end(), rule._op_label);
                     if(lb == std::end(_tos) || *lb != rule._op_label)
@@ -285,11 +244,6 @@ namespace pdaaal {
                 if(dual_stack)
                 {
                     // but we also push all TOS labels down
-                    if(!_stack_dot && prev._top_dot)
-                    {
-                        changed = true;
-                        _stack_dot = true;
-                    }
                     if(_stack.size() != all_labels.size())
                     {
                         if(prev._tos.size() == all_labels.size())
@@ -377,13 +331,11 @@ namespace pdaaal {
         void target_tos_prune(){
             for(size_t s = 1; s < _states.size(); ++s)
             {
-                if(_states[s]._pre_is_dot) continue;
                 std::unordered_set<T> usefull_tos;
                 bool cont = false;
                 bool any_dot = false;
                 for(auto& r : _states[s]._rules)
                 {
-                    any_dot |= r._precondition.dot();
                     if(!r._precondition.wildcard())
                     {
                         if(!usefull_tos.size() == _all_labels.size())
@@ -414,15 +366,14 @@ namespace pdaaal {
                             {
                                 case SWAP:
                                 case PUSH:
-                                    if(!any_dot && !r._precondition.labels().empty() && usefull_tos.count(r._op_label) == 0)
+                                    if(!r._precondition.labels().empty() && usefull_tos.count(r._op_label) == 0)
                                     {
                                         r._precondition.clear();
-                                        r._dot_label = false;
                                     }
                                     break;
                                 case NOOP:
                                 {
-                                    r._precondition.noop_pre_filter(usefull_tos, any_dot);
+                                    r._precondition.noop_pre_filter(usefull_tos);
                                     break;
                                 }
                                 case POP:
@@ -450,11 +401,6 @@ namespace pdaaal {
             }
             auto ds = (aggresivity >= 2);
             std::vector<tos_t> approximation(_states.size());
-            // remove predefined dot on everything, 
-            // we are going to compute it 
-            for(auto& s : _states)
-                for(auto& r : s._rules)
-                    r._precondition.set_dot(false);
 
             // initialize
             for(auto& r : _states[0]._rules)
@@ -468,13 +414,9 @@ namespace pdaaal {
                     ss._in_waiting = -1;
                 }
                 assert(r._operation == PUSH);
-                if(r._dot_label) ss._top_dot = true;
-                else
-                {
-                    auto lb = std::lower_bound(ss._tos.begin(), ss._tos.end(), r._op_label);
-                    if(lb == std::end(ss._tos) || *lb != r._op_label)
-                        ss._tos.insert(lb, r._op_label);
-                }
+                auto lb = std::lower_bound(ss._tos.begin(), ss._tos.end(), r._op_label);
+                if(lb == std::end(ss._tos) || *lb != r._op_label)
+                    ss._tos.insert(lb, r._op_label);
             }
                       
             // saturate
@@ -489,18 +431,15 @@ namespace pdaaal {
                 {
                     if(fit->_to == 0) { ++fit; continue; }
                     if(fit->_precondition.empty()) { ++fit; continue; }
-                    fit->_precondition.set_dot(ss._top_dot);
                     auto& to = approximation[fit->_to];
                     // handle dots!
                     bool change = false;
                     switch(fit->_operation)
                     {
                         case POP:
-                            assert(fit->_dot_label);
                             change = to.merge_pop(ss, *fit, ds, _all_labels);
                             break;
                         case NOOP:
-                            assert(fit->_dot_label);
                             change = to.merge_noop(ss, *fit, ds, _all_labels);
                             break;
                         case PUSH:
@@ -626,21 +565,7 @@ namespace pdaaal {
                         continue;
                     }
                     if (r._precondition.empty()) continue;
-                    if (state._pre_is_dot && (r._precondition.wildcard() || r._operation == PDA<T>::POP || r._operation == PDA<T>::SWAP)) {
-                        ++cnt;
-                    } else if (state._pre_is_dot) {
-                        // we effectively settle the state of the DOT symbol here
-                        assert(!r._precondition.wildcard());
-                        cnt += r._precondition.labels().size();
-                    } else {
-                        assert(!state._pre_is_dot);
-                        auto ss = r._precondition.wildcard() ? labelset().size() : r._precondition.labels().size();
-                        if (r._precondition.dot() && r._operation == PDA<T>::POP) {
-                            cnt += ss + 1;
-                        } else {
-                            cnt += ss*2;
-                        }
-                    }
+                    cnt += r._precondition.wildcard() ? labelset().size() : r._precondition.labels().size();
                 }
             }
             return cnt;
@@ -667,15 +592,7 @@ namespace pdaaal {
         
         void add_rules(size_t from, size_t to, op_t op, bool negated, const std::vector<T>& labels, bool negated_pre, const std::vector<T>& pre)
         {
-            if(negated && labels.size() == 0)
-            {
-                add_wildcard(from, to, op, negated_pre, pre);
-            }
-            else if(!negated && labels.size() == _all_labels.size())
-            {
-                add_wildcard(from, to, op, negated_pre, pre);
-            }
-            else if(negated)
+            if(negated)
             {
                 auto lid = labels.begin();
                 auto ait = _all_labels.begin();
@@ -683,7 +600,7 @@ namespace pdaaal {
                 {
                     while(*ait < *lid && ait != std::end(_all_labels))
                     {
-                        add_rule(from, to, op, false, *ait, negated_pre, pre);
+                        add_rule(from, to, op, *ait, negated_pre, pre);
                         ++ait;
                     }
                     assert(*ait == *lid);
@@ -691,48 +608,30 @@ namespace pdaaal {
                     assert(ait == std::end(_all_labels) || *ait != *lid);
                 }
                 for(; ait != std::end(_all_labels); ++ait)
-                    add_rule(from, to, op, false, *ait, negated_pre, pre);
+                    add_rule(from, to, op, *ait, negated_pre, pre);
             }
             else
             {
                 for(auto& s : labels)
                 {
-                    add_rule(from, to, op, false, s, negated_pre, pre);
+                    add_rule(from, to, op, s, negated_pre, pre);
                 }
             }
         }
                 
-        void add_wildcard(size_t from, size_t to, op_t op, bool negated, const std::vector<T>& pre)
+        void add_rule(size_t from, size_t to, op_t op, T label, bool negated, const std::vector<T>& pre)
         {
-            add_rule(from, to, op, true, T{}, negated, pre);
-        }
-        
-        void add_rule(size_t from, size_t to, op_t op, bool is_dot, T label, bool negated, const std::vector<T>& pre)
-        {
-            if(op == POP && !is_dot)
-                throw base_error("Popping-op should be wild-card not supported.");
-            if(op == NOOP && !is_dot)
-                throw base_error("No-op should be wildcard supported.");
             auto mm = std::max(from, to);
             if(mm >= _states.size())
                 _states.resize(mm+1);
             rule_t r;
             r._to = to;
-            r._op_label = is_dot ? T{} : label;
+            r._op_label = label;
             r._operation = op;
-            r._dot_label = is_dot;
-            if(r._dot_label && label != T{})
-            {
-                throw base_error("Expected default label when dot-labeled");
-            }
             auto& rules = _states[from]._rules;
             auto lb = std::lower_bound(rules.begin(), rules.end(), r);
             if(lb == std::end(rules) || *lb != r)
-            {
                 lb = rules.insert(lb, r); // TODO this is expensive. Use lists?
-                if(!is_dot || (op != PUSH && op != SWAP))
-                    _states[to]._pre_is_dot = false;
-            }
 
             lb->_precondition.merge(negated, pre, _all_labels);
             auto& prestate = _states[to]._pre;
@@ -828,7 +727,7 @@ namespace pdaaal {
     }
     
     template<typename T>
-    void PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<T>& usefull, bool with_dot)
+    void PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<T>& usefull)
     {
         if(_wildcard)
         {
@@ -859,18 +758,16 @@ namespace pdaaal {
                 _labels.resize(wit - _labels.begin());
             }
         }
-        _dot = _dot && !empty() && with_dot;
     }
     
     template<typename T>
     bool PDA<T>::pre_t::intersect(const tos_t& tos, const std::vector<T>& all_labels)
     {
-        if(tos._tos.size() == all_labels.size() || tos._top_dot)
+        if(tos._tos.size() == all_labels.size())
         {
 //            std::cerr << "EMPY 1" << std::endl;
             return !empty();
         }
-        _dot = tos._top_dot;
         if(_wildcard)
         {
             if(tos._tos.size() == all_labels.size())

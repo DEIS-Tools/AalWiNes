@@ -63,6 +63,7 @@ namespace mpls2pda
         bool empty_accept() const override;
         bool accepting(size_t) override;
         std::vector<rule_t> rules(size_t ) override;
+        void expand_back(std::vector<rule_t>& rules, const Query::label_t& pre);
 
     private:
         void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;

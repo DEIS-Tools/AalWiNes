@@ -44,7 +44,7 @@ public:
     const Router* get_router(size_t id) const;
     size_t size() const { return _routers.size(); }
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
-    std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask);
+    std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask, Query::type_t type);
     std::unordered_set<Query::label_t> all_labels();
     const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);

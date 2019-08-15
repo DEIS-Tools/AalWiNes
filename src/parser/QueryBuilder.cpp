@@ -115,6 +115,7 @@ namespace mpls2pda
         ptr[1] = i3;
         ptr[2] = i2;
         ptr[3] = i1;
+        val = ((val << mask) >> mask); // canonize
         return {Query::label_t{Query::IP4, static_cast<uint8_t>(mask), val}};
     }
 
@@ -141,6 +142,7 @@ namespace mpls2pda
         ptr[5] = i3;
         ptr[6] = i2;
         ptr[7] = i1;
+        val = ((val << mask) >> mask); // canonize
         return {Query::label_t{Query::IP6, static_cast<uint8_t>(mask), val}};
     }
 
@@ -197,7 +199,7 @@ namespace mpls2pda
     
     Builder::labelset_t Builder::find_label(uint64_t label, uint64_t mask)
     {
-        return _network.get_labels(label, mask);
+        return _network.get_labels(label, mask, Query::MPLS);
     }
     
     filter_t Builder::discard_id()

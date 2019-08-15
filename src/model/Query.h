@@ -38,16 +38,58 @@ namespace mpls2pda {
         };
 
         enum type_t {
-            ANYIP = 1, IP4 = 2, IP6 = 4, MPLS = 8, INTERFACE = 16
+            ANYMPLS = 1, ANYIP = 2, IP4 = 4, IP6 = 8, MPLS = 16, INTERFACE = 32, NONE = 128
         };
 
         struct label_t {
+            label_t()
+            {
+                _type = NONE;
+                _mask = 0;
+                _value = 0;
+            }
+            
+            void set_value(uint64_t val, uint32_t mask)
+            {
+                _mask = mask;
+                _value = val;
+                switch(_type)
+                {
+                    case ANYIP:
+                        *this = any_ip;
+                        break;
+                    case ANYMPLS:
+                        *this = any_mpls;
+                        break;
+                    case MPLS:
+                        if(_mask == 8)
+                            *this = any_mpls;
+                        break;
+                    case IP4:
+                        if(_mask >= 31)
+                            *this = any_ip4;
+                        break;
+                    case IP6:
+                        if(_mask >= 63)
+                            *this = any_ip6;
+                        break;
+                    default:
+                        _mask = 0;
+                        break;
+                }
+            }
+            
+            label_t(type_t type, uint8_t mask, uint64_t val)
+                    : _type(type), _mask(mask), _value(val)
+            {
+                set_value(val, mask);
+            }
             
             type_t _type = MPLS;
             uint8_t _mask = 0;
             uint64_t _value = 0;            
             bool uses_mask() const {
-                return _mask != 0 && _type != INTERFACE && _type != ANYIP;
+                return _mask != 0 && _type != INTERFACE && _type != ANYIP && _type != ANYMPLS;
             }
             bool operator<(const label_t& other) const {
                 if(_type != other._type)
@@ -95,6 +137,13 @@ namespace mpls2pda {
                         break;
                     case ANYIP:
                         stream << "ANY_IP";
+                        break;
+                    case ANYMPLS:
+                        stream << "ANY_MPLS";
+                        break;
+                    case NONE:
+                        stream << "NONE";
+                        break;
                 }
                 if(label.uses_mask())
                     stream << "/" << (int)label._mask;
@@ -104,6 +153,7 @@ namespace mpls2pda {
             const static label_t unused_ip4;
             const static label_t unused_ip6;
             const static label_t any_mpls;
+            const static label_t any_ip;
             const static label_t any_ip4;
             const static label_t any_ip6;
         };

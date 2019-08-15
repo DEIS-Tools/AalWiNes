@@ -92,8 +92,6 @@ namespace mpls2pda
             throw base_error(e.str());
         }
 
-        std::vector<std::pair<std::string, std::pair<size_t, size_t>>> lsi;
-
         while (rule) {
             std::string tl = rule->first_node("rt-destination")->value();
             nr._entries.emplace_back();
@@ -117,12 +115,13 @@ namespace mpls2pda
             else if (tl == "default") {
                 // we ignore these! (I suppose, TODO, check)
                 rule = rule->next_sibling("rt-entry");
+                nr._entries.pop_back();
                 continue;
             }
             else {
                 auto inf = parent->get_interface(all_interfaces, tl);
                 entry._ingoing = inf;
-                entry._top_label._type = Query::ANYIP;
+                entry._top_label = Query::label_t::any_ip;
             }
 
             auto nh = rule->first_node("nh");
@@ -435,20 +434,34 @@ namespace mpls2pda
 
     void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
     {
-        /*if(quote) s << "\"";
+        if(quote) s << "\"";
         switch(label._type)
         {
-        case MPLS:
-            s << 'l' << label.
+        case Query::MPLS:
+            s << 'l' << std::hex << label._value << std::dec;
+            assert(label._mask == 0);
+            break;
+        case Query::ANYMPLS:
+            s << "am";
+            break;
+        case Query::ANYIP:
+            s << "ap";
+            break;
+        case Query::IP4:
+            s << "ip4" << std::hex << label._value << "M" << (uint32_t)label._mask << std::dec;
+            assert(label._mask == 0 || label._value == std::numeric_limits<uint64_t>::max());
+            break;
+        case Query::IP6:
+            s << "ip6" << std::hex << label._value << "M" << (uint32_t)label._mask << std::dec;
+            assert(label._mask == 0 || label._value == std::numeric_limits<uint64_t>::max());
+            break;
+        case Query::INTERFACE:
+        case Query::NONE:
+            assert(false);
+            throw base_error("Interfaces cannot be pushdown-labels.");
+            break;
         }
-        if (label == 0)
-            s << "default";
-        else if (label > 0)
-            s << 'l' << (label - 1);
-        else
-            s << 'i' << ((label + 1)*-1);
-        if(quote) s << "\"";*/
-        //TODO FIX
+        if(quote) s << "\"";
     }
 
     void RoutingTable::forward_t::print_json(std::ostream& s) const
