@@ -31,5 +31,9 @@ void write_ip4(std::ostream& s, uint32_t ip);
 
 uint32_t parse_ip4(const char* s);
 
+void write_ip6(std::ostream& s, uint32_t ip);
+
+uint32_t parse_ip6(const char* s);
+
 #endif /* PARSING_H */
 

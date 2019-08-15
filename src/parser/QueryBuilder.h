@@ -77,15 +77,16 @@ namespace mpls2pda {
         void clear_link() { _link = false; }
         
         
-        filter_t match_ip4(int i1, int i2, int i3, int i4, int mask);
-        filter_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int mask);
         filter_t match_re(std::string&& re);
         filter_t match_exact(const std::string& str);
         filter_t routing_id();
         filter_t discard_id();
         labelset_t find_label(uint64_t label, uint64_t mask);
-        labelset_t ip_labels(filter_t& filter);
-
+        labelset_t any_ip();
+        labelset_t any_mpls();
+        labelset_t match_ip4(int i1, int i2, int i3, int i4, int mask);
+        labelset_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int mask);
+        
         // Error handling.
         void error(const location &l, const std::string &m);
 

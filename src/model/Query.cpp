@@ -40,5 +40,12 @@ namespace mpls2pda {
         out << "// PATH\n";
         _path.to_dot(out);
     }
+    
+    const Query::label_t Query::label_t::unused_mpls{MPLS, 0, std::numeric_limits<uint64_t>::max()};
+    const Query::label_t Query::label_t::unused_ip4{IP4, 0, 0};
+    const Query::label_t Query::label_t::unused_ip6{IP6, 0, 0};
 
+    const Query::label_t Query::label_t::any_mpls{MPLS, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max()};
+    const Query::label_t Query::label_t::any_ip4{IP4, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max()};
+    const Query::label_t Query::label_t::any_ip6{IP6, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max()};
 }

@@ -82,7 +82,21 @@ namespace mpls2pda
         _pathmode = false;
     }
 
-    filter_t Builder::match_ip4(int i1, int i2, int i3, int i4, int mask)
+    Builder::labelset_t Builder::any_ip()
+    {
+        labelset_t res;
+        res.insert(Query::label_t::any_ip4);
+        res.insert(Query::label_t::any_ip6);
+        return res;
+    }
+
+    Builder::labelset_t Builder::any_mpls()
+    {
+        return {Query::label_t::any_mpls};
+    }
+
+    
+    Builder::labelset_t Builder::match_ip4(int i1, int i2, int i3, int i4, int mask)
     {
         if(mask > 32)
         {
@@ -101,44 +115,33 @@ namespace mpls2pda
         ptr[1] = i3;
         ptr[2] = i2;
         ptr[3] = i1;
-        filter_t res;
-        if(_link || _post)
-        {
-            bool is_link = _link;
-            res._link = [val, mask,is_link](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
-                if(!is_link)
-                {
-                    auto ip = parse_ip4(tname);
-                    if(ip == std::numeric_limits<uint32_t>::max()) return false;
-                    if((ip << mask) == (val << mask))
-                        return true;
-                    return false;
-                }
-                else
-                {
-                    return (tip4 << mask) == (val << mask); 
-                }
-            };
-        }
-        else
-        {
-            
-            res._from = [val, mask](const char* name)
-            {
-                auto ip = parse_ip4(name);
-                    if(ip == std::numeric_limits<uint32_t>::max()) return false;
-                    if((ip << mask) == (val << mask))
-                        return true;
-                    return false;
-            };
-        }
-        return res;
+        return {Query::label_t{Query::IP4, static_cast<uint8_t>(mask), val}};
     }
 
-    filter_t Builder::match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int mask)
+    Builder::labelset_t Builder::match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int mask)
     {
-        throw base_error("IPv6 parsing is not yet implemented");
-        return {};
+        if(mask > 64)
+        {
+            throw type_error("IPv6 mask can be at most 64");
+        }
+        for(auto n : {i1, i2, i3, i4, i5, i6, i7, i8})
+        {
+            if(n > 256 || n < 0)
+            {
+                throw type_error("IPv6 format contains only numbers between 00 and FF.");
+            }
+        }
+        uint64_t val;
+        uint8_t* ptr = (uint8_t*)&val;
+        ptr[0] = i8;
+        ptr[1] = i7;
+        ptr[2] = i6;
+        ptr[3] = i5;
+        ptr[4] = i4;
+        ptr[5] = i3;
+        ptr[6] = i2;
+        ptr[7] = i1;
+        return {Query::label_t{Query::IP6, static_cast<uint8_t>(mask), val}};
     }
 
     filter_t Builder::match_exact(const std::string& str)
@@ -217,11 +220,6 @@ namespace mpls2pda
             return false;
         };
         return res;
-    }
-
-    Builder::labelset_t Builder::ip_labels(filter_t& filter)
-    {
-        return {_network.ip_labels(filter)};
     }
 
     Builder::labelset_t Builder::filter(filter_t& f)

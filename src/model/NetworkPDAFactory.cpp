@@ -66,13 +66,14 @@ namespace mpls2pda
                 }
                 else if (!e._negated) {
                     for (auto s : e._symbols) {
-                        auto interface = _network.all_interfaces()[(s+1)*-1];
+                        assert(s._type == Query::INTERFACE);
+                        auto interface = _network.all_interfaces()[s._value];
                         add_initial(e._destination, interface);
                     }
                 }
                 else {
                     for (auto inf : _network.all_interfaces()) {
-                        auto iid = Query::label_t{((ssize_t)inf->global_id() + 1) * -1};
+                        auto iid = Query::label_t{Query::INTERFACE, 0, inf->global_id()};
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                         if (lb == std::end(e._symbols) || *lb != iid) {
                             add_initial(e._destination, inf);
@@ -172,14 +173,6 @@ namespace mpls2pda
             if (s._inf == nullptr) return result;
             // all clean! start pushing.
             for (auto& entry : s._inf->table().entries()) {
-                if(entry.is_default()) 
-                {
-                    continue; // we assume these are DROP
-                }
-                if(entry.is_interface() && s._opid != -2)
-                {
-                    continue; // only accept interface-labels from initial -2 mode
-                }
                 for (auto& forward : entry._rules) {
                     if (forward._via == nullptr || forward._via->target() == nullptr)
                     {
@@ -190,7 +183,7 @@ namespace mpls2pda
                         {
                             continue;
                         }
-                        auto iid = Query::label_t{((ssize_t)forward._via->global_id() + 1) * -1};
+                        auto iid = Query::label_t{Query::INTERFACE, 0, forward._via->global_id()};
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                         bool found = lb != std::end(e._symbols) && *lb == iid;
 
@@ -210,23 +203,16 @@ namespace mpls2pda
                                 switch (forward._ops[0]._op) {
                                 case RoutingTable::POP:
                                     nr._op = POP;
-                                    assert(!entry.is_interface());
+                                    assert(entry._top_label._type == Query::MPLS);
                                     break;
                                 case RoutingTable::PUSH:
-                                    if (entry.is_interface()) {
-                                        nr._op = SWAP;
-                                        nr._op_label = forward._ops[0]._op_label;
-                                    }
-                                    else {
-                                        nr._op = PUSH;
-                                        assert(forward._ops[0]._op_label >= 0);
-                                        nr._op_label = forward._ops[0]._op_label;
-                                    }
+                                    nr._op = PUSH;
+                                    assert(forward._ops[0]._op_label._type == Query::MPLS);
+                                    nr._op_label = forward._ops[0]._op_label;
                                     break;
                                 case RoutingTable::SWAP:
                                     nr._op = SWAP;
                                     nr._op_label = forward._ops[0]._op_label;
-                                    assert(!entry.is_interface());
                                     break;
                                 }
                             }
@@ -242,21 +228,8 @@ namespace mpls2pda
                                 for (auto& n : next) {
                                     result.emplace_back(nr);
                                     auto& ar = result.back();
-                                    if(nr._op == NOOP && s._opid == -2 && entry.is_interface())
-                                    {
-                                        assert(false);
-                                        // special case, we forward the initial IP->MPLS to the next router
-                                        auto res = add_state(n, forward._via->match(), appmode, 0, 0, -1);
-                                        ar._dest = res.second;
-                                        // we swap to receivers label
-                                        ar._op = SWAP;
-                                        ar._op_label = Query::label_t{((int)forward._via->match()->global_id() + 1) * -1};
-                                    }
-                                    else
-                                    {
-                                        auto res = add_state(n, forward._via->match(), appmode);
-                                        ar._dest = res.second;
-                                    }
+                                    auto res = add_state(n, forward._via->match(), appmode);
+                                    ar._dest = res.second;
                                 }
                             }
                             else {
@@ -327,9 +300,9 @@ namespace mpls2pda
 
     void NetworkPDAFactory::print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
         stream << "{\"pre\":";
-        if(entry._top_label < 0)
+        if(entry._top_label._type == Query::INTERFACE)
         {
-            auto inf = _network.all_interfaces()[entry.as_interface()];
+            auto inf = _network.all_interfaces()[entry._top_label._value];
             auto iname = inf->source()->interface_name(inf->id());
             stream << "\"" << iname.get() << "\"";
         }
@@ -396,8 +369,6 @@ namespace mpls2pda
                             for(auto& entry : s._inf->table().entries())
                             {
                                 if(found) break;
-                                if(entry.is_default())
-                                    continue;
                                 if(!step._stack.front().first && step._stack.front().second != entry._top_label)
                                     continue; // not matching on pre
                                 for(auto& r : entry._rules)
@@ -489,7 +460,7 @@ namespace mpls2pda
             {
                 ++from;
                 auto l = strtoll(from, (char**)&to, 10);
-                auto rl = Query::label_t{l + 1};
+                auto rl = Query::label_t{Query::MPLS, 0, static_cast<uint64_t>(l)};
                 if(_all_labels.count(rl) != 1)
                 {
                     std::stringstream e;
@@ -500,20 +471,28 @@ namespace mpls2pda
             }
             else if(*from == 'i')
             {
-                auto i = strtoll(from, (char**)&to, 10);
-                if((size_t)i >= _network.all_interfaces().size())
+                Query::label_t res;
+                if(*(from + 1) == '4')
+                    res = Query::label_t::any_ip4;
+                else
+                    res == Query::label_t::any_ip6;
+                if(from + 2 != to)
                 {
-                    std::stringstream e;
-                    e << "Unknown interface ID: " << i;
-                    throw base_error(e.str());
+                    res._value = strtoll(from, (char**)&to, 10);
+                    res._mask = 0;
                 }
-                return Query::label_t{(i+1)*-1};
+                return res;
+
+            }
+            else if(*from == 'a')
+            {
+                return Query::label_t{Query::ANYIP, 0, 0};
             }
             else
             {
                 throw base_error("Unknown label");
             }
-            return Query::label_t{0};
+            return Query::label_t{};
         };
     }
 }

@@ -87,7 +87,7 @@ namespace mpls2pda {
                     }
                     if(filter._link(fname.get(), fip, fip6, tname.get(), tip, tip6, tr))
                     {
-                        res.insert(((ssize_t)i->global_id() + 1) * -1 ); // TODO: little hacksy, but we have uniform types in the parser
+                        res.insert(Query::label_t{Query::INTERFACE, 0, i->global_id()}); // TODO: little hacksy, but we have uniform types in the parser
                     }
                 }
             }
@@ -102,10 +102,10 @@ namespace mpls2pda {
         {
             for(auto& entry : pr.second)
             {
-                if(entry.first->is_mpls())
+                if(entry.first->_top_label._type == Query::MPLS)
                 {
-                    auto mpls = entry.first->as_mpls();
-                    if((mpls / mask) == (label / mask))
+                    auto mpls = entry.first->_top_label._value;
+                    if((mpls << mask) == (label << mask))
                         res.insert(entry.first->_top_label);
                 }
             }
@@ -113,38 +113,19 @@ namespace mpls2pda {
         return res;
     }
 
-    std::unordered_set<Query::label_t> Network::ip_labels(filter_t& filter)
-    {
-        // TODO: we already know the routers form the first matching, so we could just iterate over these.
-        // possibly same thing if using interfaces instead.
-        std::unordered_set<Query::label_t> res;
-        auto ifaces = interfaces(filter);
-        for(auto& inf : _all_interfaces)
-        {
-            if(inf->is_virtual()) continue;
-            auto ifid = Query::label_t{(((ssize_t)inf->global_id()) + 1)*-1};
-            if(ifaces.count(ifid) > 0)
-                res.insert(ifid);
-        }
-        return res;
-    }
-
     std::unordered_set<Query::label_t> Network::all_labels()
     {
-
         std::unordered_set<Query::label_t> res;
-        for(auto& i : _all_interfaces)
-        {
-            res.insert((i->global_id() + 1)*-1);
-        }
-        res.reserve(_label_map.size());
+        res.reserve(_label_map.size() + 3);
+        res.insert(Query::label_t::unused_ip4);
+        res.insert(Query::label_t::unused_ip6);
+        res.insert(Query::label_t::unused_mpls);
         for(auto& r : _routers)
         {
             for(auto& inf : r->interfaces())
             {
                 for(auto& e : inf->table().entries())
                 {
-                    if(e.is_default()) continue;
                     res.insert(e._top_label);
                     for(auto& f : e._rules)
                     {

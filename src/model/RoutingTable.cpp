@@ -111,14 +111,18 @@ namespace mpls2pda
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
             {
-                entry._top_label = atoll(tl.c_str()) + 1;
+                entry._top_label._value = atoll(tl.c_str()) + 1;
+                entry._top_label._type = Query::MPLS;
             }
             else if (tl == "default") {
-                entry._top_label = 0;
+                // we ignore these! (I suppose, TODO, check)
+                rule = rule->next_sibling("rt-entry");
+                continue;
             }
             else {
                 auto inf = parent->get_interface(all_interfaces, tl);
                 entry._ingoing = inf;
+                entry._top_label._type = Query::ANYIP;
             }
 
             auto nh = rule->first_node("nh");
@@ -297,7 +301,8 @@ namespace mpls2pda
                         }
                         auto n = ostr.substr(i, (j - i));
                         auto olabel = std::atoi(n.c_str());
-                        _ops.back()._op_label = 1 + olabel; // offset by one
+                        _ops.back()._op_label._type = Query::MPLS;
+                        _ops.back()._op_label._value = olabel;
                         i = j;
                         parse_label = false;
                         _ops.emplace_back();
@@ -316,6 +321,8 @@ namespace mpls2pda
     {
         bool all_fine = true;
         auto iit = _entries.begin();
+        assert(std::is_sorted(other._entries.begin(), other._entries.end()));
+        assert(std::is_sorted(_entries.begin(), _entries.end()));
         for (auto oit = other._entries.begin(); oit != other._entries.end(); ++oit) {
             if(oit->_ingoing != nullptr && oit->_ingoing != &parent) continue;
             auto& e = (*oit);
@@ -324,6 +331,7 @@ namespace mpls2pda
             if (iit == std::end(_entries))
             {
                 _entries.insert(_entries.end(), oit, std::end(other._entries));
+                assert(std::is_sorted(_entries.begin(), _entries.end()));
                 return all_fine;
             }
             else if ((*iit) == e) {
@@ -338,10 +346,11 @@ namespace mpls2pda
             }
             else
             {
-                assert((*iit) < e);
+                assert(e < (*iit));
                 iit = _entries.insert(iit, e);
             }
         }
+        assert(std::is_sorted(_entries.begin(), _entries.end()));
         return all_fine;        
     }
     
@@ -369,14 +378,16 @@ namespace mpls2pda
 
     bool RoutingTable::entry_t::operator<(const entry_t& other) const
     {
-        if (other._decreasing == _decreasing)
-            return _top_label < other._top_label;
-        return _decreasing < other._decreasing;
+        if(other._ingoing != _ingoing)
+            return _ingoing < other._ingoing;
+        if (other._decreasing != _decreasing)
+            return _decreasing < other._decreasing;
+        return _top_label < other._top_label;
     }
 
     bool RoutingTable::entry_t::operator==(const entry_t& other) const
     {
-        return _decreasing == other._decreasing && _top_label == other._top_label;
+        return _decreasing == other._decreasing && _top_label == other._top_label && _ingoing == other._ingoing;
     }
 
     void RoutingTable::action_t::print_json(std::ostream& s, bool quote ) const
@@ -424,14 +435,20 @@ namespace mpls2pda
 
     void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
     {
-        if(quote) s << "\"";
+        /*if(quote) s << "\"";
+        switch(label._type)
+        {
+        case MPLS:
+            s << 'l' << label.
+        }
         if (label == 0)
             s << "default";
         else if (label > 0)
             s << 'l' << (label - 1);
         else
             s << 'i' << ((label + 1)*-1);
-        if(quote) s << "\"";
+        if(quote) s << "\"";*/
+        //TODO FIX
     }
 
     void RoutingTable::forward_t::print_json(std::ostream& s) const

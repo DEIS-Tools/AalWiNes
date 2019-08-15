@@ -129,7 +129,8 @@ namespace pdaaal {
                             assert(fit > lit);
                             if((fit - lit) == 3 && strncmp(lit, "DOT", 3) == 0)
                             {
-                                trace.back()._stack.emplace_back(true, 0);
+                                // TODO FIX
+                                trace.back()._stack.emplace_back(true, T{});
                             }
                             else
                             {
@@ -194,7 +195,7 @@ namespace pdaaal {
                 write_op(s, r, "_");
                 s << ">\n";
             } else {
-                assert(r._op_label == PDA<T>::NOOP);
+                assert(r._operation == PDA<T>::NOOP);
                 s << "I<_> --> D<_>\n";
                 return;
             }

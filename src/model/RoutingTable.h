@@ -27,6 +27,7 @@
 #include <ptrie_map.h>
 
 #include "Router.h"
+#include "Query.h"
 
 #ifndef ROUTINGTABLE_H
 #define ROUTINGTABLE_H
@@ -45,11 +46,11 @@ namespace mpls2pda {
             PUSH, POP, SWAP
         };
         
-        using label_t = int64_t;
+        using label_t = Query::label_t;
 
         struct action_t {
             op_t _op = POP;
-            label_t _op_label = std::numeric_limits<label_t>::min();
+            label_t _op_label;
             void print_json(std::ostream& s, bool quote = true) const;
         };
 
@@ -60,10 +61,15 @@ namespace mpls2pda {
             size_t _weight = 0;
             void print_json(std::ostream&) const;
             void parse_ops(std::string& opstr);
+            friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd)
+            {
+                fwd.print_json(s);
+                return s;
+            }
         };
 
         struct entry_t {
-            label_t _top_label = std::numeric_limits<label_t>::min();
+            label_t _top_label;
             const Interface* _ingoing = nullptr;
             bool _decreasing = false;
             std::vector<forward_t> _rules;
@@ -72,26 +78,14 @@ namespace mpls2pda {
             bool operator<(const entry_t& other) const;
             void print_json(std::ostream&) const;
             static void print_label(label_t label, std::ostream& s, bool quote = true);
-
-            bool is_interface() const {
-                return _top_label < 0;
+            friend std::ostream& operator<<(std::ostream& s, const entry_t& entry)
+            {
+                s << entry._top_label << " ";
+                s << entry._ingoing  << " ";
+                entry.print_json(s);
+                return s;
             }
 
-            bool is_default() const {
-                return _top_label == 0;
-            }
-
-            bool is_mpls() const {
-                return _top_label > 0;
-            }
-
-            label_t as_mpls() const {
-                return _top_label - 1;
-            }
-
-            label_t as_interface() const {
-                return -(_top_label + 1);
-            }
         };
     public:
         RoutingTable(const RoutingTable& orig) = default;

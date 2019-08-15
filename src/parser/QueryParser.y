@@ -96,6 +96,8 @@
         OVER      "OVER"
         UNDER     "UNDER"
         EXACT     "EXACT"
+        ANYIP     "@"
+        ANYMPLS   "¤"
 ;
 
 
@@ -104,8 +106,8 @@
 %type  <Query> query;
 %type  <NFA<Query::label_t>> regex cregex;
 %type  <Query::mode_t> mode;
-%type  <std::unordered_set<Query::label_t>> atom_list label;
-%type  <filter_t> atom ip4 ip6 identifier name;
+%type  <std::unordered_set<Query::label_t>> atom_list label ip4 ip6;
+%type  <filter_t> atom identifier name;
 %type  <std::string> literal;
 //%printer { yyoutput << $$; } <*>;
 %left AND
@@ -153,6 +155,8 @@ regex
     | regex QUESTION { $$ = std::move($1); $$.question_extend(); }    
     | LSQBRCKT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($2), false); }
     | LSQBRCKT HAT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($3), true); } // negated set
+    | ANYIP { $$ = builder.any_ip(); }
+    | ANYMPLS { $$ = builder.any_mpls(); }
     | LPAREN regex RPAREN { $$ = std::move($2); }
     ;
 
@@ -167,6 +171,7 @@ hexnumber
     : HEX {
         $$ = scanner.last_int;
     }
+    | { $$ = 0; } // NONE
     ;
     
 atom_list
@@ -194,16 +199,16 @@ ip4
         $$ = builder.match_ip4($1, $3, $5, $7, $9);
     }
     | number DOT number DOT number DOT number {
-        $$ = builder.match_ip4($1, $3, $5, $7, 1);
+        $$ = builder.match_ip4($1, $3, $5, $7, 0);
     }
     ;
 
 ip6
     : hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber "/" number {
-        $$ = builder.match_ip6($1, $3, $5, $7, $9, $11, $13);
+        $$ = builder.match_ip6($1, $3, $5, $7, $9, $11, $13, $15, $17);
     }
     | hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber COLON hexnumber { 
-        $$ = builder.match_ip6($1, $3, $5, $7, $9, $11, $13);
+        $$ = builder.match_ip6($1, $3, $5, $7, $9, $11, $13, $15, 0);
     }
     ;
 
@@ -214,19 +219,17 @@ literal
     ;
 
     
-name 
-    : ip4 { $$ = std::move($1); }
-    | ip6 { $$ = std::move($1); }
-    | IDENTIFIER { $$ = builder.match_exact(scanner.last_string); }
+name
+    : IDENTIFIER { $$ = builder.match_exact(scanner.last_string); }
     | literal {  $$ = builder.match_re(std::move($1)); }
     ;
 
 label
     : number "/" number  { $$ = builder.find_label($1, $3); }
-    | number  { $$ = builder.find_label($1, 1); }
-    | COLON {builder.path_mode();} atom { builder.label_mode(); $$ = builder.ip_labels($3); }
+    | number  { $$ = builder.find_label($1, 0); }
+    | ip4
+    | ip6
     ;
-    
 
 %%
 

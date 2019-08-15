@@ -80,9 +80,13 @@ literal  \"(\\.|[^\\"])*\"
 "&"     return token::AND;
 "|"     return token::OR;
 "+"     return token::PLUS;
+"+"     return token::PLUS;
 "*"     return token::STAR;
+"∗"     return token::STAR;
+"?"     return token::QUESTION;
 "?"     return token::QUESTION;
 "."     return token::DOT;
+"·"     return token::DOT;
 "<"     return token::LT;
 ">"     return token::GT;
 ","     return token::COMMA;
@@ -92,6 +96,10 @@ literal  \"(\\.|[^\\"])*\"
 "OVER"  return token::OVER;
 "UNDER" return token::UNDER;
 "EXACT" return token::EXACT;
+"⊙"     return token::ANYIP;
+"@"     return token::ANYIP;
+"⊕"     return token::ANYMPLS;
+"¤"     return token::ANYMPLS;
 
 {int}      {
   long int n = strtol (yytext, NULL, 10);
