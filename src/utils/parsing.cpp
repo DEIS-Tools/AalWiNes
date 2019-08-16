@@ -43,6 +43,7 @@ uint32_t parse_ip4(const char* s)
             add[3 - n] = v;
             j = i + 1;
             ++n;
+            if(n > 3) break;
         }
     }
     return res;
@@ -57,7 +58,7 @@ void write_ip6(std::ostream& s, uint32_t ip)
     }
 }
 
-uint32_t parse_ip8(const char* s)
+uint32_t parse_ip6(const char* s)
 {
     if (s == nullptr)
         return std::numeric_limits<uint32_t>::max();
@@ -70,10 +71,12 @@ uint32_t parse_ip8(const char* s)
         if (s[i] == ':' || i == len - 1) {
             if (i == len - 1)
                 ++i;
-            auto v = std::atoi(&(s[j]));
-            add[3 - n] = v;
+            char *end;
+            auto v = std::strtol(&(s[j]), &end, 16);
+            add[7 - n] = v;
             j = i + 1;
             ++n;
+            if(n > 7) break;
         }
     }
     return res;

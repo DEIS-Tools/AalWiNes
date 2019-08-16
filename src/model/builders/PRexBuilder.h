@@ -35,9 +35,11 @@ namespace mpls2pda {
 
     class PRexBuilder {
     public:
-        static Network parse(const std::string& topo_fn, const std::string& routing_fn);
+        static Network parse(const std::string& topo_fn, const std::string& routing_fn, std::ostream& warnings);
     private:
-
+        static void build_routers(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, ptrie::map<Router*>& mapping, std::ostream& warnings);
+        static void build_tables(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, ptrie::map<Router*>& mapping, std::ostream& warnings);
+        static void open_xml(const std::string& topo_fn, rapidxml::xml_document<>& doc, std::vector<char>& buffer);
     };
 }
 

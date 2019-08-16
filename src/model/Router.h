@@ -64,6 +64,7 @@ public:
         return _global_id;
     }
     
+    void make_pairing(Interface* interface);
     void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
     Interface* match() const { return _matching; }
 private:
@@ -90,6 +91,7 @@ public:
 
     void print_dot(std::ostream& out);
     const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
+    Interface* find_interface(std::string iface);
     Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr);
     Interface* interface_no(size_t i) const {
         return _interfaces[i].get();

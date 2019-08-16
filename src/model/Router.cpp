@@ -45,6 +45,22 @@ namespace mpls2pda
         return _names.back();
     }
 
+    Interface* Router::find_interface(std::string iface)
+    {
+        for (size_t i = 0; i < iface.size(); ++i) {
+            if (iface[i] == ' ') {
+                iface = iface.substr(0, i);
+                break;
+            }
+        }
+        size_t l = strlen(iface.c_str());
+        auto res = _interface_map.exists((unsigned char*)iface.c_str(), l);
+        if(!res.first)
+            return nullptr;
+        else
+            return _interface_map.get_data(res.second);
+    }
+    
     Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected)
     {
         for (size_t i = 0; i < iface.size(); ++i) {
@@ -76,6 +92,14 @@ namespace mpls2pda
 
     Interface::Interface(size_t id, size_t global_id, Router* target, Router* parent) : _id(id), _global_id(global_id), _target(target), _parent(parent)
     {
+    }
+
+    void Interface::make_pairing(Interface* interface)
+    {
+        _matching = interface;
+        interface->_matching = this;
+        interface->_target = _parent;
+        _target = interface->_parent;
     }
 
     void Interface::make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher)

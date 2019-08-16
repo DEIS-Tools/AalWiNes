@@ -170,7 +170,7 @@ int main(int argc, const char** argv)
     
     stopwatch parsingwatch;
     auto network = junos_config.empty() ?
-        PRexBuilder::parse(prex_topo, prex_routing) :
+        PRexBuilder::parse(prex_topo, prex_routing, warnings) :
         JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
     
