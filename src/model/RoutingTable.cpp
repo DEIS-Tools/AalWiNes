@@ -474,7 +474,16 @@ namespace mpls2pda
         s << "{";
         s << "\"weight\":" << _weight;
         if (_via) {
-            s << ", \"via\":" << _via->id();
+            s << ", \"via\":";
+            if(use_hex)
+            {
+                s << _via->id();
+            }
+            else
+            {
+                auto iname = _via->source()->interface_name(_via->id());
+                s << "\"" << iname.get() << "\"";
+            }
         }
         else
             s << ",  \"drop\":true";
