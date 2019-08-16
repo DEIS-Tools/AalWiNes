@@ -171,7 +171,7 @@ namespace mpls2pda
         else
         {
             bool is_link = _link, is_post = _post;
-            res._link = [is_link,is_post,str](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
+            res._link = [is_link,is_post,str](const char* fname, const char* tname, const char* trname){
                 if(!is_link)
                     return (str.compare(trname) == 0);
                 else if(!is_post)
@@ -197,7 +197,7 @@ namespace mpls2pda
         else
         {
             bool is_link = _link, is_post = _post;
-            res._link = [regex,is_link,is_post](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
+            res._link = [regex,is_link,is_post](const char* fname, const char* tname, const char* trname){
                 if(!is_link)
                     return regex_match(trname, regex);
                 else if(!is_post)
@@ -218,10 +218,10 @@ namespace mpls2pda
     {
         throw base_error("discard matching is not yet implemented");
         filter_t res;
-        res._link = [](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
+        /*res._link = [](const char* fname, const char* tname, const char* trname){
             if(strcmp(fname, "!") == 0) return true;
             return false;
-        };
+        };*/
         return res;
     }
 
@@ -229,10 +229,10 @@ namespace mpls2pda
     {
         throw base_error("routing matching is not yet implemented");
         filter_t res;
-        res._link = [](const char* fname, uint32_t fip4, uint64_t fip6, const char* tname, uint32_t tip4, uint64_t tip6, const char* trname){
+        /*res._link = [](const char* fname, const char* tname, const char* trname){
             if(strcmp(fname, "^") == 0) return true;
             return false;
-        };
+        };*/
         return res;
     }
 

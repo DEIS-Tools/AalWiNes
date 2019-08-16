@@ -31,8 +31,8 @@ namespace mpls2pda {
     // probably not the fastest or prettiest, but seems to be the easiest.
     struct filter_t {
         std::function<bool(const char*)> _from = [](const char*){return true;};
-        std::function<bool(const char*, uint32_t, uint64_t, const char*, uint32_t, uint64_t, const char*)> _link = 
-        [](const char*, uint32_t, uint64_t, const char*, uint32_t, uint64_t, const char*){return true;};
+        std::function<bool(const char*, const char*, const char*)> _link = 
+        [](const char*, const char*, const char*){return true;};
         filter_t operator&&(const filter_t& other);
     };
 }

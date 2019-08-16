@@ -34,10 +34,10 @@ namespace mpls2pda {
         };
         auto ol = other._link;
         auto tl = _link;
-        ret._link = [tl,ol](const char* fn, uint32_t fi4, uint64_t fi6, const char* tn, uint32_t ti4, uint64_t ti6, const char* tr)
+        ret._link = [tl,ol](const char* fn, const char* tn, const char* tr)
         {
-            return tl(fn, fi4, fi6, tn, ti4, ti6, tr) && 
-                   ol(fn, fi4, fi6, tn, ti4, ti6, tr);
+            return tl(fn, tn, tr) && 
+                   ol(fn, tn, tr);
         };
         return ret;
     }

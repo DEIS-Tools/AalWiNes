@@ -142,7 +142,6 @@ namespace mpls2pda
                         next->add_name(nn);
                         warnings << "\t" << nn << std::endl;
                     }
-                    next->_inferred = true;
 
                 }
 
@@ -396,17 +395,12 @@ namespace mpls2pda
             out << "\"" << name() << "\" -> \"" << tgtstring
                     << "\" [ label=\"" << n.get() << "\" ];\n";
         }
-        if (!_inferred) {
-            if (_interfaces.size() == 0)
-                out << "\"" << name() << "\" [shape=triangle];\n";
-            else if (_has_config)
-                out << "\"" << name() << "\" [shape=circle];\n";
-            else
-                out << "\"" << name() << "\" [shape=square];\n";
-        }
-        else {
-            out << "\"" << name() << "\" [shape=square,color=red];\n";
-        }
+        if (_interfaces.size() == 0)
+            out << "\"" << name() << "\" [shape=triangle];\n";
+        else if (_has_config)
+            out << "\"" << name() << "\" [shape=circle];\n";
+        else
+            out << "\"" << name() << "\" [shape=square];\n";
 
         out << "\n";
 

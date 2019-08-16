@@ -62,22 +62,16 @@ namespace mpls2pda
                     // can we have empty interfaces??
                     assert(i);
                     auto fname = r->interface_name(i->id());
-                    auto fip = i->ip4();
-                    auto fip6 = i->ip6();
                     std::unique_ptr<char[] > tname = std::make_unique<char[]>(1);
                     tname.get()[0] = '\0';
                     const char* tr = empty_string;
-                    uint32_t tip = 0;
-                    uint64_t tip6 = 0;
                     if (i->target() != nullptr) {
                         if (i->match() != nullptr) {
                             tname = i->target()->interface_name(i->match()->id());
-                            tip = i->match()->ip4();
-                            tip6 = i->match()->ip6();
                         }
                         tr = i->target()->name().c_str();
                     }
-                    if (filter._link(fname.get(), fip, fip6, tname.get(), tip, tip6, tr)) {
+                    if (filter._link(fname.get(), tname.get(), tr)) {
                         res.insert(Query::label_t{Query::INTERFACE, 0, i->global_id()}); // TODO: little hacksy, but we have uniform types in the parser
                     }
                 }

@@ -65,7 +65,6 @@ public:
     }
     
     uint32_t ip4() const { return _ip; }
-    uint64_t ip6() const { return _ip6; }
     
     void make_pairing(Router* parent, std::vector<const Interface*>& all_interfaces);
     Interface* match() const { return _matching; }
@@ -75,7 +74,6 @@ private:
     Router* _target = nullptr;
     Interface* _matching = nullptr;
     uint32_t _ip = 0; // two special values; unknown = uint32_t::max, virtual = 0
-    uint64_t _ip6 = 0;
     Router* _parent = nullptr;
     RoutingTable _table;
 };
@@ -93,13 +91,10 @@ public:
     const std::string& name() const;
     const std::vector<std::string>& names() const { return _names; }
 
-    bool has_config() const {
-        return _has_config;
-    }
     void parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>&, std::ostream& warnings);
     void parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>&, std::ostream& warnings, bool skip_pfe);
     void print_dot(std::ostream& out);
-    const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
+    const std::vector<std::shared_ptr<Interface>>& interfaces() const { return _interfaces; }
     Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr, uint32_t ip = std::numeric_limits<uint32_t>::max());
     Interface* interface_no(size_t i) const {
         return _interfaces[i].get();
@@ -109,11 +104,10 @@ public:
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;
-    std::vector<std::unique_ptr<Interface>> _interfaces;
+    std::vector<std::shared_ptr<Interface>> _interfaces;
     ptrie::map<Interface*> _interface_map;
     size_t _inamelength = 0; // for printing
     bool _has_config = false;
-    bool _inferred = false;
     friend class Interface;
 };
 }
