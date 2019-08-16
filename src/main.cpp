@@ -18,13 +18,13 @@
 //
 
 #include "utils/errors.h"
-#include "parser/QueryBuilder.h"
+#include "query/QueryBuilder.h"
 
 #include "model/Router.h"
 #include "model/Network.h"
 #include "model/NetworkPDAFactory.h"
 
-#include "parser/parsererrors.h"
+#include "query/parsererrors.h"
 #include "pdaaal/model/PDAFactory.h"
 #include "pdaaal/engine/Moped.h"
 

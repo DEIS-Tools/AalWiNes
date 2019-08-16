@@ -6,8 +6,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 find_package(FLEX 2.6.4 REQUIRED)
 find_package(BISON 3.0.5 REQUIRED)
 
-flex_target(flexer "parser/QueryLexer.l"  "${CMAKE_CURRENT_SOURCE_DIR}/parser/generated_QueryLexer.cc")
-bison_target(bparser "parser/QueryParser.y" "${CMAKE_CURRENT_SOURCE_DIR}/parser/generated_QueryParser.cc")
+flex_target(flexer "query/QueryLexer.l"  "${CMAKE_CURRENT_SOURCE_DIR}/query/generated_QueryLexer.cc")
+bison_target(bparser "query/QueryParser.y" "${CMAKE_CURRENT_SOURCE_DIR}/query/generated_QueryParser.cc")
 add_flex_bison_dependency(flexer bparser)
 
 
@@ -16,7 +16,7 @@ include_directories(${Boost_INCLUDE_DIR} rapidxml)
 
 add_executable(mpls2pda ${HEADER_FILES} main.cpp 
     model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDAFactory.cpp
-    ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} parser/QueryBuilder.cpp 
+    ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp 
     pdaaal/engine/Moped.cpp
     utils/parsing.cpp utils/system.cpp)
 target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml ptrie)
