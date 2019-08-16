@@ -408,8 +408,8 @@ namespace pdaaal {
         {
             size_t cnt = size();
 
-            //forwards_prune();
-            //backwards_prune();
+            forwards_prune();
+            backwards_prune();
             std::queue<size_t> waiting;            
             if(aggresivity == 0) 
             {
