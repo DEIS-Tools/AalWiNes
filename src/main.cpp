@@ -20,6 +20,7 @@
 #include "utils/errors.h"
 #include "query/QueryBuilder.h"
 
+#include "model/builders/JuniperBuilder.h"
 #include "model/Router.h"
 #include "model/Network.h"
 #include "model/NetworkPDAFactory.h"
@@ -44,142 +45,6 @@
 namespace po = boost::program_options;
 using namespace mpls2pda;
 using namespace pdaaal;
-void parse_junos(std::vector<std::unique_ptr<Router>>&routers,
-                 std::vector<const Interface*>& interfaces,
-                 ptrie::map<Router*>& mapping,
-                 const std::string& network,
-                 std::ostream& warnings, bool skip_pfe)
-{
-    // lets start by creating empty router-objects for all the alias' we have
-    using tp = std::tuple<std::string, std::string, std::string>;
-    std::vector<tp> configs;
-    std::string line;
-    std::ifstream data(network);
-    auto wd = boost::filesystem::path(network).parent_path();
-    if (!data.is_open()) {
-        std::cerr << "Could not open " << network << std::endl;
-        exit(-1);
-    }
-
-    while (getline(data, line)) {
-        if (line.size() == 0)
-            continue;
-        size_t en = 0;
-        for (; en < line.length(); ++en) if (line[en] == ':') break;
-        std::string alias = line.substr(0, en);
-        {
-            auto id = routers.size();
-            routers.emplace_back(std::make_unique<Router>(id));
-            std::string tmp;
-            bool some = false;
-            std::istringstream ss(alias);
-            while (std::getline(ss, tmp, ',')) {
-                if (tmp.size() == 0) continue;
-                some = true;
-                auto res = mapping.insert((unsigned char*) tmp.c_str(), tmp.size());
-                if (!res.first) {
-                    auto oid = mapping.get_data(res.second)->index();
-                    if (oid != id) {
-                        std::cerr << "error: Duplicate definition of \"" << tmp << "\", previously found in entry " << oid << std::endl;
-                        exit(-1);
-                    }
-                    else {
-                        warnings << "Warning: entry " << id << " contains the duplicate alias \"" << tmp << "\"" << std::endl;
-                        continue;
-                    }
-                }
-                mapping.get_data(res.second) = routers.back().get();
-                routers.back()->add_name(tmp);
-            }
-            if (!some) {
-                std::cerr << "error: Empty name-string declared for entry " << id << std::endl;
-                exit(-1);
-            }
-            configs.emplace_back();
-            if (en + 1 < line.size()) {
-                // TODO: cleanup this pasta.
-                ++en;
-                size_t config = en;
-                for (; config < line.size(); ++config) if (line[config] == ':') break;
-                if (en < config)
-                    std::get<0>(configs.back()) = line.substr(en, (config - en));
-                ++config;
-                en = config;
-                for (; config < line.size(); ++config) if (line[config] == ':') break;
-                if (en < config)
-                    std::get<1>(configs.back()) = line.substr(en, (config - en));
-                ++config;
-                en = config;
-                for (; config < line.size(); ++config) if (line[config] == ':') break;
-                if (en < config)
-                    std::get<2>(configs.back()) = line.substr(en, (config - en));
-
-                if (std::get<0>(configs.back()).empty() || std::get<1>(configs.back()).empty()) {
-                    std::cerr << "error: Either no configuration files are specified, or both adjacency and mpls is specified." << std::endl;
-                    std::cerr << line << std::endl;
-                    exit(-1);
-                }
-                if (!std::get<2>(configs.back()).empty() && (std::get<1>(configs.back()).empty() || std::get<0>(configs.back()).empty())) {
-                    std::cerr << "error: next-hop-table requires definition of other configuration-files." << std::endl;
-                    std::cerr << line << std::endl;
-                    exit(-1);
-                }
-            }
-        }
-    }
-    for (size_t i = 0; i < configs.size(); ++i) {
-        if (std::get<0>(configs[i]).empty()) {
-            warnings << "warning: No adjacency info for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
-        }
-        else {
-            auto path = wd;
-            path.append(std::get<0>(configs[i]));
-            std::ifstream stream(path.string());
-            if (!stream.is_open()) {
-                std::cerr << "error: Could not open adjacency-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
-                exit(-1);
-            }
-            try {
-                routers[i]->parse_adjacency(stream, routers, mapping, interfaces, warnings);
-            }
-            catch (base_error& ex) {
-                std::cerr << ex.what() << "\n";
-                std::cerr << "while parsing : " << std::get<0>(configs[i]) << std::endl;
-                stream.close();
-                exit(-1);
-            }
-            stream.close();
-        }
-        if (std::get<1>(configs[i]).empty()) {
-            warnings << "warning: No routingtables for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
-        }
-        else {
-            auto path = wd;
-            path.append(std::get<1>(configs[i]));
-            std::ifstream stream(path.string());
-            if (!stream.is_open()) {
-                std::cerr << "error: Could not open routing-description for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
-                exit(-1);
-            }
-            std::ifstream id;
-            if (!std::get<2>(configs[i]).empty() && !skip_pfe) {
-                auto path = wd;
-                path.append(std::get<2>(configs[i]));
-                id.open(path.string());
-            }
-            try {
-                routers[i]->parse_routing(stream, id, interfaces, warnings, skip_pfe);
-            }
-            catch (base_error& ex) {
-                std::cerr << ex.what() << "\n";
-                std::cerr << "while parsing : " << std::get<1>(configs[i]) << std::endl;
-                stream.close();
-                exit(-1);
-            }
-            stream.close();
-        }
-    }
-}
 
 /*
  TODO:
@@ -274,19 +139,7 @@ int main(int argc, const char** argv)
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
     
     stopwatch parsingwatch;
-    Network network = [&] {
-        ptrie::map<Router*> mapping;
-        std::vector<std::unique_ptr < Router>> routers;
-        std::vector<const Interface*> interfaces;
-        if (junos_config.size() > 0)
-            parse_junos(routers, interfaces, mapping, junos_config, warnings, skip_pfe);
-
-        for (auto& r : routers) {
-            r->pair_interfaces(interfaces);
-        }
-
-        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
-    }();
+    auto network = JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
     
     if (print_dot) {

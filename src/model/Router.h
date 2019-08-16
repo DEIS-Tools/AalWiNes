@@ -91,8 +91,6 @@ public:
     const std::string& name() const;
     const std::vector<std::string>& names() const { return _names; }
 
-    void parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>&, std::ostream& warnings);
-    void parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>&, std::ostream& warnings, bool skip_pfe);
     void print_dot(std::ostream& out);
     const std::vector<std::shared_ptr<Interface>>& interfaces() const { return _interfaces; }
     Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr, uint32_t ip = std::numeric_limits<uint32_t>::max());

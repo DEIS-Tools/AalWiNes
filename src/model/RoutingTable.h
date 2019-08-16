@@ -20,7 +20,6 @@
  * Created on July 2, 2019, 3:29 PM
  */
 
-#include <rapidxml.hpp>
 #include <string>
 #include <vector>
 
@@ -60,12 +59,7 @@ namespace mpls2pda {
             Interface* _via = nullptr;
             size_t _weight = 0;
             void print_json(std::ostream&, bool use_hex = true) const;
-            void parse_ops(std::string& opstr);
-            friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd)
-            {
-                fwd.print_json(s);
-                return s;
-            }
+            friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
         };
 
         struct entry_t {
@@ -78,49 +72,32 @@ namespace mpls2pda {
             bool operator<(const entry_t& other) const;
             void print_json(std::ostream&) const;
             static void print_label(label_t label, std::ostream& s, bool quote = true);
-            friend std::ostream& operator<<(std::ostream& s, const entry_t& entry)
-            {
-                s << entry._top_label << " ";
-                s << entry._ingoing  << " ";
-                entry.print_json(s);
-                return s;
-            }
+            friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
 
         };
     public:
         RoutingTable(const RoutingTable& orig) = default;
         virtual ~RoutingTable() = default;
         RoutingTable(RoutingTable&&) = default;
-        static RoutingTable parse(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& , std::ostream& warnings, bool skip_pfe);
 
         RoutingTable& operator=(const RoutingTable&) = default;
         RoutingTable& operator=(RoutingTable&&) = default;
 
-        bool empty() const {
-            return _entries.empty();
-        }
+        bool empty() const;
         bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
         bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
-        const std::vector<entry_t>& entries() const {
-            return _entries;
-        }
+        const std::vector<entry_t>& entries() const;
         
-        const std::string& name() const {
-            return _name;
-        }
+        void sort();
+        bool check_nondet(std::ostream& e);
+        entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
+        void pop_entry() { _entries.pop_back(); }
 
         RoutingTable();
-
+        
     private:
-
-        static Interface* parse_via(Router* parent, rapidxml::xml_node<char>* via, std::vector<const Interface*>&);
-        static int parse_weight(rapidxml::xml_node<char>* nh);
-
-
-
-        std::string _name;
         std::vector<entry_t> _entries;
     };
 }

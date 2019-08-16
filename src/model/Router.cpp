@@ -26,8 +26,6 @@
 
 #include <vector>
 #include <streambuf>
-#include <rapidxml.hpp>
-#include <bits/basic_string.h>
 #include <sstream>
 namespace mpls2pda
 {
@@ -45,130 +43,6 @@ namespace mpls2pda
     {
         assert(_names.size() > 0);
         return _names.back();
-    }
-
-    void Router::parse_adjacency(std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings)
-    {
-        rapidxml::xml_document<> doc;
-        std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
-        buffer.push_back('\0');
-        doc.parse<0>(&buffer[0]);
-        if (!doc.first_node()) {
-            std::stringstream e;
-            e << "Ill-formed XML-document for " << name() << std::endl;
-            throw base_error(e.str());
-        }
-        auto info = doc.first_node()->first_node("isis-adjacency-information");
-        if (!info) {
-            std::stringstream e;
-            e << "Missing an \"isis-adjacency-information\"-tag for " << name() << std::endl;
-            throw base_error(e.str());
-        }
-        auto n = info->first_node("isis-adjacency");
-        _has_config = true;
-        if (n) {
-            do {
-                // we look up in order of ipv6, ipv4, name
-                Router* next = nullptr;
-                auto state = n->first_node("adjacency-state");
-                if (state && strcmp(state->value(), "Up") != 0)
-                    continue;
-                auto addv6 = n->first_node("ipv6-address");
-                if (addv6) {
-                    auto res = mapping.exists((unsigned char*) addv6->value(), strlen(addv6->value()));
-                    if (!res.first) {
-                        warnings << "warning: Could not find ipv6 " << addv6->value() << " in adjacency of " << name() << std::endl;
-                    }
-                    else next = mapping.get_data(res.second);
-
-                }
-                auto addv4 = n->first_node("ip-address");
-                if (addv4) {
-                    auto res = mapping.exists((unsigned char*) addv4->value(), strlen(addv4->value()));
-                    if (!res.first) {
-                        warnings << "warning: Could not find ipv4 " << addv4->value() << " in adjacency of " << name() << std::endl;
-                    }
-                    else if (next) {
-                        auto o = mapping.get_data(res.second);
-                        if (next != o) {
-                            std::stringstream e;
-                            e << "Mismatch between ipv4 and ipv6 in adjacency of " << name() << ", expected next router " << next->name() << " got " << o->name() << std::endl;
-                            throw base_error(e.str());
-                        }
-                    }
-                    else next = mapping.get_data(res.second);
-                }
-                auto name_node = n->first_node("system-name");
-                if (name_node) {
-                    auto res = mapping.exists((unsigned char*) name_node->value(), strlen(name_node->value()));
-                    if (!res.first) {
-                        warnings << "warning: Could not find name " << name_node->value() << " in adjacency of " << name() << std::endl;
-                    }
-                    else if (next) {
-                        auto o = mapping.get_data(res.second);
-                        if (next != o) {
-                            std::stringstream e;
-                            e << "Mismatch between ipv4 or ipv6 and name in adjacency of " << name() << ", expected next router " << next->name() << " got " << o->name() << std::endl;
-                            throw base_error(e.str());
-                        }
-                    }
-                    else next = mapping.get_data(res.second);
-                }
-
-                if (next == nullptr) {
-                    warnings << "warning: no matches router for adjecency-list of " << name() << " creating external node" << std::endl;
-                    auto nnid = routers.size();
-                    routers.emplace_back(std::make_unique<Router>(nnid));
-                    next = routers.back().get();
-                    if (addv4) {
-                        auto res = mapping.insert((unsigned char*) addv4->value(), strlen(addv4->value()));
-                        mapping.get_data(res.second) = next;
-                        std::string nn = addv4->value();
-                        next->add_name(nn);
-                        warnings << "\t" << nn << std::endl;
-                    }
-                    if (addv6) {
-                        auto res = mapping.insert((unsigned char*) addv6->value(), strlen(addv6->value()));
-                        mapping.get_data(res.second) = next;
-                        std::string nn = addv6->value();
-                        next->add_name(nn);
-                        warnings << "\t" << nn << std::endl;
-                    }
-                    if (name_node) {
-
-                        auto res = mapping.insert((unsigned char*) name_node->value(), strlen(name_node->value()));
-                        mapping.get_data(res.second) = next;
-                        std::string nn = name_node->value();
-                        next->add_name(nn);
-                        warnings << "\t" << nn << std::endl;
-                    }
-
-                }
-
-                auto iname = n->first_node("interface-name");
-                if (!iname) {
-                    std::stringstream e;
-                    e << "name not given to interface on adjacency of " << name() << std::endl;
-                    throw base_error(e.str());
-                }
-                std::string iface = iname->value();
-                const char* str = nullptr;
-                if (auto ip = n->first_node("ip-address"))
-                    str = ip->value();
-                auto res = get_interface(all_interfaces, iface, next, parse_ip4(str));
-                if (res == nullptr) {
-                    std::stringstream e;
-                    e << "Could not find interface " << iface << std::endl;
-                    throw base_error(e.str());
-                }
-            }
-            while ((n = n->next_sibling("isis-adjacency")));
-        }
-        else {
-            std::stringstream e;
-            e << "No isis-adjacency tags in " << name() << std::endl;
-            throw base_error(e.str());
-        }
     }
 
     Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected, uint32_t ip)
@@ -200,129 +74,6 @@ namespace mpls2pda
         all_interfaces.emplace_back(_interfaces.back().get());
         _interface_map.get_data(res.second) = _interfaces.back().get();
         return _interfaces.back().get();
-    }
-
-    void Router::parse_routing(std::istream& data, std::istream& indirect, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool skip_pfe)
-    {
-        rapidxml::xml_document<> doc;
-        std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
-        buffer.push_back('\0');
-        doc.parse<0>(&buffer[0]);
-        if (!doc.first_node()) {
-            std::stringstream e;
-            e << "Ill-formed XML-document for " << name() << std::endl;
-            throw base_error(e.str());
-        }
-        auto info = doc.first_node()->first_node("forwarding-table-information");
-        if (!info) {
-            std::stringstream e;
-            e << "Missing an \"forwarding-table-information\"-tag for " << name() << std::endl;
-            throw base_error(e.str());
-        }
-        auto n = info->first_node("route-table");
-        if (n == nullptr) {
-            std::stringstream e;
-            e << "Found no \"route-table\"-entries" << std::endl;
-            throw base_error(e.str());
-        }
-        else {
-            ptrie::map<std::pair < std::string, std::string>> indir;
-            if (indirect.good() && indirect.peek() != EOF) {
-                std::string line;
-                while (std::getline(indirect, line)) {
-                    size_t i = 0;
-                    for (; i < line.size(); ++i)
-                        if (line[i] != ' ') break;
-                    size_t j = i;
-                    for (; j < line.size(); ++j) {
-                        if (!std::isdigit(line[j]))
-                            break;
-                    }
-                    // TODO: a lot of pasta here too.
-                    if (j <= i) continue;
-                    auto rn = line.substr(i, (j - i));
-                    i = j;
-                    // find type
-                    for (; i < line.size(); ++i)
-                        if (line[i] != ' ') break;
-                    // skip type
-                    for (; i < line.size(); ++i)
-                        if (line[i] == ' ') break;
-                    // find eth
-                    for (; i < line.size(); ++i)
-                        if (line[i] != ' ') break;
-                    j = i;
-                    for (; i < line.size(); ++i)
-                        if (line[i] == ' ') break;
-                    if (i <= j) {
-                        warnings << "warning; no iface for " << rn << std::endl;
-                        continue;
-                    }
-                    auto iface = line.substr(j, (i - j));
-                    for (; i < line.size(); ++i)
-                        if (line[i] != ' ') break;
-                    for (; i < line.size(); ++i)
-                        if (line[i] == ' ') break;
-                    if (i == line.size()) {
-                        // next line
-                        if (!std::getline(indirect, line)) {
-                            std::stringstream e;
-                            e << "unexpected end of file" << std::endl;
-                            throw base_error(e.str());
-                        }
-                        i = 0;
-                    }
-                    for (; i < line.size(); ++i)
-                        if (line[i] != ' ') break;
-
-                    j = i;
-                    for (; i < line.size(); ++i)
-                        if (line[i] == ' ') break;
-                    auto conv = line.substr(j, (i - j));
-                    if (conv.empty()) {
-                        warnings << "warning: skip rule without protocol" << std::endl;
-                        warnings << "\t" << line << std::endl;
-                    }
-
-                    auto res = indir.insert((const unsigned char*) rn.c_str(), rn.size());
-                    auto& data = indir.get_data(res.second);
-                    if (!res.first) {
-                        if (data.first != iface) {
-                            warnings << "warning: duplicate rule " << rn << " expected \"" << data.first << ":" << data.second << "\" got \"" << iface << "\"" << std::endl;
-                        }
-                    }
-                    else {
-                        data.first.swap(iface);
-                    }
-
-                    if (!res.first) {
-                        if (data.second != conv) {
-                            warnings << "warning: duplicate rule expected \"" << data.first << ":" << data.second << "\" got \"" << conv << "\"" << std::endl;
-                        }
-                    }
-                    else {
-                        data.second.swap(conv);
-                    }
-                }
-            }
-            while (n) {
-                try {
-                    auto rt = RoutingTable::parse(n, indir, this, all_interfaces, warnings, skip_pfe);
-                    for (auto& inf : _interfaces) {
-                        // add table to all interfaces (needed as some routers can have rules matching
-                        // both TOS and interface
-                        if(!inf->table().merge(rt, *inf, warnings))
-                            warnings << "warning: nondeterministic routing discovered for " << name() << " in table " << n->first_node("table-name")->value() << std::endl;    
-                    }
-                }
-                catch (base_error& ex) {
-                    std::stringstream e;
-                    e << ex._message << " :: in router " << name() << std::endl;
-                    throw base_error(e.str());
-                }
-                n = n->next_sibling("route-table");
-            }
-        }
     }
 
     Interface::Interface(size_t id, size_t global_id, Router* target, uint32_t ip, Router* parent) : _id(id), _global_id(global_id), _target(target), _ip(ip), _parent(parent)
@@ -397,10 +148,8 @@ namespace mpls2pda
         }
         if (_interfaces.size() == 0)
             out << "\"" << name() << "\" [shape=triangle];\n";
-        else if (_has_config)
-            out << "\"" << name() << "\" [shape=circle];\n";
         else
-            out << "\"" << name() << "\" [shape=square];\n";
+            out << "\"" << name() << "\" [shape=circle];\n";
 
         out << "\n";
 
