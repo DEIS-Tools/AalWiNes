@@ -21,6 +21,8 @@
 #include "query/QueryBuilder.h"
 
 #include "model/builders/JuniperBuilder.h"
+#include "model/builders/PRexBuilder.h"
+
 #include "model/Router.h"
 #include "model/Network.h"
 #include "model/NetworkPDAFactory.h"
@@ -79,11 +81,15 @@ int main(int argc, const char** argv)
     ;
 
 
-    std::string junos_config;
+    std::string junos_config, prex_topo, prex_routing;
     bool skip_pfe = false;
     input.add_options()
-            ("juniper,j", po::value<std::string>(&junos_config),
+            ("juniper", po::value<std::string>(&junos_config),
             "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
+            ("topology", po::value<std::string>(&prex_topo), 
+            "An xml-file defining the topology in the P-Rex format")
+            ("routing", po::value<std::string>(&prex_routing), 
+            "An xml-file defining the routing in the P-Rex format")
             ("skip-pfe", po::bool_switch(&skip_pfe),
             "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
             ;    
@@ -133,13 +139,39 @@ int main(int argc, const char** argv)
         exit(-1);
     }
     
+    if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty()))
+    {
+        std::cerr << "--junos cannot be used with --topology or --routing." << std::endl;
+        exit(-1);
+    }
+    
+    if(prex_routing.empty() != prex_topo.empty())
+    {
+        std::cerr << "Both --topology and --routing have to be non-empty." << std::endl;
+        exit(-1);        
+    }
+    
+    if(junos_config.empty() && prex_routing.empty() && prex_topo.empty())
+    {
+        std::cerr << "Either a Junos configuration or a P-Rex configuration must be given." << std::endl;
+        exit(-1);                
+    }
+    
+    if(skip_pfe && junos_config.empty())
+    {
+        std::cerr << "--skip-pfe is only avaliable for --junos configurations." << std::endl;
+        exit(-1);
+    }
+    
     if(silent) no_parser_warnings = true;
     
     std::stringstream dummy;
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
     
     stopwatch parsingwatch;
-    auto network = JuniperBuilder::parse(junos_config, warnings, skip_pfe);
+    auto network = junos_config.empty() ?
+        PRexBuilder::parse(prex_topo, prex_routing) :
+        JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
     
     if (print_dot) {

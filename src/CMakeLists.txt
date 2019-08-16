@@ -14,7 +14,7 @@ add_flex_bison_dependency(flexer bparser)
 find_package(Boost 1.66 COMPONENTS program_options regex filesystem REQUIRED)
 include_directories(${Boost_INCLUDE_DIR} rapidxml)
 
-add_executable(mpls2pda ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.cpp
+add_executable(mpls2pda ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.cpp model/builders/PRexBuilder.cpp
     model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDAFactory.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp 
     pdaaal/engine/Moped.cpp
