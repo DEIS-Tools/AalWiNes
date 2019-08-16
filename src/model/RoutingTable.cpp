@@ -109,7 +109,7 @@ namespace mpls2pda
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
             {
-                entry._top_label._value = atoll(tl.c_str()) + 1;
+                entry._top_label._value = atoll(tl.c_str());
                 entry._top_label._type = Query::MPLS;
             }
             else if (tl == "default") {

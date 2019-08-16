@@ -61,14 +61,14 @@ namespace mpls2pda
             for (auto& e : i->_edges) {
                 if (e.wildcard(_network.all_interfaces().size())) {
                     for (auto inf : _network.all_interfaces()) {
-                        add_initial(e._destination, inf);
+                        add_initial(e._destination, inf->match());
                     }
                 }
                 else if (!e._negated) {
                     for (auto s : e._symbols) {
                         assert(s._type == Query::INTERFACE);
-                        auto interface = _network.all_interfaces()[s._value];
-                        add_initial(e._destination, interface);
+                        auto inf = _network.all_interfaces()[s._value];
+                        add_initial(e._destination, inf->match());
                     }
                 }
                 else {
@@ -76,7 +76,7 @@ namespace mpls2pda
                         auto iid = Query::label_t{Query::INTERFACE, 0, inf->global_id()};
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
                         if (lb == std::end(e._symbols) || *lb != iid) {
-                            add_initial(e._destination, inf);
+                            add_initial(e._destination, inf->match());
                         }
                     }
                 }
@@ -382,7 +382,7 @@ namespace mpls2pda
         {
             stream << "\"" << entry._top_label << "\"";
         }
-        stream << ",rule\":";
+        stream << ",\"rule\":";
         rule.print_json(stream, false);
         stream << "}";
     }
