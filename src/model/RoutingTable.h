@@ -51,7 +51,7 @@ namespace mpls2pda {
         struct action_t {
             op_t _op = POP;
             label_t _op_label;
-            void print_json(std::ostream& s, bool quote = true) const;
+            void print_json(std::ostream& s, bool quote = true, bool use_hex = true) const;
         };
 
         struct forward_t {
@@ -59,7 +59,7 @@ namespace mpls2pda {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _weight = 0;
-            void print_json(std::ostream&) const;
+            void print_json(std::ostream&, bool use_hex = true) const;
             void parse_ops(std::string& opstr);
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd)
             {

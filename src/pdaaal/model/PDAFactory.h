@@ -116,6 +116,18 @@ namespace pdaaal {
                             seen.insert(n);
                             waiting.push_back(n);
                         }
+                        if(n->_accepting)
+                        {
+                            for (auto s : initial()) {
+                                result.add_rules(0, s, PDA<T>::PUSH, e._negated, e._symbols, true, empty);
+                            }
+                            // we can pass directly to destruction
+                            if (empty_accept()) {
+                                for (auto s : _des_stack.initial()) {
+                                   result.add_rules(0, nfa_id(s), PDA<T>::PUSH, e._negated, e._symbols, true, empty);
+                                }
+                            }                            
+                        }
                     }
                 }
             }
@@ -123,7 +135,6 @@ namespace pdaaal {
         }
 
         void build_construction(PDA<T>& result, std::unordered_set<const nfastate_t*>& seen, std::vector<const nfastate_t*>& waiting) {
-            std::vector<T> empty;
             while (!waiting.empty()) {
                 auto top = waiting.back();
                 waiting.pop_back();
@@ -142,7 +153,8 @@ namespace pdaaal {
                         if(n->_accepting)
                         {
                             for (auto s : initial()) {
-                                result.add_rules(nfa_id(top), s, PDA<T>::PUSH, e._negated, e._symbols, false, pre);
+                                auto id = nfa_id(top);
+                                result.add_rules(id, s, PDA<T>::PUSH, e._negated, e._symbols, false, pre);
                             }
                             // we can pass directly to destruction
                             if (empty_accept()) {

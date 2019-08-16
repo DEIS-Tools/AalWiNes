@@ -104,11 +104,11 @@ namespace mpls2pda
         }
         /*if(res.first) std::cerr << "## NEW " << std::endl;
         std::string rn;
-        if(router)
-            rn = router->name();
+        if(inf)
+            rn = inf->source()->name();
         else
             rn = "SINK";
-        std::cerr << "ADDED STATE " << state << " R " << rn << "(" << router << ")" << " M" << mode << " T" << table << " F" << fid << " O" << op << " E" << eid << std::endl;
+        std::cerr << "ADDED STATE " << state << " R " << rn << "(" << inf << ")" << " M" << mode << " F" << fid << " O" << op << " E" << eid << std::endl;
         std::cerr << "\tID " << res.second << std::endl;
         if(_states.get_data(res.second))
             std::cerr << "\t\tACCEPTING !" << std::endl;*/
@@ -179,7 +179,9 @@ namespace mpls2pda
             if(mask == 0)
             {
                 rules.push_back(cpy);
-                rules.back()._pre = pre;                
+                rules.back()._pre = pre;
+                rules.push_back(cpy);
+                rules.back()._pre = Query::label_t::any_mpls;
             }
             else
             {
@@ -196,8 +198,6 @@ namespace mpls2pda
             mask = 64;
             val = 0;
             // fall through to IP            
-            rules.push_back(cpy);
-            rules.back()._pre = Query::label_t::any_ip;
             break;
         case Query::IP4:
             for(auto& l : _network.get_labels(val, mask, Query::IP4))
@@ -278,7 +278,18 @@ namespace mpls2pda
                                 }
                             }
                             else {
-                                nr._op = PDA::NOOP;
+                                if(entry._top_label._type != Query::ANYIP &&
+                                   entry._top_label._type != Query::ANYMPLS)
+                                {
+                                    nr._op = PDA::SWAP;
+                                    nr._op_label = entry._top_label;
+                                    assert(entry._top_label._mask == 0);
+                                    assert(entry._top_label._type == Query::MPLS);
+                                }
+                                else
+                                {
+                                    nr._op = PDA::NOOP;
+                                }
                             }
                             if (forward._ops.size() <= 1) {
                                 std::vector<NFA::state_t*> next{e._destination};
@@ -365,16 +376,14 @@ namespace mpls2pda
         stream << "{\"pre\":";
         if(entry._top_label._type == Query::INTERFACE)
         {
-            auto inf = _network.all_interfaces()[entry._top_label._value];
-            auto iname = inf->source()->interface_name(inf->id());
-            stream << "\"" << iname.get() << "\"";
+            assert(false);
         }
         else
         {
-            RoutingTable::entry_t::print_label(entry._top_label, stream, true);
+            stream << "\"" << entry._top_label << "\"";
         }
         stream << ",rule\":";
-        rule.print_json(stream);
+        rule.print_json(stream, false);
         stream << "}";
     }
 
@@ -403,10 +412,7 @@ namespace mpls2pda
                     {
                         if(!first_symbol)
                             stream << ",";
-                        if(symbol.first)
-                            stream << "\".\"";
-                        else 
-                            RoutingTable::entry_t::print_label(symbol.second, stream, true);
+                        stream << "\"" << symbol << "\"";
                         first_symbol = false;
                     }                    
                     stream << "]}";
@@ -432,7 +438,7 @@ namespace mpls2pda
                             for(auto& entry : s._inf->table().entries())
                             {
                                 if(found) break;
-                                if(!step._stack.front().first && step._stack.front().second != entry._top_label)
+                                if(!entry._top_label.overlaps(entry._top_label))
                                     continue; // not matching on pre
                                 for(auto& r : entry._rules)
                                 {
@@ -458,8 +464,7 @@ namespace mpls2pda
                                             if(r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP)
                                             {
                                                 if(step._stack.size() == nstep._stack.size() &&
-                                                   nstep._stack.front().second == (r._ops.empty() ? entry._top_label : r._ops[0]._op_label) &&
-                                                   !nstep._stack.front().first)
+                                                   (r._ops.empty() || nstep._stack.front() == r._ops[0]._op_label))
                                                 {
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
@@ -477,7 +482,7 @@ namespace mpls2pda
                                                     break;
                                                 }
                                                 else if(r._ops[0]._op == RoutingTable::PUSH && nstep._stack.size() == step._stack.size() + 1 &&
-                                                        r._ops[0]._op_label == nstep._stack.front().second && !nstep._stack.front().first)
+                                                        r._ops[0]._op_label == nstep._stack.front())
                                                 {
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
@@ -536,12 +541,12 @@ namespace mpls2pda
             else if(*from == 'i')
             {
                 Query::label_t res;
-                if(*(from + 1) == '4')
+                if(*(from + 2) == '4')
                     res = Query::label_t::any_ip4;
                 else
                     res = Query::label_t::any_ip6;
                 assert(res._type != Query::NONE);
-                from = from + 2;
+                from = from + 3;
                 auto ip = strtoll(from, (char**)&to, 16);
                 while(*from != 'M') ++from;
                 ++from;

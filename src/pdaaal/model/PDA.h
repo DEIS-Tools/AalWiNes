@@ -36,7 +36,7 @@ namespace pdaaal {
         };
         struct tracestate_t {
             size_t _pdastate = 0;
-            std::vector<std::pair<bool,T>> _stack;
+            std::vector<T> _stack;
         };
     public:
         struct tos_t;
@@ -408,8 +408,8 @@ namespace pdaaal {
         {
             size_t cnt = size();
 
-            forwards_prune();
-            backwards_prune();
+            //forwards_prune();
+            //backwards_prune();
             std::queue<size_t> waiting;            
             if(aggresivity == 0) 
             {

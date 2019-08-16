@@ -64,14 +64,20 @@ namespace mpls2pda {
                     case MPLS:
                         if(_mask == 8)
                             *this = any_mpls;
+                        else
+                            _value = (_value >> _mask) << _mask;
                         break;
                     case IP4:
-                        if(_mask >= 31)
+                        if(_mask >= 32)
                             *this = any_ip4;
+                        else
+                            _value = (_value >> _mask) << _mask;
                         break;
                     case IP6:
-                        if(_mask >= 63)
+                        if(_mask >= 64)
                             *this = any_ip6;
+                        else
+                            _value = (_value >> _mask) << _mask;
                         break;
                     default:
                         _mask = 0;
@@ -121,16 +127,19 @@ namespace mpls2pda {
             
             friend std::ostream & operator << (std::ostream& stream, const label_t& label)
             {
+                uint8_t mx = 255;
                 switch(label._type)
                 {
                     case MPLS:
-                        stream << "l" << label._value;
+                        stream << ((label._value >> label._mask) << label._mask);
                         break;
                     case IP4:
-                        write_ip4(stream, label._value);
+                        write_ip4(stream, (label._value >> label._mask) << label._mask);
+                        mx = 32;
                         break;
                     case IP6:
-                        write_ip6(stream, label._value);
+                        write_ip6(stream, (label._value >> label._mask) << label._mask);
+                        mx = 64;
                         break;
                     case INTERFACE:
                         stream << "i" << label._value;
@@ -146,9 +155,26 @@ namespace mpls2pda {
                         break;
                 }
                 if(label.uses_mask())
-                    stream << "/" << (int)label._mask;
+                {                    
+                    stream << "/" << (int)std::min(label._mask, mx);
+                }
                 return stream;
             }
+            
+            bool overlaps(const label_t& other) const {
+                if(_type == other._type)
+                {
+                    auto m = std::max(other._mask, _mask);
+                    return (_value >> m) == (other._value >> m);
+                }
+                if(std::min(_type, other._type) == ANYIP && 
+                        (std::max(other._type, _type) == IP4 || std::max(other._type, _type) == IP6))
+                    return true;
+                if(std::min(_type, other._type) == ANYMPLS && std::max(_type, other._type) == MPLS)
+                    return true;
+                return false;
+            }
+            
             const static label_t unused_mpls;
             const static label_t unused_ip4;
             const static label_t unused_ip6;

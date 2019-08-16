@@ -314,6 +314,7 @@ namespace mpls2pda
             }
         }
         _ops.pop_back();
+        assert(!_ops.empty());
     }
 
     bool RoutingTable::merge(const RoutingTable& other, Interface& parent, std::ostream& warnings)
@@ -389,7 +390,7 @@ namespace mpls2pda
         return _decreasing == other._decreasing && _top_label == other._top_label && _ingoing == other._ingoing;
     }
 
-    void RoutingTable::action_t::print_json(std::ostream& s, bool quote ) const
+    void RoutingTable::action_t::print_json(std::ostream& s, bool quote , bool use_hex) const
     {
         switch (_op) {
         case SWAP:
@@ -398,7 +399,10 @@ namespace mpls2pda
             s << "swap";
             if(quote) s << "\"";
             s << ":";
-            entry_t::print_label(_op_label, s, quote);
+            if(use_hex)
+                entry_t::print_label(_op_label, s, quote);
+            else
+                s << (quote ? "\"" : "") << _op_label << (quote ? "\"" : "");
             s << "}";
             break;
         case PUSH:
@@ -407,7 +411,10 @@ namespace mpls2pda
             s << "push";
             if(quote) s << "\"";
             s << ":";
-            entry_t::print_label(_op_label, s, quote);
+            if(use_hex)
+                entry_t::print_label(_op_label, s, quote);
+            else
+                s << (quote ? "\"" : "") << _op_label << (quote ? "\"" : "");
             s << "}";
             break;
         case POP:
@@ -444,9 +451,6 @@ namespace mpls2pda
         case Query::ANYMPLS:
             s << "am";
             break;
-        case Query::ANYIP:
-            s << "ap";
-            break;
         case Query::IP4:
             s << "ip4" << std::hex << label._value << "M" << (uint32_t)label._mask << std::dec;
             assert(label._mask == 0 || label._value == std::numeric_limits<uint64_t>::max());
@@ -457,6 +461,7 @@ namespace mpls2pda
             break;
         case Query::INTERFACE:
         case Query::NONE:
+        case Query::ANYIP:
             assert(false);
             throw base_error("Interfaces cannot be pushdown-labels.");
             break;
@@ -464,7 +469,7 @@ namespace mpls2pda
         if(quote) s << "\"";
     }
 
-    void RoutingTable::forward_t::print_json(std::ostream& s) const
+    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex) const
     {
         s << "{";
         s << "\"weight\":" << _weight;
@@ -479,7 +484,7 @@ namespace mpls2pda
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)
                     s << ", ";
-                _ops[i].print_json(s);
+                _ops[i].print_json(s, true, use_hex);
             }
             s << "]";
         }

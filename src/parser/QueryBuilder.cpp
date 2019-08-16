@@ -84,18 +84,30 @@ namespace mpls2pda
 
     Builder::labelset_t Builder::any_ip()
     {
-        labelset_t res;
-        res.insert(Query::label_t::any_ip4);
-        res.insert(Query::label_t::any_ip6);
-        return res;
+        auto r1 = expand_labels(Query::label_t::any_ip4);
+        auto r2 = expand_labels(Query::label_t::any_ip6);
+        r1.insert(r2.begin(), r2.end());
+        r1.insert(Query::label_t::any_ip4);
+        r1.insert(Query::label_t::any_ip6);
+        return r1;
     }
 
     Builder::labelset_t Builder::any_mpls()
     {
-        return {Query::label_t::any_mpls};
+        return expand_labels(Query::label_t::any_mpls);
     }
 
-    
+    Builder::labelset_t Builder::expand_labels(Query::label_t label)
+    {
+        if(!_expand) return {label};
+        
+        if(label._type == Query::ANYMPLS)
+        {
+            return _network.get_labels(0, 255, Query::MPLS);
+        }
+        return _network.get_labels(label._value, label._mask, label._type);        
+    }
+
     Builder::labelset_t Builder::match_ip4(int i1, int i2, int i3, int i4, int mask)
     {
         if(mask > 32)
@@ -116,7 +128,7 @@ namespace mpls2pda
         ptr[2] = i2;
         ptr[3] = i1;
         val = ((val << mask) >> mask); // canonize
-        return {Query::label_t{Query::IP4, static_cast<uint8_t>(mask), val}};
+        return expand_labels(Query::label_t(Query::IP4, static_cast<uint8_t>(mask), val));
     }
 
     Builder::labelset_t Builder::match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int mask)
@@ -143,7 +155,7 @@ namespace mpls2pda
         ptr[6] = i2;
         ptr[7] = i1;
         val = ((val << mask) >> mask); // canonize
-        return {Query::label_t{Query::IP6, static_cast<uint8_t>(mask), val}};
+        return expand_labels(Query::label_t(Query::IP6, static_cast<uint8_t>(mask), val));
     }
 
     filter_t Builder::match_exact(const std::string& str)

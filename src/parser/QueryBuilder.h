@@ -86,11 +86,13 @@ namespace mpls2pda {
         labelset_t any_mpls();
         labelset_t match_ip4(int i1, int i2, int i3, int i4, int mask);
         labelset_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int mask);
+        labelset_t expand_labels(Query::label_t label);
         void invert(bool val)
         {
             _inverted = val;
         }
         bool inverted() const { return _inverted; }
+        void expand(bool val) { _expand = val; }
         
         // Error handling.
         void error(const location &l, const std::string &m);
@@ -108,6 +110,7 @@ namespace mpls2pda {
         bool _post = false;
         bool _link = false;
         bool _inverted = false;
+        bool _expand = false;
     };
 }
 

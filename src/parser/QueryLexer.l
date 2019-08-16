@@ -80,10 +80,8 @@ literal  \"(\\.|[^\\"])*\"
 "&"     return token::AND;
 "|"     return token::OR;
 "+"     return token::PLUS;
-"+"     return token::PLUS;
 "*"     return token::STAR;
 "∗"     return token::STAR;
-"?"     return token::QUESTION;
 "?"     return token::QUESTION;
 "."     return token::DOT;
 "·"     return token::DOT;

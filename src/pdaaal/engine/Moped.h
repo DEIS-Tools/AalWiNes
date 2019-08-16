@@ -127,16 +127,7 @@ namespace pdaaal {
                         else
                         {
                             assert(fit > lit);
-                            if((fit - lit) == 3 && strncmp(lit, "DOT", 3) == 0)
-                            {
-                                // TODO FIX
-                                assert(false);
-//                                trace.back()._stack.emplace_back(true, T{});
-                            }
-                            else
-                            {
-                                trace.back()._stack.emplace_back(false, label_reader(lit, fit));                                
-                            }
+                            trace.back()._stack.emplace_back(label_reader(lit, fit));                                
                         }
                         continue;
                     }
