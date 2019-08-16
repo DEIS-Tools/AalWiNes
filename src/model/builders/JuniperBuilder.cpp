@@ -117,6 +117,7 @@ namespace mpls2pda
                 }
             }
         }
+        std::unordered_map<const Interface*, uint32_t> ipmap;
         for (size_t i = 0; i < configs.size(); ++i) {
             if (std::get<0>(configs[i]).empty()) {
                 warnings << "warning: No adjacency info for index " << i << " (i.e. router " << routers[i]->name() << ")" << std::endl;
@@ -130,7 +131,7 @@ namespace mpls2pda
                     exit(-1);
                 }
                 try {
-                    router_parse_adjacency(*routers[i], stream, routers, mapping, interfaces, warnings);
+                    router_parse_adjacency(*routers[i], stream, routers, mapping, interfaces, warnings, ipmap);
                 }
                 catch (base_error& ex) {
                     std::cerr << ex.what() << "\n";
@@ -171,13 +172,18 @@ namespace mpls2pda
         }
         
         for (auto& r : routers) {
-            r->pair_interfaces(interfaces);
+            r->pair_interfaces(interfaces, [&ipmap](const Interface* i1, const Interface* i2) {
+                auto ip1 = ipmap[i1];
+                auto ip2 = ipmap[i2];
+                auto diff = std::max(ip1, ip2) - std::min(ip1, ip2);
+                return diff == 1 && i1->target() == i2->source() && i2->target() == i1->source();
+            });
         }
    
         return Network(std::move(mapping), std::move(routers), std::move(interfaces));
     }
 
-    void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings)
+    void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap)
     {
         rapidxml::xml_document<> doc;
         std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
@@ -281,15 +287,17 @@ namespace mpls2pda
                     throw base_error(e.str());
                 }
                 std::string iface = iname->value();
-                const char* str = nullptr;
-                if (auto ip = n->first_node("ip-address"))
-                    str = ip->value();
-                auto res = router.get_interface(all_interfaces, iface, next, parse_ip4(str));
+                auto res = router.get_interface(all_interfaces, iface, next);
                 if (res == nullptr) {
                     std::stringstream e;
                     e << "Could not find interface " << iface << std::endl;
                     throw base_error(e.str());
                 }
+                const char* str = nullptr;
+                if (auto ip = n->first_node("ip-address"))
+                    str = ip->value();
+
+                ipmap[res] = parse_ip4(str);
             }
             while ((n = n->next_sibling("isis-adjacency")));
         }

@@ -45,7 +45,7 @@ namespace mpls2pda
         return _names.back();
     }
 
-    Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected, uint32_t ip)
+    Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected)
     {
         for (size_t i = 0; i < iface.size(); ++i) {
             if (iface[i] == ' ') {
@@ -67,50 +67,43 @@ namespace mpls2pda
         if (!res.first)
             return _interface_map.get_data(res.second);
         auto iid = _interfaces.size();
-        if (expected == this)
-            ip = 0;
         auto gid = all_interfaces.size();
-        _interfaces.emplace_back(std::make_unique<Interface>(iid, gid, expected, ip, this));
+        _interfaces.emplace_back(std::make_unique<Interface>(iid, gid, expected, this));
         all_interfaces.emplace_back(_interfaces.back().get());
         _interface_map.get_data(res.second) = _interfaces.back().get();
         return _interfaces.back().get();
     }
 
-    Interface::Interface(size_t id, size_t global_id, Router* target, uint32_t ip, Router* parent) : _id(id), _global_id(global_id), _target(target), _ip(ip), _parent(parent)
+    Interface::Interface(size_t id, size_t global_id, Router* target, Router* parent) : _id(id), _global_id(global_id), _target(target), _parent(parent)
     {
     }
 
-    void Interface::make_pairing(Router* parent, std::vector<const Interface*>& all_interfaces)
+    void Interface::make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher)
     {
         if (_matching != nullptr)
             return;
         if (_target == nullptr)
             return;
-        if (_target == parent)
+        if (_target == _parent)
             return;
         _matching = nullptr;
         for (auto& i : _target->_interfaces) {
-            auto diff = std::max(i->_ip, _ip) - std::min(i->_ip, _ip);
-            if (diff == 1 && i->_target == parent) {
-                if (_matching != nullptr) {
+            if(matcher(this, i.get()))
+            {
+                if(_matching != nullptr)
+                {
                     std::stringstream e;
-                    auto n = parent->interface_name(_id);
+                    e << "Non-unique paring of links between " << _parent->name() << " and " << _target->name() << "\n";
+                    auto n = _parent->interface_name(_id);
                     auto n2 = _target->interface_name(_matching->_id);
                     auto n3 = _target->interface_name(i->_id);
-                    e << "Non-unique paring of links between " << parent->name() << " and " << _target->name() << "\n";
-                    e << n.get() << "(";
-                    write_ip4(e, _ip);
-                    e << ") could be matched with both :\n";
-                    e << n2.get() << "(";
-                    write_ip4(e, _matching->_ip);
-                    e << ") and\n";
-                    e << n3.get() << "(";
-                    write_ip4(e, i->_ip);
-                    e << ")" << std::endl;
+                    e << n.get() << " could be matched with both :\n";
+                    e << n2.get() << " and\n";
+                    e << n3.get() << std::endl;
                     throw base_error(e.str());
                 }
                 _matching = i.get();
-            }
+            }            
         }
 
 
@@ -120,18 +113,18 @@ namespace mpls2pda
         else {
 
             std::stringstream e;
-            auto n = parent->interface_name(_id);
+            auto n = _parent->interface_name(_id);
             e << _parent->name() << "." << n.get();
-            auto iface = _target->get_interface(all_interfaces, e.str(), parent, 0);
+            auto iface = _target->get_interface(all_interfaces, e.str(), _parent);
             _matching = iface;
             iface->_matching = this;
         }
     }
 
-    void Router::pair_interfaces(std::vector<const Interface*>& interfaces)
+    void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher)
     {
         for (auto& i : _interfaces)
-            i->make_pairing(this, interfaces);
+            i->make_pairing(interfaces, matcher);
     }
 
     void Router::print_dot(std::ostream& out)
