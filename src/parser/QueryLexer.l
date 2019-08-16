@@ -96,8 +96,10 @@ literal  \"(\\.|[^\\"])*\"
 "EXACT" return token::EXACT;
 "⊙"     return token::ANYIP;
 "@"     return token::ANYIP;
+"ip"    return token::ANYIP;
 "⊕"     return token::ANYMPLS;
 "¤"     return token::ANYMPLS;
+"mpls"  return token::ANYMPLS;
 
 {int}      {
   long int n = strtol (yytext, NULL, 10);

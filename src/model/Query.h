@@ -145,10 +145,10 @@ namespace mpls2pda {
                         stream << "i" << label._value;
                         break;
                     case ANYIP:
-                        stream << "ANY_IP";
+                        stream << "ip";
                         break;
                     case ANYMPLS:
-                        stream << "ANY_MPLS";
+                        stream << "mpls";
                         break;
                     case NONE:
                         stream << "NONE";
