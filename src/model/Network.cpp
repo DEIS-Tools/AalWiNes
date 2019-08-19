@@ -83,27 +83,25 @@ namespace mpls2pda
     std::unordered_set<Query::label_t> Network::get_labels(uint64_t label, uint64_t mask, Query::type_t type)
     {
         std::unordered_set<Query::label_t> res;
-        for (auto& pr : _label_map) {
-            for (auto& entry : pr.second) {
-                if (entry.first->_top_label._type == type) {
-                    auto mpls = entry.first->_top_label._value;
-                    switch (type) {
-                    case Query::IP6:
-                    case Query::IP4:
-                    {
-                        auto msk = std::max<uint8_t>(mask, entry.first->_top_label._mask);
-                        if ((mpls << msk) == (label << msk))
-                            res.insert(entry.first->_top_label);                        
-                        break;
-                    }
-                    case Query::MPLS:
-                        if ((mpls << mask) == (label << mask))
-                            res.insert(entry.first->_top_label);                        
-                        break;
-                    default:
-                        break;
-                    }
-                }
+        for (auto& pr : all_labels()) {
+            if (pr._type != type) continue;
+            auto msk = std::max<uint8_t>(mask, pr._mask);
+            if(pr == Query::label_t::unused_ip4 ||
+               pr == Query::label_t::unused_ip6 ||
+               pr == Query::label_t::unused_mpls  ) continue;
+            switch (type) {
+            case Query::IP6:
+            case Query::IP4:
+            case Query::MPLS:
+            {
+                if ((pr._value << msk) == (label << msk))
+                    res.insert(pr);
+                else
+                    
+                break;
+            }
+            default:
+                break;
             }
         }
         if (!res.empty()) {
@@ -121,35 +119,55 @@ namespace mpls2pda
                 throw base_error("Unknown exapnsion");
             }
         }
+        else if(res.empty())
+        {
+            switch (type) {
+            case Query::IP4:
+                res.emplace(Query::label_t::unused_ip4);
+                break;
+            case Query::IP6:
+                res.emplace(Query::label_t::unused_ip6);
+                break;
+            case Query::MPLS:
+                res.emplace(Query::label_t::unused_mpls);
+                break;
+            default:
+                throw base_error("Unknown exapnsion");
+            }
+        }
         return res;
     }
 
     std::unordered_set<Query::label_t> Network::all_labels()
     {
-        std::unordered_set<Query::label_t> res;
-        res.reserve(_label_map.size() + 3);
-        res.insert(Query::label_t::unused_ip4);
-        res.insert(Query::label_t::unused_ip6);
-        res.insert(Query::label_t::unused_mpls);
-        for (auto& r : _routers) {
-            for (auto& inf : r->interfaces()) {
-                for (auto& e : inf->table().entries()) {
-                    res.insert(e._top_label);
-                    for (auto& f : e._rules) {
-                        for (auto& o : f._ops) {
-                            switch (o._op) {
-                            case RoutingTable::SWAP:
-                            case RoutingTable::PUSH:
-                                res.insert(o._op_label);
-                            default:
-                                break;
+        if(_label_cache.size() == 0)
+        {
+            std::unordered_set<Query::label_t> res;
+            res.reserve(_label_map.size() + 3);
+            res.insert(Query::label_t::unused_ip4);
+            res.insert(Query::label_t::unused_ip6);
+            res.insert(Query::label_t::unused_mpls);
+            for (auto& r : _routers) {
+                for (auto& inf : r->interfaces()) {
+                    for (auto& e : inf->table().entries()) {
+                        res.insert(e._top_label);
+                        for (auto& f : e._rules) {
+                            for (auto& o : f._ops) {
+                                switch (o._op) {
+                                case RoutingTable::SWAP:
+                                case RoutingTable::PUSH:
+                                    res.insert(o._op_label);
+                                default:
+                                    break;
+                                }
                             }
                         }
                     }
                 }
             }
+            _label_cache = res;
         }
-        return res;
+        return _label_cache;
     }
 
     void Network::print_dot(std::ostream& s)

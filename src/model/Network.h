@@ -54,6 +54,7 @@ private:
     std::vector<std::unique_ptr<Router>> _routers;    
     std::unordered_map<Query::label_t,std::vector<std::pair<const RoutingTable::entry_t*, const Router*>>> _label_map;
     std::vector<const Interface*> _all_interfaces;
+    std::unordered_set<Query::label_t> _label_cache;
     
 
 };

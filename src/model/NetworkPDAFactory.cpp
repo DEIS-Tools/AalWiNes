@@ -198,7 +198,6 @@ namespace mpls2pda
             mask = 64;
             val = 0;
             // fall through to IP            
-            break;
         case Query::IP4:
             for(auto& l : _network.get_labels(val, mask, Query::IP4))
             {
@@ -464,7 +463,8 @@ namespace mpls2pda
                                             if(r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP)
                                             {
                                                 if(step._stack.size() == nstep._stack.size() &&
-                                                   (r._ops.empty() || nstep._stack.front() == r._ops[0]._op_label))
+                                                   ( ( r._ops.empty() && nstep._stack.front() == trace[sno]._stack.front()) || 
+                                                     (!r._ops.empty() && nstep._stack.front() == r._ops[0]._op_label)))
                                                 {
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
