@@ -165,7 +165,11 @@ namespace pdaaal {
                 }
                 bool changed = false;
                 if (!dual_stack) {
-                    _tos = all_labels;
+                    if(_tos.size() != all_labels.size())
+                    {
+                        _tos = all_labels;
+                        changed = true;
+                    }
                 } else {
                     // move stack->stack
                     changed |= forward_stack(prev, all_labels);
@@ -211,9 +215,9 @@ namespace pdaaal {
             }
 
             bool merge_swap(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels) {
-                if (!active(prev, rule, all_labels)) return false; // we know that there is a match!
+                if (!active(prev, rule, all_labels))
+                    return false; // we know that there is a match!
                 bool changed = false;
-
                 {
                     auto lb = std::lower_bound(_tos.begin(), _tos.end(), rule._op_label);
                     if (lb == std::end(_tos) || *lb != rule._op_label) {
@@ -391,6 +395,8 @@ namespace pdaaal {
                 auto& ss = approximation[el];
                 auto& state = _states[el];
                 auto fit = state._rules.begin();
+                auto wm = ss._in_waiting;
+                ss._in_waiting = 1;
                 while (fit != std::end(state._rules)) {
                     if (fit->_to == 0) {
                         ++fit;
@@ -420,13 +426,12 @@ namespace pdaaal {
                             throw base_error("Unknown PDA operation");
                             break;
                     }
-                    if (change || ss._in_waiting == -1) {
+                    if (change || wm == -1) {
                         if (to._in_waiting >= 0) {
                             to._in_waiting = to._in_waiting == 0 ? -1 : -2;
                             waiting.push(fit->_to);
                         }
                     }
-                    ss._in_waiting = 1;
                     ++fit;
                 }
             }
