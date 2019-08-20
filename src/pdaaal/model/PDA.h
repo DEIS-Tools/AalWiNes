@@ -357,11 +357,15 @@ namespace pdaaal {
         
         T get_symbol(size_t i) {
             T res;
-            auto it = _label_map.begin();
-            for(size_t n = 0; n < i; ++n) ++it;
-            return it->first;
-            /*assert(i < _label_map.size());
-            _label_map.unpack(i, (unsigned char*)&res);*/
+            for(auto& l : _label_map)
+            {
+                if(l.second == i)
+                {
+                    res = l.first;
+                    break;
+                }
+            }
+            return res;
         }
         
         void target_tos_prune() {
@@ -486,67 +490,20 @@ namespace pdaaal {
                 auto& app = approximation[i];
                 auto& state = _states[i];
                 size_t br = 0;
-                /*                std::cerr << "[" << i << "] \n";
-                                std::cerr << "\t" << (app._top_dot ? "DOT + [" : "[");
-                                if(app._tos.size() == _all_labels.size())
-                                    std::cerr << "ALL";
-                                else
-                                {
-                                    for(auto& l : app._tos)
-                                    {
-                                        std::cerr << l << ", ";
-                                    }
-                                }
-                                std::cerr << "]\n";
-                                std::cerr << "\t" << (app._stack_dot ? "DOT + [" : "[");
-                                if(app._stack.size() == _all_labels.size())
-                                    std::cerr << "ALL";
-                                else
-                                {
-                                    for(auto& l : app._stack)
-                                    {
-                                        std::cerr << l << ", ";
-                                    }
-                                }
-                                std::cerr << "]\n";*/
                 for (size_t r = 0; r < state._rules.size(); ++r) {
                     // check rule
                     auto& rule = state._rules[r];
-                    /*                    std::cerr << "PRE \n\t";
-                                        for(auto& p : rule._precondition.labels())
-                                        {
-                                            std::cerr << p << ",";
-                                        }
-                                        std::cerr << "\n\t";
-                                        if(rule._precondition.wildcard())
-                                                std::cerr << "Wildcard\n\t";
-                                        for(auto& l : rule._precondition.labels())
-                                            std::cerr << l << ",";
-                                        std::cerr << std::endl;*/
                     if (rule._to == 0 || rule._precondition.intersect(app, _label_map.size())) {
-                        /*                        std::cerr << "Keep rule on [[" << i << "]] with oplabel " << rule._op_label << " AND OP " << rule._operation << std::endl;
-                                                if(rule._precondition.wildcard())
-                                                    std::cerr << "\tWildcard\n";
-                                                std::cerr << "\t" << rule._precondition.labels().size() << std::endl;*/
                         if (br != r) {
                             std::swap(state._rules[br], state._rules[r]);
                         }
                         ++br;
                     }
-                    /*                    else
-                                        {
-                                            std::cerr << "Remove rule on [[" << i << "]] with oplabel " << rule._op_label << " AND OP " << rule._operation << std::endl;
-                                        }*/
                 }
                 state._rules.resize(br);
                 if (state._rules.empty()) {
-                    //                    std::cerr << "CLEAR S" << i << " !!" << std::endl;
                     clear_state(i);
                 }
-                /*                else
-                                {
-                                    std::cerr << "NS S" << i << std::endl; 
-                                }*/
             }
             forwards_prune();
             backwards_prune();
@@ -592,19 +549,9 @@ namespace pdaaal {
             size_t id = 0;
             for(auto& l : sorted)
             {
-#ifndef NDEBUG
-//                auto res = 
-#endif
                 _label_map[l] = id;
-                //std::cerr << "[" << res.second << "] -> " << id << std::endl;
-//                assert(res.first);               
                 ++id;
             }
-            /*for(auto& l : all_labels)
-            {
-                auto re = _label_map.exists((unsigned char*)&l, sizeof(T));
-                assert(re.first);
-            }*/
         }
 
         void add_rules(size_t from, size_t to, op_t op, bool negated, const std::vector<T>& labels, bool negated_pre, const std::vector<T>& pre) {
@@ -612,10 +559,10 @@ namespace pdaaal {
                 size_t last = 0;
                 for(auto& l : labels)
                 {
-                    //auto res = _label_map.exists((unsigned char*)&l, sizeof(T));      
                     assert(_label_map.count(l) == 1);
-                    auto res = _label_map[l];
-                    for(; last < res; ++last)
+                    auto res = _label_map.find(l);
+                    assert(res != std::end(_label_map));
+                    for(; last < res->second; ++last)
                     {
                         _add_rule(from, to, op, last, negated_pre, pre);
                     }
@@ -633,8 +580,20 @@ namespace pdaaal {
         }
 
         void add_rule(size_t from, size_t to, op_t op, T label, bool negated, const std::vector<T>& pre) {
-            auto res = _label_map[label];//.exists((unsigned char*)&label, sizeof(T));      
-            return _add_rule(from, to, op, res, negated, pre);
+            uint32_t lid = 0;
+            if(op != POP && op != NOOP)
+            {
+                auto res = _label_map.find(label);
+                if(res != std::end(_label_map))
+                {
+                    lid = res->second;
+                }
+                else
+                {
+                    throw base_error("Couldnt find label during construction");
+                }
+            }
+            return _add_rule(from, to, op, lid, negated, pre);
         }
         
         void _add_rule(size_t from, size_t to, op_t op, uint32_t label, bool negated, const std::vector<T>& pre) {
@@ -654,13 +613,9 @@ namespace pdaaal {
             {
                 auto& p = pre[i];
                 assert(_label_map.count(p) == 1);
-                auto res = _label_map[p];
-                /*if(!res.first)
-                {
-                    std::cerr << "Did not find " << p << std::endl;
-                }*/
-//                assert(res.first);
-                tpre[i] = res;//res.second;
+                auto res = _label_map.find(p);
+                assert(res != std::end(_label_map));
+                tpre[i] = res->second;
             }
             assert(std::is_sorted(tpre.begin(), tpre.end()));
             lb->_precondition.merge(negated, tpre, _label_map.size());
@@ -671,7 +626,7 @@ namespace pdaaal {
         }
 
         std::vector<state_t> _states;
-        std::map<T, uint32_t> _label_map;
+        std::unordered_map<T, uint32_t> _label_map;
 
     };
 
