@@ -105,8 +105,33 @@ namespace pdaaal {
         struct tos_t {
             std::vector<T> _tos; // TODO: some symbolic representation would be better here
             std::vector<T> _stack; // TODO: some symbolic representation would be better here
-            int _in_waiting = 0;
-
+            enum waiting_t {
+                NOT_IN_STACK = 0, TOS = 8, BOS = 16, BOTH = TOS | BOS
+            };
+            waiting_t _in_waiting = NOT_IN_STACK;
+            
+            bool update_state(const std::pair<bool,bool>& new_state)
+            {
+                auto pre = _in_waiting;
+                switch(_in_waiting)
+                {
+                    case TOS:
+                    case BOS:
+                    case NOT_IN_STACK:
+                        if(new_state.first)
+                            _in_waiting = (waiting_t)(_in_waiting | TOS);
+                        if(new_state.second)
+                            _in_waiting = (waiting_t)(_in_waiting | BOS);
+                        return (_in_waiting != pre);
+                        break;
+                    case BOTH:
+                        return false;
+                        break;
+                }
+                assert(false);
+                return false;
+            }
+            
             bool empty_tos() const {
                 return _tos.empty();
             }
@@ -133,11 +158,10 @@ namespace pdaaal {
             }
 
             bool forward_stack(const tos_t& prev, const std::vector<T>& all_labels) {
-                bool changed = false;
+                auto os = _stack.size();
                 if (_stack.size() != all_labels.size()) {
                     if (prev._stack.size() == all_labels.size()) {
                         _stack = all_labels;
-                        changed = true;
                     } else {
                         auto lid = _stack.begin();
                         auto pid = prev._stack.begin();
@@ -151,19 +175,19 @@ namespace pdaaal {
                             auto oid = pid;
                             while (pid != std::end(prev._stack) && *pid < *lid) ++pid;
                             lid = _stack.insert(lid, oid, pid);
-                            changed = true;
                         }
                         _stack.insert(lid, pid, std::end(prev._stack));
                     }
                 }
-                return changed;
+                return os != _stack.size();
             }
 
-            bool merge_pop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels) {
+            std::pair<bool,bool> merge_pop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
                 if (!active(prev, rule, all_labels)) {
-                    return false;
+                    return std::make_pair(false,false);
                 }
                 bool changed = false;
+                bool stack_changed = false;
                 if (!dual_stack) {
                     if(_tos.size() != all_labels.size())
                     {
@@ -172,7 +196,9 @@ namespace pdaaal {
                     }
                 } else {
                     // move stack->stack
-                    changed |= forward_stack(prev, all_labels);
+                    if((state & tos_t::BOS) == 0)
+                        return std::make_pair(false,false);
+                    stack_changed |= forward_stack(prev, all_labels);
                     // move stack -> TOS
                     if (_tos.size() != all_labels.size()) {
                         if (prev._stack.size() == all_labels.size()) {
@@ -189,13 +215,13 @@ namespace pdaaal {
                         }
                     }
                 }
-                return changed;
+                return std::make_pair(changed, stack_changed);
             }
 
-            bool merge_noop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels) {
-                if (rule._precondition.empty()) return false;
+            std::pair<bool,bool> merge_noop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
+                if (rule._precondition.empty()) return std::make_pair(false,false);
                 bool changed = false;
-                {
+                if((state & tos_t::TOS) != 0) {
                     auto iit = _tos.begin();
                     for (auto& symbol : rule._precondition.wildcard() ? prev._tos : rule._precondition.labels()) {
                         while (iit != _tos.end() && *iit < symbol) ++iit;
@@ -208,37 +234,40 @@ namespace pdaaal {
                         ++iit;
                     }
                 }
-                if (dual_stack) {
-                    changed |= forward_stack(prev, all_labels);
+                bool stack_changed = false;
+                if (dual_stack && (state & tos_t::BOS) != 0) {
+                    stack_changed |= forward_stack(prev, all_labels);
                 }
-                return changed;
+                return std::make_pair(changed, stack_changed);
             }
 
-            bool merge_swap(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels) {
+            std::pair<bool,bool> merge_swap(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
                 if (!active(prev, rule, all_labels))
-                    return false; // we know that there is a match!
+                    return std::make_pair(false,false); // we know that there is a match!
                 bool changed = false;
-                {
+                { 
                     auto lb = std::lower_bound(_tos.begin(), _tos.end(), rule._op_label);
                     if (lb == std::end(_tos) || *lb != rule._op_label) {
                         changed = true;
                         _tos.insert(lb, rule._op_label);
                     }
                 }
-                if (dual_stack) {
-                    changed |= forward_stack(prev, all_labels);
+                bool stack_changed = false;
+                if (dual_stack && (state & tos_t::BOS) != 0) {
+                    stack_changed |= forward_stack(prev, all_labels);
                 }
-                return changed;
+                return std::make_pair(changed, stack_changed);
             }
 
-            bool merge_push(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels) {
+            std::pair<bool,bool> merge_push(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
                 // similar to swap!
-                bool changed = merge_swap(prev, rule, dual_stack, all_labels);
-                if (dual_stack) {
+                if(state == tos_t::NOT_IN_STACK) return std::make_pair(false, false);
+                auto changed = merge_swap(prev, rule, dual_stack, all_labels, state);
+                if (dual_stack && (state & tos_t::TOS) != 0) {
                     // but we also push all TOS labels down
                     if (_stack.size() != all_labels.size()) {
                         if (prev._tos.size() == all_labels.size()) {
-                            changed = true;
+                            changed.second = true;
                             _stack = all_labels;
                         } else {
                             auto it = _stack.begin();
@@ -246,7 +275,7 @@ namespace pdaaal {
                                 while (it != _stack.end() && *it < s) ++it;
                                 if (it != std::end(_stack) && *it == s) continue;
                                 it = _stack.insert(it, s);
-                                changed = true;
+                                changed.second = true;
                             }
                         }
                     }
@@ -379,9 +408,10 @@ namespace pdaaal {
                 if (r._to == 0) continue;
                 if (r._precondition.empty()) continue;
                 auto& ss = approximation[r._to];
-                if (ss._in_waiting == 0) {
+                std::pair<bool,bool> tmp(true,true);
+                if (ss._in_waiting == tos_t::NOT_IN_STACK) {
+                    ss.update_state(tmp);
                     waiting.push(r._to);
-                    ss._in_waiting = -1;
                 }
                 assert(r._operation == PUSH);
                 auto lb = std::lower_bound(ss._tos.begin(), ss._tos.end(), r._op_label);
@@ -395,8 +425,8 @@ namespace pdaaal {
                 auto& ss = approximation[el];
                 auto& state = _states[el];
                 auto fit = state._rules.begin();
-                auto wm = ss._in_waiting;
-                ss._in_waiting = 1;
+                auto old = ss._in_waiting;
+                ss._in_waiting = tos_t::NOT_IN_STACK;
                 while (fit != std::end(state._rules)) {
                     if (fit->_to == 0) {
                         ++fit;
@@ -408,29 +438,26 @@ namespace pdaaal {
                     }
                     auto& to = approximation[fit->_to];
                     // handle dots!
-                    bool change = false;
+                    std::pair<bool,bool> change;
                     switch (fit->_operation) {
                         case POP:
-                            change = to.merge_pop(ss, *fit, ds, _all_labels);
+                            change = to.merge_pop(ss, *fit, ds, _all_labels, old);
                             break;
                         case NOOP:
-                            change = to.merge_noop(ss, *fit, ds, _all_labels);
+                            change = to.merge_noop(ss, *fit, ds, _all_labels, old);
                             break;
                         case PUSH:
-                            change = to.merge_push(ss, *fit, ds, _all_labels);
+                            change = to.merge_push(ss, *fit, ds, _all_labels, old);
                             break;
                         case SWAP:
-                            change = to.merge_swap(ss, *fit, ds, _all_labels);
+                            change = to.merge_swap(ss, *fit, ds, _all_labels, old);
                             break;
                         default:
                             throw base_error("Unknown PDA operation");
                             break;
                     }
-                    if (change || wm == -1) {
-                        if (to._in_waiting >= 0) {
-                            to._in_waiting = to._in_waiting == 0 ? -1 : -2;
-                            waiting.push(fit->_to);
-                        }
+                    if (to.update_state(change)) {
+                        waiting.push(fit->_to);
                     }
                     ++fit;
                 }
