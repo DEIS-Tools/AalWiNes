@@ -415,7 +415,7 @@ namespace mpls2pda
                         first_symbol = false;
                     }                    
                     stream << "]}";
-                    
+
                     if(sno != trace.size() - 1 && trace[sno + 1]._pdastate < _num_pda_states && !step._stack.empty())
                     {
                         stream << ",\n\t\t\t";
@@ -437,7 +437,7 @@ namespace mpls2pda
                             for(auto& entry : s._inf->table().entries())
                             {
                                 if(found) break;
-                                if(!entry._top_label.overlaps(entry._top_label))
+                                if(!entry._top_label.overlaps(step._stack.front()))
                                     continue; // not matching on pre
                                 for(auto& r : entry._rules)
                                 {
@@ -462,10 +462,18 @@ namespace mpls2pda
                                         {
                                             if(r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP)
                                             {
-                                                if(step._stack.size() == nstep._stack.size() &&
-                                                   ( ( r._ops.empty() && nstep._stack.front() == trace[sno]._stack.front()) || 
-                                                     (!r._ops.empty() && nstep._stack.front() == r._ops[0]._op_label)))
+                                                if(step._stack.size() == nstep._stack.size())
                                                 {
+                                                    if(!r._ops.empty()) 
+                                                    {
+                                                        assert(r._ops[0]._op == RoutingTable::SWAP);
+                                                        if(nstep._stack.front() != r._ops[0]._op_label)
+                                                            continue;
+                                                    }
+                                                    else if(!entry._top_label.overlaps(nstep._stack.front()))
+                                                    {
+                                                        continue;
+                                                    }
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
                                                     break;
