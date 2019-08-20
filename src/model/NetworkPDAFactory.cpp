@@ -203,7 +203,7 @@ namespace mpls2pda
             {
                 rules.push_back(cpy);
                 rules.back()._pre = l;
-                assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::IP4);
+                assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::IP4 || rules.back()._pre == Query::label_t::any_ip4);
             }
             if(pre._type != Query::ANYIP) break; // fall through to IP6 if any
         case Query::IP6:
@@ -211,10 +211,9 @@ namespace mpls2pda
             {
                 rules.push_back(cpy);
                 rules.back()._pre = l;
-                assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::IP6);
+                assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::IP6 || rules.back()._pre == Query::label_t::any_ip6);
             }            
             break;
-
         default:
             throw base_error("Unknown label-type");
         }

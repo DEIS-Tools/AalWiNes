@@ -104,22 +104,7 @@ namespace mpls2pda
                 break;
             }
         }
-        if (!res.empty()) {
-            switch (type) {
-            case Query::IP4:
-                res.emplace(Query::label_t::any_ip4);
-                break;
-            case Query::IP6:
-                res.emplace(Query::label_t::any_ip6);
-                break;
-            case Query::MPLS:
-                res.emplace(Query::label_t::any_mpls);
-                break;
-            default:
-                throw base_error("Unknown exapnsion");
-            }
-        }
-        else if(res.empty())
+        if(res.empty())
         {
             switch (type) {
             case Query::IP4:
@@ -135,6 +120,19 @@ namespace mpls2pda
                 throw base_error("Unknown exapnsion");
             }
         }
+        switch (type) {
+        case Query::IP4:
+            res.emplace(Query::label_t::any_ip4);
+            break;
+        case Query::IP6:
+            res.emplace(Query::label_t::any_ip6);
+            break;
+        case Query::MPLS:
+            res.emplace(Query::label_t::any_mpls);
+            break;
+        default:
+            throw base_error("Unknown exapnsion");
+        }        
         return res;
     }
 
