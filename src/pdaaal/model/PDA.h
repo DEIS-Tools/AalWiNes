@@ -68,7 +68,7 @@ namespace pdaaal {
                 return !_wildcard && _labels.empty();
             }
             bool intersect(const tos_t& tos, size_t all_labels);
-            void noop_pre_filter(const std::unordered_set<uint32_t>& usefull);
+            bool noop_pre_filter(const std::unordered_set<uint32_t>& usefull);
         };
 
         struct rule_t {
@@ -368,7 +368,8 @@ namespace pdaaal {
             return res;
         }
         
-        void target_tos_prune() {
+        bool target_tos_prune() {
+            bool changed = false;
             for (size_t s = 1; s < _states.size(); ++s) {
                 std::unordered_set<uint32_t> usefull_tos;
                 bool cont = false;
@@ -397,11 +398,12 @@ namespace pdaaal {
                                 case PUSH:
                                     if (!r._precondition.empty() && usefull_tos.count(r._op_label) == 0) {
                                         r._precondition.clear();
+                                        changed = true;
                                     }
                                     break;
                                 case NOOP:
                                 {
-                                    r._precondition.noop_pre_filter(usefull_tos);
+                                    changed |= r._precondition.noop_pre_filter(usefull_tos);
                                     break;
                                 }
                                 case POP:
@@ -413,11 +415,13 @@ namespace pdaaal {
                     }
                 }
             }
+            return changed;
         }
 
         std::pair<size_t, size_t> reduce(int aggresivity) {
             size_t cnt = size();
-            forwards_prune();
+            if(aggresivity == 0)
+                forwards_prune();
             backwards_prune();
             std::queue<size_t> waiting;
             if (aggresivity == 0) {
@@ -440,6 +444,11 @@ namespace pdaaal {
                 auto lb = std::lower_bound(ss._tos.begin(), ss._tos.end(), r._op_label);
                 if (lb == std::end(ss._tos) || *lb != r._op_label)
                     ss._tos.insert(lb, r._op_label);
+            }
+            
+            if (aggresivity == 3) {
+                // it could potentially work as fixpoint; not sure if it has any effect.
+                while(target_tos_prune());
             }
             // saturate
             while (!waiting.empty()) {
@@ -505,13 +514,10 @@ namespace pdaaal {
                     clear_state(i);
                 }
             }
-            forwards_prune();
             backwards_prune();
             if (aggresivity == 3) {
                 // it could potentially work as fixpoint; not sure if it has any effect.
-                target_tos_prune();
-                forwards_prune();
-                backwards_prune();
+                while(target_tos_prune());
             }
 
             size_t after_cnt = size();
@@ -702,10 +708,11 @@ namespace pdaaal {
     }
 
     template<typename T>
-    void PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<uint32_t>& usefull) {
+    bool PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<uint32_t>& usefull) {
         if (_wildcard) {
             _labels.insert(_labels.begin(), usefull.begin(), usefull.end());
             _wildcard = false;
+            return true;
         } else {
             auto it = _labels.begin();
             auto wit = it;
@@ -722,8 +729,10 @@ namespace pdaaal {
             }
             if (wit != it) {
                 _labels.resize(wit - _labels.begin());
+                return true;
             }
         }
+        return false;
     }
 
     template<typename T>
