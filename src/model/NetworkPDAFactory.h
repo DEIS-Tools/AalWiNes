@@ -53,8 +53,6 @@ namespace mpls2pda
         
         std::function<void(std::ostream&, const Query::label_t&) > label_writer() const;
         
-        std::function<Query::label_t(const char*, const char*)> label_reader() const;
-        
         void write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>&& trace);
 
         

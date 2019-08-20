@@ -84,17 +84,21 @@ namespace mpls2pda
     {
         std::unordered_set<Query::label_t> res;
         for (auto& pr : all_labels()) {
-            if (pr._type != type) continue;
-            auto msk = std::max<uint8_t>(mask, pr._mask);
+            if (pr.type() != type) continue;
+            auto msk = std::max<uint8_t>(mask, pr.mask());
             if(pr == Query::label_t::unused_ip4 ||
                pr == Query::label_t::unused_ip6 ||
-               pr == Query::label_t::unused_mpls  ) continue;
+               pr == Query::label_t::unused_mpls ||
+               pr == Query::label_t::any_ip ||
+               pr == Query::label_t::any_ip4 ||
+               pr == Query::label_t::any_ip6 ||
+               pr == Query::label_t::any_mpls) continue;
             switch (type) {
             case Query::IP6:
             case Query::IP4:
             case Query::MPLS:
             {
-                if ((pr._value << msk) == (label << msk))
+                if ((pr.value() << msk) == (label << msk))
                     res.insert(pr);
                 else
                     
@@ -141,10 +145,14 @@ namespace mpls2pda
         if(_label_cache.size() == 0)
         {
             std::unordered_set<Query::label_t> res;
-            res.reserve(_label_map.size() + 3);
+            res.reserve(_label_map.size() + 7);
             res.insert(Query::label_t::unused_ip4);
             res.insert(Query::label_t::unused_ip6);
             res.insert(Query::label_t::unused_mpls);
+            res.insert(Query::label_t::any_ip);
+            res.insert(Query::label_t::any_ip4);
+            res.insert(Query::label_t::any_ip6);
+            res.insert(Query::label_t::any_mpls);
             for (auto& r : _routers) {
                 for (auto& inf : r->interfaces()) {
                     for (auto& e : inf->table().entries()) {

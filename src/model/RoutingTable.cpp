@@ -158,21 +158,21 @@ namespace mpls2pda
     void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
     {
         if (quote) s << "\"";
-        switch (label._type) {
+        switch (label.type()) {
         case Query::MPLS:
-            s << 'l' << std::hex << label._value << std::dec;
-            assert(label._mask == 0);
+            s << 'l' << std::hex << label.value() << std::dec;
+            assert(label.mask() == 0);
             break;
         case Query::ANYMPLS:
             s << "am";
             break;
         case Query::IP4:
-            s << "ip4" << std::hex << label._value << "M" << (uint32_t) label._mask << std::dec;
-            assert(label._mask == 0 || label._value == std::numeric_limits<uint64_t>::max());
+            s << "ip4" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
+            assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
             break;
         case Query::IP6:
-            s << "ip6" << std::hex << label._value << "M" << (uint32_t) label._mask << std::dec;
-            assert(label._mask == 0 || label._value == std::numeric_limits<uint64_t>::max());
+            s << "ip6" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
+            assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
             break;
         case Query::INTERFACE:
         case Query::NONE:

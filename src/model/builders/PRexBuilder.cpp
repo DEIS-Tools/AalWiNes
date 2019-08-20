@@ -261,9 +261,7 @@ namespace mpls2pda {
                     entry._ingoing = inf;
                     if(lblattr != nullptr)
                     {
-                        entry._top_label._type = Query::MPLS;
-                        entry._top_label._mask = 0;
-                        entry._top_label._value = atoi(lblattr->value());
+                        entry._top_label.set_value(Query::MPLS, atoi(lblattr->value()), 0);
                     }
                     else if(ipattr != nullptr)
                     {
@@ -274,15 +272,13 @@ namespace mpls2pda {
                             // this is too simple, FIX!
                             if(c == '.')
                             {
-                                entry._top_label._type = Query::IP4;
-                                entry._top_label._value = parse_ip4(add.c_str());
+                                entry._top_label.set_value(Query::IP4, parse_ip4(add.c_str()), 0);
                                 ok = true;
                                 break;
                             }
                             else if(c == ':')
                             {
-                                entry._top_label._type = Query::IP6;
-                                entry._top_label._value = parse_ip6(add.c_str());                                
+                                entry._top_label.set_value(Query::IP6, parse_ip6(add.c_str()), 0);
                                 ok = true;
                                 break;
                             }
@@ -298,7 +294,7 @@ namespace mpls2pda {
                         ++i;
                         if(i < add.size())
                         {
-                            entry._top_label._mask = atoi(&add[i]);
+                            entry._top_label.set_mask(atoi(&add[i]));
                         }
                         
                     }
@@ -368,9 +364,7 @@ namespace mpls2pda {
                                                     es << type << " needs an \"arg\"";
                                                     throw base_error(es.str());
                                                 }
-                                                op._op_label._value = std::atoi(aattr->value());
-                                                op._op_label._mask = 0;
-                                                op._op_label._type = Query::MPLS;
+                                                op._op_label.set_value(Query::MPLS, std::atoi(aattr->value()), 0);
                                                 if(type == "push")
                                                 {
                                                     op._op = RoutingTable::PUSH;

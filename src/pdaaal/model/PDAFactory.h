@@ -198,6 +198,7 @@ namespace pdaaal {
                 for (rule_t& r : rules(top)) {
                     // translate rules into PDA rules
                     std::vector<T> pre{r._pre};
+                    assert(_all_labels.count(r._pre) == 1);
                     result.add_rule(top, r._dest, r._op, r._op_label, false, pre);
                     if (pdaseen.count(r._dest) == 0) {
                         pdaseen.insert(r._dest);

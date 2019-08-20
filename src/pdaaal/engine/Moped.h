@@ -29,13 +29,13 @@ namespace pdaaal {
         bool verify(const std::string& tmpfile, bool build_trace);
         
         template<typename T>
-        bool verify(const PDA<T>& pda, bool build_trace, std::function<void(std::ostream&, const T&) > labelprinter);
+        bool verify(const PDA<T>& pda, bool build_trace);
+
+        template<typename T>        
+        static void dump_pda(const PDA<T>& pda, std::ostream& s);
         
         template<typename T>
-        static void dump_pda(const PDA<T>& pda, std::ostream& s, std::function<void(std::ostream&, const T&) > labelprinter);
-        
-        template<typename T>
-        std::vector<typename PDA<T>::tracestate_t> get_trace(std::function<T(const char*, const char*)> label_reader) const;
+        std::vector<typename PDA<T>::tracestate_t> get_trace(PDA<T>& pda) const;
         
     private:
         bool parse_result(const std::string&, bool build_trace);
@@ -46,18 +46,18 @@ namespace pdaaal {
     };
 
     template<typename T>
-    bool Moped::verify(const PDA<T>& pda, bool build_trace, std::function<void(std::ostream&, const T&) > labelprinter)
+    bool Moped::verify(const PDA<T>& pda, bool build_trace)
     {
         _raw_trace.clear();
         std::fstream file;
         file.open(_tmpfilepath, std::fstream::out);
-        dump_pda(pda, file, labelprinter);
+        dump_pda(pda, file);
         file.close();
         return verify(_tmpfilepath, build_trace);
     }
     
     template<typename T>
-    std::vector<typename PDA<T>::tracestate_t> Moped::get_trace(std::function<T(const char*, const char*)> label_reader) const
+    std::vector<typename PDA<T>::tracestate_t> Moped::get_trace(PDA<T>& pda) const
     {
         using tracestate_t = typename PDA<T>::tracestate_t;
         std::vector<tracestate_t> trace;
@@ -126,8 +126,17 @@ namespace pdaaal {
                         }
                         else
                         {
+                            assert(fit > lit);   
+                            assert(*lit == 'l');
+                            if(*lit != 'l')
+                            {
+                                std::cerr << &*fit << std::endl;
+                                throw base_error("Could not parse trace");
+                            }
+                            ++fit;
                             assert(fit > lit);
-                            trace.back()._stack.emplace_back(label_reader(lit, fit));                                
+                            auto res = atoi(&*lit);
+                            trace.back()._stack.emplace_back(pda.get_symbol(res));                                
                         }
                         continue;
                     }
@@ -148,17 +157,17 @@ namespace pdaaal {
     }
     
     template<typename T>
-    void Moped::dump_pda(const PDA<T>& pda, std::ostream& s, std::function<void(std::ostream&, const T&) > labelprinter) {
+    void Moped::dump_pda(const PDA<T>& pda, std::ostream& s) {
         using rule_t = typename PDA<T>::rule_t;
         using state_t = typename PDA<T>::state_t;
-        auto write_op = [&labelprinter](std::ostream& s, const rule_t& rule, std::string noop) {
+        auto write_op = [](std::ostream& s, const rule_t& rule, std::string noop) {
             assert(rule._to != 0);
             switch (rule._operation) {
                 case PDA<T>::SWAP:
-                    labelprinter(s, rule._op_label);
+                    s << "l" << rule._op_label;
                     break;
                 case PDA<T>::PUSH:
-                    labelprinter(s, rule._op_label);
+                    s << "l" << rule._op_label;
                     s << " ";
                 case PDA<T>::NOOP:
                     s << noop;
@@ -193,17 +202,34 @@ namespace pdaaal {
                     continue;
                 }
                 if (r._precondition.empty()) continue;
-                auto& symbols = r._precondition.wildcard() ? pda.labelset() : r._precondition.labels();
-                for (auto& symbol : symbols) {
-                    s << "S" << sid << "<";
-                    std::stringstream ss;
-                    labelprinter(ss, symbol);
-                    s << ss.str();
-                    s << "> --> ";
-                    s << "S" << r._to;
-                    s << "<";
-                    write_op(s, r, ss.str());
-                    s << ">\n";
+                if(!r._precondition.wildcard())
+                {
+                    auto& symbols = r._precondition.labels();
+                    for (auto& symbol : symbols) {
+                        s << "S" << sid << "<l";
+                        s << symbol;
+                        s << "> --> ";
+                        s << "S" << r._to;
+                        s << "<";
+                        std::stringstream ss;
+                        ss << "l" << symbol;
+                        write_op(s, r, ss.str());
+                        s << ">\n";
+                    }
+                }
+                else
+                {
+                    for (size_t symbol = 0; symbol < pda.number_of_labels(); ++symbol) {
+                        s << "S" << sid << "<l";
+                        s << symbol;
+                        s << "> --> ";
+                        s << "S" << r._to;
+                        s << "<";
+                        std::stringstream ss;
+                        ss << "l" << symbol;
+                        write_op(s, r, ss.str());
+                        s << ">\n";
+                    }                    
                 }
             }
         }

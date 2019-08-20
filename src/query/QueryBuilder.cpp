@@ -101,11 +101,11 @@ namespace mpls2pda
     {
         if(!_expand) return {label};
         
-        if(label._type == Query::ANYMPLS)
+        if(label.type() == Query::ANYMPLS)
         {
             return _network.get_labels(0, 255, Query::MPLS);
         }
-        return _network.get_labels(label._value, label._mask, label._type);        
+        return _network.get_labels(label.value(), label.mask(), label.type());        
     }
 
     Builder::labelset_t Builder::match_ip4(int i1, int i2, int i3, int i4, int mask)

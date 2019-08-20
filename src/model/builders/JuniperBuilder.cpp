@@ -474,8 +474,7 @@ namespace mpls2pda
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
             {
-                entry._top_label._value = atoll(tl.c_str());
-                entry._top_label._type = Query::MPLS;
+                entry._top_label.set_value(Query::MPLS, atoll(tl.c_str()), 0);
             }
             else if (tl == "default") {
                 // we ignore these! (I suppose, TODO, check)
@@ -659,8 +658,7 @@ namespace mpls2pda
                         }
                         auto n = ostr.substr(i, (j - i));
                         auto olabel = std::atoi(n.c_str());
-                        f._ops.back()._op_label._type = Query::MPLS;
-                        f._ops.back()._op_label._value = olabel;
+                        f._ops.back()._op_label.set_value(Query::MPLS, olabel, 0);
                         i = j;
                         parse_label = false;
                         f._ops.emplace_back();

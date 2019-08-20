@@ -42,6 +42,11 @@ namespace mpls2pda {
         };
 
         struct label_t {
+        private:
+            type_t _type = NONE;
+            uint8_t _mask = 0;
+            uint64_t _value = 0;               
+        public:
             label_t()
             {
                 _type = NONE;
@@ -49,35 +54,37 @@ namespace mpls2pda {
                 _value = 0;
             }
             
-            void set_value(uint64_t val, uint32_t mask)
+            type_t type() const { return _type; }
+            uint8_t mask() const { return _mask; }
+            uint64_t value() const { return _value; }
+            
+            void set_value(type_t type, uint64_t val, uint32_t mask)
             {
+                _type = type;
                 _mask = mask;
                 _value = val;
                 switch(_type)
                 {
                     case ANYIP:
-                        *this = any_ip;
+                        _mask = 64;
+                        _value = 0;
                         break;
                     case ANYMPLS:
-                        *this = any_mpls;
+                        _mask = 64;
+                        _value = 0;
                         break;
                     case MPLS:
-                        if(_mask == 8)
-                            *this = any_mpls;
-                        else
-                            _value = (_value >> _mask) << _mask;
+                        _mask = std::min<uint8_t>(64, _mask);
+                        _value = (_value >> _mask) << _mask;
                         break;
                     case IP4:
-                        if(_mask >= 32)
-                            *this = any_ip4;
-                        else
-                            _value = (_value >> _mask) << _mask;
+                        _mask = std::min<uint8_t>(32, _mask);
+                        _value = std::min<uint64_t>(std::numeric_limits<uint32_t>::max(), _value);
+                        _value = (_value >> _mask) << _mask;
                         break;
                     case IP6:
-                        if(_mask >= 64)
-                            *this = any_ip6;
-                        else
-                            _value = (_value >> _mask) << _mask;
+                        _mask = std::min<uint8_t>(64, _mask);
+                        _value = (_value >> _mask) << _mask;
                         break;
                     default:
                         _mask = 0;
@@ -88,12 +95,13 @@ namespace mpls2pda {
             label_t(type_t type, uint8_t mask, uint64_t val)
                     : _type(type), _mask(mask), _value(val)
             {
-                set_value(val, mask);
+                set_value(type, val, mask);
+            }
+                  
+            void set_mask(uint8_t mask) {
+                set_value(_type, _value, mask);
             }
             
-            type_t _type = MPLS;
-            uint8_t _mask = 0;
-            uint64_t _value = 0;            
             bool uses_mask() const {
                 return _mask != 0 && _type != INTERFACE && _type != ANYIP && _type != ANYMPLS;
             }
@@ -229,7 +237,7 @@ namespace std {
     {
         std::size_t operator()(const mpls2pda::Query::label_t& k) const {
             std::hash<uint64_t> hf;
-            return hf(k._value) xor hf((int)k._type) xor hf(k._mask);
+            return hf(k.value()) xor hf((int)k.type()) xor hf(k.mask());
         }
     };
     

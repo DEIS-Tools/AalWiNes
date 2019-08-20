@@ -66,8 +66,8 @@ namespace mpls2pda
                 }
                 else if (!e._negated) {
                     for (auto s : e._symbols) {
-                        assert(s._type == Query::INTERFACE);
-                        auto inf = _network.all_interfaces()[s._value];
+                        assert(s.type() == Query::INTERFACE);
+                        auto inf = _network.all_interfaces()[s.value()];
                         add_initial(e._destination, inf->match());
                     }
                 }
@@ -165,10 +165,10 @@ namespace mpls2pda
         rule_t cpy;
         std::swap(rules.back(), cpy);
         rules.pop_back();
-        auto val = pre._value;
-        auto mask = pre._mask;
+        auto val = pre.value();
+        auto mask = pre.mask();
         
-        switch(pre._type)
+        switch(pre.type())
         {
         case Query::ANYMPLS:
             mask = 64;
@@ -189,7 +189,7 @@ namespace mpls2pda
                 {
                     rules.push_back(cpy);
                     rules.back()._pre = l;
-                    assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::MPLS);
+                    assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::MPLS);
                 }
             }
             break;
@@ -203,15 +203,15 @@ namespace mpls2pda
             {
                 rules.push_back(cpy);
                 rules.back()._pre = l;
-                assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::IP4 || rules.back()._pre == Query::label_t::any_ip4);
+                assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP4 || rules.back()._pre == Query::label_t::any_ip4);
             }
-            if(pre._type != Query::ANYIP) break; // fall through to IP6 if any
+            if(pre.type() != Query::ANYIP) break; // fall through to IP6 if any
         case Query::IP6:
             for(auto& l : _network.get_labels(val, mask, Query::IP6))
             {
                 rules.push_back(cpy);
                 rules.back()._pre = l;
-                assert(rules.back()._pre._mask == 0 || rules.back()._pre._type != Query::IP6 || rules.back()._pre == Query::label_t::any_ip6);
+                assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP6 || rules.back()._pre == Query::label_t::any_ip6);
             }            
             break;
         default:
@@ -262,11 +262,11 @@ namespace mpls2pda
                                 switch (forward._ops[0]._op) {
                                 case RoutingTable::POP:
                                     nr._op = PDA::POP;
-                                    assert(entry._top_label._type == Query::MPLS);
+                                    assert(entry._top_label.type() == Query::MPLS);
                                     break;
                                 case RoutingTable::PUSH:
                                     nr._op = PDA::PUSH;
-                                    assert(forward._ops[0]._op_label._type == Query::MPLS);
+                                    assert(forward._ops[0]._op_label.type() == Query::MPLS);
                                     nr._op_label = forward._ops[0]._op_label;
                                     break;
                                 case RoutingTable::SWAP:
@@ -276,13 +276,13 @@ namespace mpls2pda
                                 }
                             }
                             else {
-                                if(entry._top_label._type != Query::ANYIP &&
-                                   entry._top_label._type != Query::ANYMPLS)
+                                if(entry._top_label.type() != Query::ANYIP &&
+                                   entry._top_label.type() != Query::ANYMPLS)
                                 {
                                     nr._op = PDA::SWAP;
                                     nr._op_label = entry._top_label;
-                                    assert(entry._top_label._mask == 0);
-                                    assert(entry._top_label._type == Query::MPLS);
+                                    assert(entry._top_label.mask() == 0);
+                                    assert(entry._top_label.type() == Query::MPLS);
                                 }
                                 else
                                 {
@@ -372,7 +372,7 @@ namespace mpls2pda
 
     void NetworkPDAFactory::print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
         stream << "{\"pre\":";
-        if(entry._top_label._type == Query::INTERFACE)
+        if(entry._top_label.type() == Query::INTERFACE)
         {
             assert(false);
         }
@@ -525,55 +525,4 @@ namespace mpls2pda
         };
     }
     
-    std::function<Query::label_t(const char*, const char*) > NetworkPDAFactory::label_reader() const
-    {
-        return [this](const char* from, const char* to)
-        {
-            if(to <= from)
-                throw base_error("Cannot parse empty string");
-            if(*from == 'l')
-            {
-                ++from;
-                auto l = strtoll(from, (char**)&to, 16);
-                auto rl = Query::label_t(Query::MPLS, 0, static_cast<uint64_t>(l));
-                if(_all_labels.count(rl) != 1)
-                {
-                    std::stringstream e;
-                    e << "Unknown label: " << l;
-                    throw base_error(e.str());
-                }
-                assert(rl._type != Query::NONE);
-                return rl;
-            }
-            else if(*from == 'i')
-            {
-                Query::label_t res;
-                if(*(from + 2) == '4')
-                    res = Query::label_t::any_ip4;
-                else
-                    res = Query::label_t::any_ip6;
-                assert(res._type != Query::NONE);
-                from = from + 3;
-                auto ip = strtoll(from, (char**)&to, 16);
-                while(*from != 'M') ++from;
-                ++from;
-                auto mask = strtoll(from, (char**)&to, 16);
-                res.set_value(ip, mask);   
-                assert(res._type != Query::NONE);
-                return res;
-            }
-            else if(*from == 'a')
-            {
-                if(*(from + 1) == 'm')
-                    return Query::label_t::any_mpls;
-                else 
-                    return Query::label_t::any_ip;
-            }
-            else
-            {
-                throw base_error("Unknown label");
-            }
-            return Query::label_t{};
-        };
-    }
 }

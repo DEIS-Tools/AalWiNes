@@ -224,7 +224,7 @@ int main(int argc, const char** argv)
             reduction_time.stop();
             if(dump_to_moped)
             {
-                Moped::dump_pda(pda, std::cout, factory.label_writer());
+                Moped::dump_pda(pda, std::cout);
             }
             else
             {
@@ -232,14 +232,14 @@ int main(int argc, const char** argv)
                 {
                     // moped
                     stopwatch verification_time;
-                    auto result = moped.verify(pda, get_trace, factory.label_writer());
+                    auto result = moped.verify(pda, get_trace);
                     verification_time.stop();
                     std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
                     std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
                     if(get_trace && result)
                     {
                         std::cout << ",\n\t\t\"trace\":[\n";
-                        factory.write_json_trace(std::cout, moped.get_trace(factory.label_reader()));                    
+                        factory.write_json_trace(std::cout, moped.get_trace(pda));    
                         std::cout << "\n\t\t]";
                     }
                     if(!no_timing)

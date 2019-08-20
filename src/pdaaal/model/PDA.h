@@ -19,6 +19,8 @@
 #include <vector>
 #include <queue>
 #include <unordered_set>
+#include <set>
+#include <map>
 
 namespace pdaaal {
     template<typename T>
@@ -45,7 +47,7 @@ namespace pdaaal {
         struct pre_t {
         private:
             bool _wildcard = false;
-            std::vector<T> _labels;
+            std::vector<uint32_t> _labels;
         public:
 
             bool wildcard() const {
@@ -55,7 +57,7 @@ namespace pdaaal {
             auto& labels() const {
                 return _labels;
             }
-            void merge(bool negated, const std::vector<T>& other, const std::vector<T>& all_labels);
+            void merge(bool negated, const std::vector<uint32_t>& other, size_t all_labels);
 
             void clear() {
                 _wildcard = false;
@@ -65,14 +67,14 @@ namespace pdaaal {
             bool empty() const {
                 return !_wildcard && _labels.empty();
             }
-            bool intersect(const tos_t& tos, const std::vector<T>& all_labels);
-            void noop_pre_filter(const std::unordered_set<T>& usefull);
+            bool intersect(const tos_t& tos, size_t all_labels);
+            void noop_pre_filter(const std::unordered_set<uint32_t>& usefull);
         };
 
         struct rule_t {
             size_t _to = 0;
             op_t _operation = NOOP;
-            T _op_label = T{};
+            uint32_t _op_label = uint32_t{};
 
             bool is_terminal() const {
                 return _to == 0;
@@ -103,8 +105,8 @@ namespace pdaaal {
         };
 
         struct tos_t {
-            std::vector<T> _tos; // TODO: some symbolic representation would be better here
-            std::vector<T> _stack; // TODO: some symbolic representation would be better here
+            std::vector<uint32_t> _tos; // TODO: some symbolic representation would be better here
+            std::vector<uint32_t> _stack; // TODO: some symbolic representation would be better here
             enum waiting_t {
                 NOT_IN_STACK = 0, TOS = 8, BOS = 16, BOTH = TOS | BOS
             };
@@ -136,7 +138,7 @@ namespace pdaaal {
                 return _tos.empty();
             }
 
-            bool active(const tos_t& prev, const rule_t& rule, const std::vector<T>& all_labels) {
+            bool active(const tos_t& prev, const rule_t& rule) {
                 if (rule._precondition.empty())
                     return false;
                 else if (rule._precondition.wildcard()) {
@@ -157,11 +159,11 @@ namespace pdaaal {
                 return true;
             }
 
-            bool forward_stack(const tos_t& prev, const std::vector<T>& all_labels) {
+            bool forward_stack(const tos_t& prev, size_t all_labels) {
                 auto os = _stack.size();
-                if (_stack.size() != all_labels.size()) {
-                    if (prev._stack.size() == all_labels.size()) {
-                        _stack = all_labels;
+                if (_stack.size() != all_labels) {
+                    if (prev._stack.size() == all_labels) {
+                        _stack = prev._stack;
                     } else {
                         auto lid = _stack.begin();
                         auto pid = prev._stack.begin();
@@ -182,16 +184,17 @@ namespace pdaaal {
                 return os != _stack.size();
             }
 
-            std::pair<bool,bool> merge_pop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
-                if (!active(prev, rule, all_labels)) {
+            std::pair<bool,bool> merge_pop(const tos_t& prev, const rule_t& rule, bool dual_stack, size_t all_labels, tos_t::waiting_t state) {
+                if (!active(prev, rule)) {
                     return std::make_pair(false,false);
                 }
                 bool changed = false;
                 bool stack_changed = false;
                 if (!dual_stack) {
-                    if(_tos.size() != all_labels.size())
+                    if(_tos.size() != all_labels)
                     {
-                        _tos = all_labels;
+                        _tos.resize(all_labels);
+                        for(size_t i = 0; i < all_labels; ++i) _tos[i] = i;
                         changed = true;
                     }
                 } else {
@@ -200,10 +203,10 @@ namespace pdaaal {
                         return std::make_pair(false,false);
                     stack_changed |= forward_stack(prev, all_labels);
                     // move stack -> TOS
-                    if (_tos.size() != all_labels.size()) {
-                        if (prev._stack.size() == all_labels.size()) {
-                            _tos = all_labels;
+                    if (_tos.size() != all_labels) {
+                        if (prev._stack.size() == all_labels) {
                             changed = true;
+                            _tos = prev._stack;
                         } else {
                             auto it = _tos.begin();
                             for (auto s : prev._stack) {
@@ -218,7 +221,7 @@ namespace pdaaal {
                 return std::make_pair(changed, stack_changed);
             }
 
-            std::pair<bool,bool> merge_noop(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
+            std::pair<bool,bool> merge_noop(const tos_t& prev, const rule_t& rule, bool dual_stack, size_t all_labels, tos_t::waiting_t state) {
                 if (rule._precondition.empty()) return std::make_pair(false,false);
                 bool changed = false;
                 if((state & tos_t::TOS) != 0) {
@@ -241,8 +244,8 @@ namespace pdaaal {
                 return std::make_pair(changed, stack_changed);
             }
 
-            std::pair<bool,bool> merge_swap(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
-                if (!active(prev, rule, all_labels))
+            std::pair<bool,bool> merge_swap(const tos_t& prev, const rule_t& rule, bool dual_stack, size_t all_labels, tos_t::waiting_t state) {
+                if (!active(prev, rule))
                     return std::make_pair(false,false); // we know that there is a match!
                 bool changed = false;
                 { 
@@ -259,16 +262,16 @@ namespace pdaaal {
                 return std::make_pair(changed, stack_changed);
             }
 
-            std::pair<bool,bool> merge_push(const tos_t& prev, const rule_t& rule, bool dual_stack, const std::vector<T>& all_labels, tos_t::waiting_t state) {
+            std::pair<bool,bool> merge_push(const tos_t& prev, const rule_t& rule, bool dual_stack, size_t all_labels, tos_t::waiting_t state) {
                 // similar to swap!
                 if(state == tos_t::NOT_IN_STACK) return std::make_pair(false, false);
                 auto changed = merge_swap(prev, rule, dual_stack, all_labels, state);
                 if (dual_stack && (state & tos_t::TOS) != 0) {
                     // but we also push all TOS labels down
-                    if (_stack.size() != all_labels.size()) {
-                        if (prev._tos.size() == all_labels.size()) {
+                    if (_stack.size() != all_labels) {
+                        if (prev._tos.size() == all_labels) {
                             changed.second = true;
-                            _stack = all_labels;
+                            _stack = prev._tos;
                         } else {
                             auto it = _stack.begin();
                             for (auto& s : prev._tos) {
@@ -348,21 +351,37 @@ namespace pdaaal {
             }
         }
     public:
-
+        size_t number_of_labels() const {
+            return _label_map.size();
+        }
+        
+        T get_symbol(size_t i) {
+            T res;
+            auto it = _label_map.begin();
+            for(size_t n = 0; n < i; ++n) ++it;
+            return it->first;
+            /*assert(i < _label_map.size());
+            _label_map.unpack(i, (unsigned char*)&res);*/
+        }
+        
         void target_tos_prune() {
             for (size_t s = 1; s < _states.size(); ++s) {
-                std::unordered_set<T> usefull_tos;
+                std::unordered_set<uint32_t> usefull_tos;
+                bool cont = false;
                 for (auto& r : _states[s]._rules) {
                     if (!r._precondition.wildcard()) {
                         usefull_tos.insert(r._precondition.labels().begin(), r._precondition.labels().end());
                     } else {
-                        usefull_tos.insert(_all_labels.begin(), _all_labels.end());
+                        cont = true;
                     }
-                    if(usefull_tos.size() == _all_labels.size())
+                    if(usefull_tos.size() == _label_map.size() || cont)
+                    {
+                        cont = true;
                         break;
+                    }
                 }
 
-                if(usefull_tos.size() == _all_labels.size())
+                if(cont)
                     continue;
                 
                 for (auto& pres : _states[s]._pre) {
@@ -441,16 +460,16 @@ namespace pdaaal {
                     std::pair<bool,bool> change;
                     switch (fit->_operation) {
                         case POP:
-                            change = to.merge_pop(ss, *fit, ds, _all_labels, old);
+                            change = to.merge_pop(ss, *fit, ds, _label_map.size(), old);
                             break;
                         case NOOP:
-                            change = to.merge_noop(ss, *fit, ds, _all_labels, old);
+                            change = to.merge_noop(ss, *fit, ds, _label_map.size(), old);
                             break;
                         case PUSH:
-                            change = to.merge_push(ss, *fit, ds, _all_labels, old);
+                            change = to.merge_push(ss, *fit, ds, _label_map.size(), old);
                             break;
                         case SWAP:
-                            change = to.merge_swap(ss, *fit, ds, _all_labels, old);
+                            change = to.merge_swap(ss, *fit, ds, _label_map.size(), old);
                             break;
                         default:
                             throw base_error("Unknown PDA operation");
@@ -504,7 +523,7 @@ namespace pdaaal {
                                         for(auto& l : rule._precondition.labels())
                                             std::cerr << l << ",";
                                         std::cerr << std::endl;*/
-                    if (rule._to == 0 || rule._precondition.intersect(app, _all_labels)) {
+                    if (rule._to == 0 || rule._precondition.intersect(app, _label_map.size())) {
                         /*                        std::cerr << "Keep rule on [[" << i << "]] with oplabel " << rule._op_label << " AND OP " << rule._operation << std::endl;
                                                 if(rule._precondition.wildcard())
                                                     std::cerr << "\tWildcard\n";
@@ -555,7 +574,7 @@ namespace pdaaal {
                         continue;
                     }
                     if (r._precondition.empty()) continue;
-                    cnt += r._precondition.wildcard() ? labelset().size() : r._precondition.labels().size();
+                    cnt += r._precondition.wildcard() ? _label_map.size() : r._precondition.labels().size();
                 }
             }
             return cnt;
@@ -565,33 +584,47 @@ namespace pdaaal {
             return _states;
         }
 
-        const std::vector<T>& labelset() const {
-            return _all_labels;
-        }
-
     protected:
         friend class PDAFactory<T>;
 
         PDA(std::unordered_set<T>& all_labels) {
-            _all_labels.insert(_all_labels.end(), all_labels.begin(), all_labels.end());
-            std::sort(_all_labels.begin(), _all_labels.end());
+            std::set<T> sorted(all_labels.begin(), all_labels.end());
+            size_t id = 0;
+            for(auto& l : sorted)
+            {
+#ifndef NDEBUG
+//                auto res = 
+#endif
+                _label_map[l] = id;
+                //std::cerr << "[" << res.second << "] -> " << id << std::endl;
+//                assert(res.first);               
+                ++id;
+            }
+            /*for(auto& l : all_labels)
+            {
+                auto re = _label_map.exists((unsigned char*)&l, sizeof(T));
+                assert(re.first);
+            }*/
         }
 
         void add_rules(size_t from, size_t to, op_t op, bool negated, const std::vector<T>& labels, bool negated_pre, const std::vector<T>& pre) {
             if (negated) {
-                auto lid = labels.begin();
-                auto ait = _all_labels.begin();
-                for (; lid != labels.end(); ++lid) {
-                    while (*ait < *lid && ait != std::end(_all_labels)) {
-                        add_rule(from, to, op, *ait, negated_pre, pre);
-                        ++ait;
+                size_t last = 0;
+                for(auto& l : labels)
+                {
+                    //auto res = _label_map.exists((unsigned char*)&l, sizeof(T));      
+                    assert(_label_map.count(l) == 1);
+                    auto res = _label_map[l];
+                    for(; last < res; ++last)
+                    {
+                        _add_rule(from, to, op, last, negated_pre, pre);
                     }
-                    assert(*ait == *lid);
-                    ++ait;
-                    assert(ait == std::end(_all_labels) || *ait != *lid);
+                    ++last;
                 }
-                for (; ait != std::end(_all_labels); ++ait)
-                    add_rule(from, to, op, *ait, negated_pre, pre);
+                for(; last < _label_map.size(); ++last)
+                {
+                    _add_rule(from, to, op, last, negated_pre, pre);
+                }
             } else {
                 for (auto& s : labels) {
                     add_rule(from, to, op, s, negated_pre, pre);
@@ -600,6 +633,11 @@ namespace pdaaal {
         }
 
         void add_rule(size_t from, size_t to, op_t op, T label, bool negated, const std::vector<T>& pre) {
+            auto res = _label_map[label];//.exists((unsigned char*)&label, sizeof(T));      
+            return _add_rule(from, to, op, res, negated, pre);
+        }
+        
+        void _add_rule(size_t from, size_t to, op_t op, uint32_t label, bool negated, const std::vector<T>& pre) {
             auto mm = std::max(from, to);
             if (mm >= _states.size())
                 _states.resize(mm + 1);
@@ -611,8 +649,21 @@ namespace pdaaal {
             auto lb = std::lower_bound(rules.begin(), rules.end(), r);
             if (lb == std::end(rules) || *lb != r)
                 lb = rules.insert(lb, r); // TODO this is expensive. Use lists?
-
-            lb->_precondition.merge(negated, pre, _all_labels);
+            std::vector<uint32_t> tpre(pre.size());
+            for(size_t i = 0; i < pre.size(); ++i)
+            {
+                auto& p = pre[i];
+                assert(_label_map.count(p) == 1);
+                auto res = _label_map[p];
+                /*if(!res.first)
+                {
+                    std::cerr << "Did not find " << p << std::endl;
+                }*/
+//                assert(res.first);
+                tpre[i] = res;//res.second;
+            }
+            assert(std::is_sorted(tpre.begin(), tpre.end()));
+            lb->_precondition.merge(negated, tpre, _label_map.size());
             auto& prestate = _states[to]._pre;
             auto lpre = std::lower_bound(prestate.begin(), prestate.end(), from);
             if (lpre == std::end(prestate) || *lpre != from)
@@ -620,12 +671,12 @@ namespace pdaaal {
         }
 
         std::vector<state_t> _states;
-        std::vector<T> _all_labels;
+        std::map<T, uint32_t> _label_map;
 
     };
 
     template<typename T>
-    void PDA<T>::pre_t::merge(bool negated, const std::vector<T>& other, const std::vector<T>& all_labels) {
+    void PDA<T>::pre_t::merge(bool negated, const std::vector<uint32_t>& other, size_t all_labels) {
         if (_wildcard) return;
         if (negated && other.empty()) {
             _wildcard = true;
@@ -647,49 +698,56 @@ namespace pdaaal {
             }
         } else {
             auto lid = _labels.begin();
-            auto ait = all_labels.begin();
+            uint32_t ait = 0;
             for (auto fit = other.begin(); fit != other.end(); ++fit) {
-                auto nm = ait;
-                while (nm != std::end(all_labels) && *nm < *fit) ++nm;
+                uint32_t nm = ait;
+                while (nm != all_labels && nm < *fit) ++nm;
                 // assert(*nm == *fit); TODO, check if this is ok
-                for (; ait != nm; ++ait) {
-                    while (lid != std::end(_labels) && *lid < *ait) ++lid;
+                for (; ait < nm; ++ait) {
+                    assert(ait == nm);
+                    while (lid != std::end(_labels) && *lid < ait) ++lid;
                     if (lid == std::end(_labels)) {
-                        _labels.insert(_labels.end(), ait, nm);
+                        for(auto n = ait; n < nm; ++n)
+                            _labels.insert(_labels.end(), n);
                         lid = std::end(_labels);
                         break;
-                    } else if (*ait == *lid) continue;
+                    } else if (ait == *lid)
+                    {
+                        continue;
+                    }
                     else {
-                        assert(*ait < *lid);
-                        lid = _labels.insert(lid, *ait);
+                        assert(ait < *lid);
+                        lid = _labels.insert(lid, ait);
                         ++lid;
                     }
                 }
 
             }
-            for (; ait != std::end(all_labels); ++ait) {
-                while (lid != std::end(_labels) && *lid < *ait) ++lid;
+            for (; ait < all_labels; ++ait) {
+                while (lid != std::end(_labels) && *lid < ait) ++lid;
                 if (lid == std::end(_labels)) {
-                    _labels.insert(_labels.end(), ait, std::end(all_labels));
+                    for(uint32_t n = ait; n < all_labels; ++n)
+                        _labels.insert(_labels.end(), n);
                     lid = std::end(_labels);
                     break;
-                } else if (*ait == *lid) continue;
+                } else if (ait == *lid) continue;
                 else {
-                    assert(*ait < *lid);
-                    lid = _labels.insert(lid, *ait);
+                    assert(ait < *lid);
+                    lid = _labels.insert(lid, ait);
                     ++lid;
                 }
             }
         }
 
-        if (_labels.size() == all_labels.size()) {
+        if (_labels.size() == all_labels) {
             _wildcard = true;
             _labels.clear();
         }
+        assert(std::is_sorted(_labels.begin(), _labels.end()));
     }
 
     template<typename T>
-    void PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<T>& usefull) {
+    void PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<uint32_t>& usefull) {
         if (_wildcard) {
             _labels.insert(_labels.begin(), usefull.begin(), usefull.end());
             _wildcard = false;
@@ -714,13 +772,13 @@ namespace pdaaal {
     }
 
     template<typename T>
-    bool PDA<T>::pre_t::intersect(const tos_t& tos, const std::vector<T>& all_labels) {
-        if (tos._tos.size() == all_labels.size()) {
+    bool PDA<T>::pre_t::intersect(const tos_t& tos, size_t all_labels) {
+        if (tos._tos.size() == all_labels) {
             //            std::cerr << "EMPY 1" << std::endl;
             return !empty();
         }
         if (_wildcard) {
-            if (tos._tos.size() == all_labels.size())
+            if (tos._tos.size() == all_labels)
                 return empty();
             else {
                 _labels = tos._tos;
@@ -738,7 +796,7 @@ namespace pdaaal {
                 }
             }
             _labels.resize(bit);
-            assert(_labels.size() != all_labels.size());
+            assert(_labels.size() != all_labels);
         }
         return !empty();
     }
