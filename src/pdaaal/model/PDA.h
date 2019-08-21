@@ -365,9 +365,22 @@ namespace pdaaal {
             return res;
         }
         
-        bool target_tos_prune() {
-            bool changed = false;
-            for (size_t s = 1; s < _states.size(); ++s) {
+        void target_tos_prune() {
+            std::queue<size_t> waiting;
+            std::vector<bool> in_waiting(_states.size());
+            in_waiting[0] = true; // we don't ever prune 0.
+            for(size_t t = 0; t < _states.size(); ++t)
+            {
+                in_waiting[t] = true;
+                waiting.push(t);
+            }
+            
+            while(!waiting.empty())
+            {
+                auto s = waiting.front();
+                waiting.pop();
+                if(s == 0) continue;
+                in_waiting[s] = false;
                 std::unordered_set<uint32_t> usefull_tos;
                 bool cont = false;
                 for (auto& r : _states[s]._rules) {
@@ -382,10 +395,8 @@ namespace pdaaal {
                         break;
                     }
                 }
-
                 if(cont)
                     continue;
-                
                 for (auto& pres : _states[s]._pre) {
                     auto& state = _states[pres];
                     for (auto& r : state._rules) {
@@ -395,12 +406,19 @@ namespace pdaaal {
                                 case PUSH:
                                     if (!r._precondition.empty() && usefull_tos.count(r._op_label) == 0) {
                                         r._precondition.clear();
-                                        changed = true;
+                                        if(!in_waiting[pres])
+                                            waiting.push(pres);
+                                        in_waiting[pres] = true;
                                     }
                                     break;
                                 case NOOP:
                                 {
-                                    changed |= r._precondition.noop_pre_filter(usefull_tos);
+                                    bool changed = r._precondition.noop_pre_filter(usefull_tos);
+                                    if(changed && !in_waiting[pres])
+                                    {
+                                        waiting.push(pres);
+                                        in_waiting[pres] = true;
+                                    }
                                     break;
                                 }
                                 case POP:
@@ -412,7 +430,6 @@ namespace pdaaal {
                     }
                 }
             }
-            return changed;
         }
 
         std::pair<size_t, size_t> reduce(int aggresivity) {
@@ -444,8 +461,7 @@ namespace pdaaal {
             }
             
             if (aggresivity == 3) {
-                // it could potentially work as fixpoint; not sure if it has any effect.
-                while(target_tos_prune());
+                target_tos_prune();
             }
             // saturate
             while (!waiting.empty()) {
@@ -510,12 +526,13 @@ namespace pdaaal {
                     clear_state(i);
                 }
             }
+            
             backwards_prune();
             if (aggresivity == 3) {
                 // it could potentially work as fixpoint; not sure if it has any effect.
-                while(target_tos_prune());
+                target_tos_prune();
             }
-
+            
             size_t after_cnt = size();
             return std::make_pair(cnt, after_cnt);
         }
