@@ -133,10 +133,11 @@ namespace pdaaal {
                                 std::cerr << &*fit << std::endl;
                                 throw base_error("Could not parse trace");
                             }
-                            ++fit;
+                            ++lit;
                             assert(fit > lit);
                             auto res = atoi(&*lit);
-                            trace.back()._stack.emplace_back(pda.get_symbol(res));                                
+                            auto sym = pda.get_symbol(res);
+                            trace.back()._stack.emplace_back(sym);                                
                         }
                         continue;
                     }
