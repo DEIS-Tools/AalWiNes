@@ -68,7 +68,7 @@ namespace pdaaal {
                 return !_wildcard && _labels.empty();
             }
             bool intersect(const tos_t& tos, size_t all_labels);
-            bool noop_pre_filter(const std::unordered_set<uint32_t>& usefull);
+            bool noop_pre_filter(const std::set<uint32_t>& usefull);
         };
 
         struct rule_t {
@@ -381,7 +381,7 @@ namespace pdaaal {
                 waiting.pop();
                 if(s == 0) continue;
                 in_waiting[s] = false;
-                std::unordered_set<uint32_t> usefull_tos;
+                std::set<uint32_t> usefull_tos;
                 bool cont = false;
                 for (auto& r : _states[s]._rules) {
                     if (!r._precondition.wildcard()) {
@@ -721,7 +721,7 @@ namespace pdaaal {
     }
 
     template<typename T>
-    bool PDA<T>::pre_t::noop_pre_filter(const std::unordered_set<uint32_t>& usefull) {
+    bool PDA<T>::pre_t::noop_pre_filter(const std::set<uint32_t>& usefull) {
         if (_wildcard) {
             _labels.insert(_labels.begin(), usefull.begin(), usefull.end());
             _wildcard = false;
