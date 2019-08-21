@@ -13,6 +13,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ *  Copyright Peter G. Jensen
+ */
+
 //
 // Created by Peter G. Jensen on 10/15/18.
 //

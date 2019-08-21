@@ -13,6 +13,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ *  Copyright Peter G. Jensen
+ */
+
 /* 
  * File:   PDAFactory.h
  * Author: Peter G. Jensen <root@petergjoel.dk>

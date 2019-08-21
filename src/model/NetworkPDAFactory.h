@@ -14,7 +14,7 @@
  */
 
 /*
- *  Copyright Peter G. Jensen, all rights reserved.
+ *  Copyright Peter G. Jensen
  */
 
 /* 
