@@ -137,7 +137,92 @@ namespace pdaaal
         return res;
     }
 
-    
+    bool Moped::verify(const PDA& pda, bool build_trace)
+    {
+        _raw_trace.clear();
+        std::fstream file;
+        file.open(_tmpfilepath, std::fstream::out);
+        dump_pda(pda, file);
+        file.close();
+        return verify(_tmpfilepath, build_trace);
+    }
 
+    void Moped::dump_pda(const PDA& pda, std::ostream& s) {
+        using rule_t = PDA::rule_t;
+        using state_t = PDA::state_t;
+        auto write_op = [](std::ostream& s, const rule_t& rule, std::string noop) {
+            assert(rule._to != 0);
+            switch (rule._operation) {
+                case PDA::SWAP:
+                    s << "l" << rule._op_label;
+                    break;
+                case PDA::PUSH:
+                    s << "l" << rule._op_label;
+                    s << " ";
+                case PDA::NOOP:
+                    s << noop;
+                    break;
+                case PDA::POP:
+                default:
+                    break;
+            }
+        };
+
+        s << "(I<_>)\n";
+        // lets start by the initial transitions
+        auto& is = pda.states()[0];
+        for (auto& r : is._rules) {
+            if (r._to != 0) {
+                assert(r._operation == PDA::PUSH);
+                s << "I<_> --> S" << r._to << "<";
+                write_op(s, r, "_");
+                s << ">\n";
+            } else {
+                assert(r._operation == PDA::NOOP);
+                s << "I<_> --> D<_>\n";
+                return;
+            }
+        }
+        for (size_t sid = 1; sid < pda.states().size(); ++sid) {
+            const state_t& state = pda.states()[sid];
+            for (auto& r : state._rules) {
+                if (r._to == 0) {
+                    assert(r._operation == PDA::NOOP);
+                    s << "S" << sid << "<_> --> DONE<_>\n";
+                    continue;
+                }
+                if (r._precondition.empty()) continue;
+                if(!r._precondition.wildcard())
+                {
+                    auto& symbols = r._precondition.labels();
+                    for (auto& symbol : symbols) {
+                        s << "S" << sid << "<l";
+                        s << symbol;
+                        s << "> --> ";
+                        s << "S" << r._to;
+                        s << "<";
+                        std::stringstream ss;
+                        ss << "l" << symbol;
+                        write_op(s, r, ss.str());
+                        s << ">\n";
+                    }
+                }
+                else
+                {
+                    for (size_t symbol = 0; symbol < pda.number_of_labels(); ++symbol) {
+                        s << "S" << sid << "<l";
+                        s << symbol;
+                        s << "> --> ";
+                        s << "S" << r._to;
+                        s << "<";
+                        std::stringstream ss;
+                        ss << "l" << symbol;
+                        write_op(s, r, ss.str());
+                        s << ">\n";
+                    }                    
+                }
+            }
+        }
+    }
 }
 

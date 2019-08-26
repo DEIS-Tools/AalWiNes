@@ -43,11 +43,9 @@ namespace pdaaal {
         ~Moped();
         bool verify(const std::string& tmpfile, bool build_trace);
         
-        template<typename T>
-        bool verify(const TypedPDA<T>& pda, bool build_trace);
+        bool verify(const PDA& pda, bool build_trace);
 
-        template<typename T>        
-        static void dump_pda(const TypedPDA<T>& pda, std::ostream& s);
+        static void dump_pda(const PDA& pda, std::ostream& s);
         
         template<typename T>
         std::vector<typename TypedPDA<T>::tracestate_t> get_trace(TypedPDA<T>& pda) const;
@@ -59,17 +57,6 @@ namespace pdaaal {
         std::vector<std::string> _raw_trace;
         // trace?
     };
-
-    template<typename T>
-    bool Moped::verify(const TypedPDA<T>& pda, bool build_trace)
-    {
-        _raw_trace.clear();
-        std::fstream file;
-        file.open(_tmpfilepath, std::fstream::out);
-        dump_pda(pda, file);
-        file.close();
-        return verify(_tmpfilepath, build_trace);
-    }
     
     template<typename T>
     std::vector<typename TypedPDA<T>::tracestate_t> Moped::get_trace(TypedPDA<T>& pda) const
@@ -169,85 +156,6 @@ namespace pdaaal {
             }
         }
         return trace;
-    }
-    
-    template<typename T>
-    void Moped::dump_pda(const TypedPDA<T>& pda, std::ostream& s) {
-        using rule_t = typename TypedPDA<T>::rule_t;
-        using state_t = typename TypedPDA<T>::state_t;
-        auto write_op = [](std::ostream& s, const rule_t& rule, std::string noop) {
-            assert(rule._to != 0);
-            switch (rule._operation) {
-                case TypedPDA<T>::SWAP:
-                    s << "l" << rule._op_label;
-                    break;
-                case TypedPDA<T>::PUSH:
-                    s << "l" << rule._op_label;
-                    s << " ";
-                case TypedPDA<T>::NOOP:
-                    s << noop;
-                    break;
-                case TypedPDA<T>::POP:
-                default:
-                    break;
-            }
-        };
-
-        s << "(I<_>)\n";
-        // lets start by the initial transitions
-        auto& is = pda.states()[0];
-        for (auto& r : is._rules) {
-            if (r._to != 0) {
-                assert(r._operation == TypedPDA<T>::PUSH);
-                s << "I<_> --> S" << r._to << "<";
-                write_op(s, r, "_");
-                s << ">\n";
-            } else {
-                assert(r._operation == TypedPDA<T>::NOOP);
-                s << "I<_> --> D<_>\n";
-                return;
-            }
-        }
-        for (size_t sid = 1; sid < pda.states().size(); ++sid) {
-            const state_t& state = pda.states()[sid];
-            for (auto& r : state._rules) {
-                if (r._to == 0) {
-                    assert(r._operation == TypedPDA<T>::NOOP);
-                    s << "S" << sid << "<_> --> DONE<_>\n";
-                    continue;
-                }
-                if (r._precondition.empty()) continue;
-                if(!r._precondition.wildcard())
-                {
-                    auto& symbols = r._precondition.labels();
-                    for (auto& symbol : symbols) {
-                        s << "S" << sid << "<l";
-                        s << symbol;
-                        s << "> --> ";
-                        s << "S" << r._to;
-                        s << "<";
-                        std::stringstream ss;
-                        ss << "l" << symbol;
-                        write_op(s, r, ss.str());
-                        s << ">\n";
-                    }
-                }
-                else
-                {
-                    for (size_t symbol = 0; symbol < pda.number_of_labels(); ++symbol) {
-                        s << "S" << sid << "<l";
-                        s << symbol;
-                        s << "> --> ";
-                        s << "S" << r._to;
-                        s << "<";
-                        std::stringstream ss;
-                        ss << "l" << symbol;
-                        write_op(s, r, ss.str());
-                        s << ">\n";
-                    }                    
-                }
-            }
-        }
     }
 }
 
