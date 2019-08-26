@@ -27,7 +27,7 @@
 #ifndef MOPED_H
 #define MOPED_H
 
-#include "pdaaal/model/PDA.h"
+#include "pdaaal/model/TypedPDA.h"
 
 #include <cassert>
 #include <sstream>
@@ -44,13 +44,13 @@ namespace pdaaal {
         bool verify(const std::string& tmpfile, bool build_trace);
         
         template<typename T>
-        bool verify(const PDA<T>& pda, bool build_trace);
+        bool verify(const TypedPDA<T>& pda, bool build_trace);
 
         template<typename T>        
-        static void dump_pda(const PDA<T>& pda, std::ostream& s);
+        static void dump_pda(const TypedPDA<T>& pda, std::ostream& s);
         
         template<typename T>
-        std::vector<typename PDA<T>::tracestate_t> get_trace(PDA<T>& pda) const;
+        std::vector<typename TypedPDA<T>::tracestate_t> get_trace(TypedPDA<T>& pda) const;
         
     private:
         bool parse_result(const std::string&, bool build_trace);
@@ -61,7 +61,7 @@ namespace pdaaal {
     };
 
     template<typename T>
-    bool Moped::verify(const PDA<T>& pda, bool build_trace)
+    bool Moped::verify(const TypedPDA<T>& pda, bool build_trace)
     {
         _raw_trace.clear();
         std::fstream file;
@@ -72,9 +72,9 @@ namespace pdaaal {
     }
     
     template<typename T>
-    std::vector<typename PDA<T>::tracestate_t> Moped::get_trace(PDA<T>& pda) const
+    std::vector<typename TypedPDA<T>::tracestate_t> Moped::get_trace(TypedPDA<T>& pda) const
     {
-        using tracestate_t = typename PDA<T>::tracestate_t;
+        using tracestate_t = typename TypedPDA<T>::tracestate_t;
         std::vector<tracestate_t> trace;
         std::stringstream error;
         for(size_t sid = 0; sid < _raw_trace.size(); ++sid)
@@ -145,7 +145,6 @@ namespace pdaaal {
                             assert(*lit == 'l');
                             if(*lit != 'l')
                             {
-                                std::cerr << &*fit << std::endl;
                                 throw base_error("Could not parse trace");
                             }
                             ++lit;
@@ -173,22 +172,22 @@ namespace pdaaal {
     }
     
     template<typename T>
-    void Moped::dump_pda(const PDA<T>& pda, std::ostream& s) {
-        using rule_t = typename PDA<T>::rule_t;
-        using state_t = typename PDA<T>::state_t;
+    void Moped::dump_pda(const TypedPDA<T>& pda, std::ostream& s) {
+        using rule_t = typename TypedPDA<T>::rule_t;
+        using state_t = typename TypedPDA<T>::state_t;
         auto write_op = [](std::ostream& s, const rule_t& rule, std::string noop) {
             assert(rule._to != 0);
             switch (rule._operation) {
-                case PDA<T>::SWAP:
+                case TypedPDA<T>::SWAP:
                     s << "l" << rule._op_label;
                     break;
-                case PDA<T>::PUSH:
+                case TypedPDA<T>::PUSH:
                     s << "l" << rule._op_label;
                     s << " ";
-                case PDA<T>::NOOP:
+                case TypedPDA<T>::NOOP:
                     s << noop;
                     break;
-                case PDA<T>::POP:
+                case TypedPDA<T>::POP:
                 default:
                     break;
             }
@@ -199,12 +198,12 @@ namespace pdaaal {
         auto& is = pda.states()[0];
         for (auto& r : is._rules) {
             if (r._to != 0) {
-                assert(r._operation == PDA<T>::PUSH);
+                assert(r._operation == TypedPDA<T>::PUSH);
                 s << "I<_> --> S" << r._to << "<";
                 write_op(s, r, "_");
                 s << ">\n";
             } else {
-                assert(r._operation == PDA<T>::NOOP);
+                assert(r._operation == TypedPDA<T>::NOOP);
                 s << "I<_> --> D<_>\n";
                 return;
             }
@@ -213,7 +212,7 @@ namespace pdaaal {
             const state_t& state = pda.states()[sid];
             for (auto& r : state._rules) {
                 if (r._to == 0) {
-                    assert(r._operation == PDA<T>::NOOP);
+                    assert(r._operation == TypedPDA<T>::NOOP);
                     s << "S" << sid << "<_> --> DONE<_>\n";
                     continue;
                 }

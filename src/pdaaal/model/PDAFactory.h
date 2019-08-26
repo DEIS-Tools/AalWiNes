@@ -34,7 +34,7 @@
 #include <unordered_set>
 
 #include "NFA.h"
-#include "PDA.h"
+#include "TypedPDA.h"
 
 namespace pdaaal {
 
@@ -42,7 +42,7 @@ namespace pdaaal {
     class PDAFactory {
     public:
         using nfastate_t = typename NFA<T>::state_t;
-        using op_t = typename PDA<T>::op_t;
+        using op_t = typename TypedPDA<T>::op_t;
 
         struct state_t {
             size_t _ptr;
@@ -51,7 +51,7 @@ namespace pdaaal {
     protected:
 
         struct rule_t {
-            op_t _op = PDA<T>::POP;
+            op_t _op = TypedPDA<T>::POP;
             T _pre;
             size_t _dest;
             T _op_label;
@@ -65,8 +65,8 @@ namespace pdaaal {
             _des_stack.compile();
         };
 
-        PDA<T> compile() {
-            PDA<T> result(_all_labels);
+        TypedPDA<T> compile() {
+            TypedPDA<T> result(_all_labels);
             bool cons_empty_accept = false;
             bool des_empty_accept = empty_desctruction_accept();
             
@@ -92,7 +92,7 @@ namespace pdaaal {
             if (cons_empty_accept && empty_accept() && des_empty_accept) {
                 std::vector<T> empty;
                 T lbl;
-                result.add_rule(0, 0, PDA<T>::NOOP, lbl ,true, empty);
+                result.add_rule(0, 0, TypedPDA<T>::NOOP, lbl ,true, empty);
             }
 
             // Destruct the stack!
@@ -103,7 +103,7 @@ namespace pdaaal {
 
     protected:
 
-        bool initialize_construction(PDA<T>& result, std::unordered_set<const nfastate_t*>& seen, std::vector<const nfastate_t*>& waiting) {
+        bool initialize_construction(TypedPDA<T>& result, std::unordered_set<const nfastate_t*>& seen, std::vector<const nfastate_t*>& waiting) {
             bool has_empty_accept = false;
             std::vector<T> empty;
             for (auto& i : _cons_stack.initial()) {
@@ -115,7 +115,7 @@ namespace pdaaal {
                     std::vector<nfastate_t*> next{e._destination};
                     NFA<T>::follow_epsilon(next);
                     for (auto n : next) {
-                        result.add_rules(0, nfa_id(n), PDA<T>::PUSH, e._negated, e._symbols, true, empty);
+                        result.add_rules(0, nfa_id(n), TypedPDA<T>::PUSH, e._negated, e._symbols, true, empty);
                         if (seen.count(n) == 0) {
                             seen.insert(n);
                             waiting.push_back(n);
@@ -123,12 +123,12 @@ namespace pdaaal {
                         if(n->_accepting)
                         {
                             for (auto s : initial()) {
-                                result.add_rules(0, s, PDA<T>::PUSH, e._negated, e._symbols, true, empty);
+                                result.add_rules(0, s, TypedPDA<T>::PUSH, e._negated, e._symbols, true, empty);
                             }
                             // we can pass directly to destruction
                             if (empty_accept()) {
                                 for (auto s : _des_stack.initial()) {
-                                   result.add_rules(0, nfa_id(s), PDA<T>::PUSH, e._negated, e._symbols, true, empty);
+                                   result.add_rules(0, nfa_id(s), TypedPDA<T>::PUSH, e._negated, e._symbols, true, empty);
                                 }
                             }                            
                         }
@@ -138,7 +138,7 @@ namespace pdaaal {
             return has_empty_accept;
         }
 
-        void build_construction(PDA<T>& result, std::unordered_set<const nfastate_t*>& seen, std::vector<const nfastate_t*>& waiting) {
+        void build_construction(TypedPDA<T>& result, std::unordered_set<const nfastate_t*>& seen, std::vector<const nfastate_t*>& waiting) {
             while (!waiting.empty()) {
                 auto top = waiting.back();
                 waiting.pop_back();
@@ -149,7 +149,7 @@ namespace pdaaal {
                     std::vector<nfastate_t*> next{e._destination};
                     NFA<T>::follow_epsilon(next);
                     for (auto n : next) {
-                        result.add_rules(nfa_id(top), nfa_id(n), PDA<T>::PUSH, e._negated, e._symbols, false, pre);
+                        result.add_rules(nfa_id(top), nfa_id(n), TypedPDA<T>::PUSH, e._negated, e._symbols, false, pre);
                         if (seen.count(n) == 0) {
                             seen.insert(n);
                             waiting.push_back(n);
@@ -158,12 +158,12 @@ namespace pdaaal {
                         {
                             for (auto s : initial()) {
                                 auto id = nfa_id(top);
-                                result.add_rules(id, s, PDA<T>::PUSH, e._negated, e._symbols, false, pre);
+                                result.add_rules(id, s, TypedPDA<T>::PUSH, e._negated, e._symbols, false, pre);
                             }
                             // we can pass directly to destruction
                             if (empty_accept()) {
                                 for (auto s : _des_stack.initial()) {
-                                   result.add_rules(nfa_id(top), nfa_id(s), PDA<T>::PUSH, e._negated, e._symbols, false, pre);
+                                   result.add_rules(nfa_id(top), nfa_id(s), TypedPDA<T>::PUSH, e._negated, e._symbols, false, pre);
                                 }
                             }                            
                         }
@@ -181,7 +181,7 @@ namespace pdaaal {
             return false;
         }
 
-        void build_pda(PDA<T>& result, bool des_empty_accept) {
+        void build_pda(TypedPDA<T>& result, bool des_empty_accept) {
             auto pdawaiting = initial();
             std::unordered_set<size_t> pdaseen(pdawaiting.begin(), pdawaiting.end());
             std::vector<T> empty;
@@ -220,7 +220,7 @@ namespace pdaaal {
                 // do first step of DES
                 if (des_empty_accept) {
                     // empty accept in destruction, just go directly.
-                    result.add_rule(a, 0, PDA<T>::NOOP, none, true, empty);
+                    result.add_rule(a, 0, TypedPDA<T>::NOOP, none, true, empty);
                 }
                 // link with destruction-header
                 for (auto ds : _des_stack.initial()) {
@@ -229,14 +229,14 @@ namespace pdaaal {
                         std::vector<nfastate_t*> next{e._destination};
                         NFA<T>::follow_epsilon(next);
                         for (auto n : next) {
-                            result.add_rule(a, nfa_id(n), PDA<T>::POP, none, e._negated, e._symbols);
+                            result.add_rule(a, nfa_id(n), TypedPDA<T>::POP, none, e._negated, e._symbols);
                         }
                     }
                 }                
             }
         }
 
-        void build_destruction(PDA<T>& result) {
+        void build_destruction(TypedPDA<T>& result) {
             std::vector<nfastate_t*> waiting_next = _des_stack.initial();
             std::unordered_set<nfastate_t*> seen_next(waiting_next.begin(), waiting_next.end());
             std::vector<T> empty;
@@ -245,13 +245,13 @@ namespace pdaaal {
                 auto top = waiting_next.back();
                 waiting_next.pop_back();
                 if (top->_accepting) {
-                    result.add_rule(nfa_id(top), 0, PDA<T>::NOOP, none, true, empty);
+                    result.add_rule(nfa_id(top), 0, TypedPDA<T>::NOOP, none, true, empty);
                 }
                 for (auto& e : top->_edges) {
                     std::vector<nfastate_t*> next{e._destination};
                     NFA<T>::follow_epsilon(next);
                     for (auto n : next) {
-                        result.add_rule(nfa_id(top), nfa_id(n), PDA<T>::POP, none, e._negated, e._symbols);
+                        result.add_rule(nfa_id(top), nfa_id(n), TypedPDA<T>::POP, none, e._negated, e._symbols);
                         if (seen_next.count(n) == 0) {
                             waiting_next.push_back(n);
                             seen_next.insert(n);

@@ -38,7 +38,7 @@ namespace mpls2pda
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
         using PDAFactory = pdaaal::PDAFactory<label_t>;
-        using PDA = pdaaal::PDA<label_t>;
+        using PDA = pdaaal::TypedPDA<label_t>;
     private:        
         struct nstate_t {
             int32_t _appmode = 0; // mode of approximation
