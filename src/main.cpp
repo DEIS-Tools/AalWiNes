@@ -211,7 +211,7 @@ int main(int argc, const char** argv)
             if(!no_timing)
             {
                 std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration()) 
-                          << "\", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
+                          << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
             }
             std::cout << "\t\"answers\":{\n";
         }
