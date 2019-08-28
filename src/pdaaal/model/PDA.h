@@ -60,6 +60,7 @@ namespace pdaaal {
             bool empty() const;
             bool intersect(const tos_t& tos, size_t all_labels);
             bool noop_pre_filter(const std::set<uint32_t>& usefull);
+            bool contains(uint32_t label) const;
         };
 
         struct rule_t {

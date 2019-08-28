@@ -33,7 +33,7 @@
 #include <rapidxml.hpp>
 
 #include <string>
-#include <ptrie_map.h>
+#include <ptrie/ptrie_map.h>
 #include <ostream>
 #include <memory>
 

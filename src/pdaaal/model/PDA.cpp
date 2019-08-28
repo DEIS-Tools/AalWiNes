@@ -431,6 +431,16 @@ namespace pdaaal
         return false;
     }
 
+    bool PDA::pre_t::contains(uint32_t label) const
+    {
+        if(_wildcard) return true;
+        auto lb = std::lower_bound(_labels.begin(), _labels.end(), label);
+        if(lb == std::end(_labels) || *lb != label)
+            return false;
+        return true;
+    }
+
+    
     bool PDA::pre_t::intersect(const tos_t& tos, size_t all_labels)
     {
         if (tos._tos.size() == all_labels) {

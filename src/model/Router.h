@@ -32,7 +32,7 @@
 #include <string>
 #include <memory>
 
-#include <ptrie_map.h>
+#include <ptrie/ptrie_map.h>
 
 #include "RoutingTable.h"
 

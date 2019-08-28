@@ -34,10 +34,11 @@
 #include "query/parsererrors.h"
 #include "pdaaal/model/PDAFactory.h"
 #include "pdaaal/engine/Moped.h"
+#include "pdaaal/engine/PostStar.h"
 
 #include "utils/stopwatch.h"
 
-#include <ptrie_map.h>
+#include <ptrie/ptrie_map.h>
 
 #include <boost/program_options.hpp>
 
@@ -109,7 +110,7 @@ int main(int argc, const char** argv)
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=internal")
+            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
             ;    
     
     opts.add(input);
@@ -232,36 +233,44 @@ int main(int argc, const char** argv)
             }
             else
             {
-                if(engine == 1)
+                // move this into function that generalizes
+                // and extracts trace at the same time.
+                stopwatch verification_time;
+                PostStar post_star;
+                bool result;
+                switch(engine)
                 {
-                    // moped
-                    stopwatch verification_time;
-                    auto result = moped.verify(pda, get_trace);
-                    verification_time.stop();
-                    std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
-                    std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
-                    if(get_trace && result)
-                    {
-                        std::cout << ",\n\t\t\"trace\":[\n";
-                        factory.write_json_trace(std::cout, moped.get_trace(pda));    
-                        std::cout << "\n\t\t]";
-                    }
-                    if(!no_timing)
-                    {
-                        std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
-                                  << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
-                                 << ",\n\t\t\"verification-time\":" << (verification_time.duration());
-                    }
-                    std::cout << "\n\t}";
-                    if(query_no != builder._result.size())
-                        std::cout << ",";
-                    std::cout << "\n";
+                case 1:
+                    result = moped.verify(pda, get_trace);
+                    break;
+                case 2:
+                    result = post_star.verify(pda, get_trace);
+                    break;
+                case 3:
+                    // break;
+                default:
+                    throw base_error("Unsupported --engine value given");
                 }
-                else if(engine == 2)
+
+                verification_time.stop();
+                std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
+                std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
+                if(get_trace && result)
                 {
-                    // internal
-                    throw base_error("Internal engine not yet implemented!");
+                    std::cout << ",\n\t\t\"trace\":[\n";
+                    factory.write_json_trace(std::cout, moped.get_trace(pda));    
+                    std::cout << "\n\t\t]";
                 }
+                if(!no_timing)
+                {
+                    std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
+                              << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
+                             << ",\n\t\t\"verification-time\":" << (verification_time.duration());
+                }
+                std::cout << "\n\t}";
+                if(query_no != builder._result.size())
+                    std::cout << ",";
+                std::cout << "\n";
             }
         }
         if(!dump_to_moped)

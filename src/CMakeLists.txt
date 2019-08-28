@@ -17,7 +17,7 @@ include_directories(${Boost_INCLUDE_DIR} rapidxml)
 add_executable(mpls2pda ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.cpp model/builders/PRexBuilder.cpp
     model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDAFactory.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp 
-    pdaaal/model/PDA.cpp pdaaal/engine/Moped.cpp
+    pdaaal/model/PDA.cpp pdaaal/engine/Moped.cpp pdaaal/engine/PostStar.cpp
     utils/parsing.cpp utils/system.cpp)
 target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml ptrie)
 

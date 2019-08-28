@@ -31,7 +31,7 @@
 #include "Query.h"
 #include "filter.h"
 
-#include <ptrie_map.h>
+#include <ptrie/ptrie_map.h>
 #include <vector>
 #include <memory>
 #include <functional>

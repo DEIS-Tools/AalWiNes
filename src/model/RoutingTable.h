@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#include <ptrie_map.h>
+#include <ptrie/ptrie_map.h>
 
 #include "Router.h"
 #include "Query.h"
