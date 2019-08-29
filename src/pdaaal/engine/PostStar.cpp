@@ -52,22 +52,39 @@ namespace pdaaal
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf page 48
         std::vector<std::unique_ptr<edge_t>> edges;
 
-        std::queue<edge_t*> trans;
+        std::stack<edge_t*> trans;
         std::vector<edge_t*> rel;
         auto dummy = std::make_unique<edge_t>();
         ptrie::set_stable<> stateacts;
         auto npdastates = pda.states().size();
-        auto state_id = [&stateacts,npdastates](size_t from, size_t to, uint32_t lbl)
+        auto state_id = [&stateacts,npdastates, &pda](size_t from, size_t to, uint32_t lbl)
         {
-            size_t el[3] = {from, to, lbl};
+            constexpr size_t elsize = sizeof(size_t)*2 + sizeof(uint32_t);
+            size_t el[3];
+            assert(to < pda.states().size() || to == std::numeric_limits<size_t>::max());
+            if(from >= pda.states().size() && from != std::numeric_limits<size_t>::max())
+            {
+//                std::cerr << "\t\t NS (" << from << ", " << to << ", : " << lbl << ") " << std::endl;
+                stateacts.unpack(from-pda.states().size(), (unsigned char*)el);
+            }
+            else
+            {
+                el[1] = to;
+            }
+            el[1] = to;
+            el[2] = lbl;
+
             static_assert(sizeof(size_t) >= sizeof(uint32_t));
-            auto res = stateacts.insert((unsigned char*)&el, sizeof(size_t)*2 + sizeof(uint32_t));
+            auto res = stateacts.insert((unsigned char*)&el, elsize);
             return res.second + npdastates;
         };
-        auto insert_edge = [&edges,&dummy,&trans](size_t from, uint32_t lbl, size_t to, bool add_to_waiting) -> edge_t*
+        auto insert_edge = [&edges,&dummy,&trans,&pda](size_t from, uint32_t lbl, size_t to, bool add_to_waiting) -> edge_t*
         {
-//            std::cerr << "\t(" << from << ", " << lbl << ", " << to << ")" << std::endl;
-
+/*            std::cerr << "\t(" << from << ", " << lbl << ", " << to << ")" << std::endl;
+            if(from > pda.states().size() || to > pda.states().size())
+            {
+                std::cerr << "\t\tTEMP" << std::endl;
+            }*/
             (*dummy) = edge_t(from, lbl, to);
             auto lb = std::lower_bound(std::begin(edges), std::end(edges), dummy, [](auto& a, auto& b) -> bool { return *a < *b; });
             if (lb == std::end(edges) || *(*lb) != *dummy) {
@@ -98,7 +115,7 @@ namespace pdaaal
 
         
         while (!trans.empty()) {
-            auto t = trans.front();
+            auto t = trans.top(); //trans.front();
             if (t->_to == 0)
                 return true;
             trans.pop();
@@ -111,7 +128,7 @@ namespace pdaaal
                 t->_in_rel = true;
                 rel.push_back(t);
             }
-            //std::cerr << "(" << t->_from << ", " << t->_label << ", " << t->_to << ")" << std::endl;
+//            std::cerr << "(" << t->_from << ", " << t->_label << ", " << t->_to << ")" << std::endl;
 
             t->_in_waiting = false;
             if (t->_label != std::numeric_limits<uint32_t>::max()) {
