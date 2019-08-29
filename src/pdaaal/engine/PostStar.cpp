@@ -66,71 +66,104 @@ namespace pdaaal
         };
         auto insert_edge = [&edges,&dummy,&trans](size_t from, uint32_t lbl, size_t to, bool add_to_waiting) -> edge_t*
         {
+//            std::cerr << "\t(" << from << ", " << lbl << ", " << to << ")" << std::endl;
+
             (*dummy) = edge_t(from, lbl, to);
             auto lb = std::lower_bound(std::begin(edges), std::end(edges), dummy, [](auto& a, auto& b) -> bool { return *a < *b; });
             if (lb == std::end(edges) || *(*lb) != *dummy) {
                 lb = edges.insert(lb, std::make_unique<edge_t>(from, lbl, to));
             }
-            if(!(*lb)->_in_waiting && add_to_waiting)
+            if(add_to_waiting && !(*lb)->_in_waiting && !(*lb)->_in_rel)
             {
-                assert(!(*lb)->_in_rel);
+//                std::cerr << "\tWAITING!" << std::endl;
                 (*lb)->_in_waiting = true;
                 trans.push(lb->get());
             }
             return lb->get();
         };
 
+                
+        auto init = state_id(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max(), std::numeric_limits<uint32_t>::max());
         for (auto& rule : pda.states()[0]._rules) {
             assert(rule._operation == PDA::PUSH);
-            edge_t* edge = insert_edge(0, rule._op_label, rule._to, true);
-            assert(!edge->_in_waiting);
+            edge_t* edge = insert_edge(rule._to, rule._op_label, init, true);
             trans.emplace(edge);
-            edge->_in_waiting = true;
+            { // insert bottom-element of stack
+                auto e = insert_edge(init, std::numeric_limits<uint32_t>::max()-1, 0, false);
+                e->_in_rel = true;
+                rel.push_back(e);
+            }
         }
 
+
+        
         while (!trans.empty()) {
             auto t = trans.top();
             if (t->_to == 0)
                 return true;
             trans.pop();
-            if (t->_in_rel) continue;
-            t->_in_rel = true;
+            if (t->_in_rel)
+            {
+                continue;
+            }
+            //if (!t->_in_rel)
+            {
+                t->_in_rel = true;
+                rel.push_back(t);
+            }
+//            std::cerr << "(" << t->_from << ", " << t->_label << ", " << t->_to << ")" << std::endl;
+
             t->_in_waiting = false;
-            rel.push_back(t);
             if (t->_label != std::numeric_limits<uint32_t>::max()) {
-                assert(t._from < pda.states().size());
-                for (auto& rule : pda.states()[t->_from]._rules) {
-                    if(!rule._precondition.contains(t->_label)) continue;
-                    switch (rule._operation) {
-                    case PDA::POP:
-                        insert_edge(t->_to, std::numeric_limits<uint32_t>::max(), rule._to, true);
-                        break;
-                    case PDA::SWAP:
-                        insert_edge(t->_to, rule._op_label, rule._to, true);
-                        break;
-                    case PDA::PUSH:
-                    {
-                        auto ns = state_id(t->_to, rule._to, rule._op_label);
-                        insert_edge(rule._to, rule._op_label, ns, true);
-                        auto re = insert_edge(ns, t->_label, t->_to, false);
-                        re->_in_rel = true;
-                        rel.push_back(re);
-                        for(auto e : rel)
+                if(t->_from < pda.states().size())
+                {
+                    for (auto& rule : pda.states()[t->_from]._rules) {
+                        assert(rule._to != 0);
+                        if(!rule._precondition.contains(t->_label)) continue;
+                        switch (rule._operation) {
+                        case PDA::POP:
+                            insert_edge(rule._to, std::numeric_limits<uint32_t>::max(), t->_to, true);
+                            break;
+                        case PDA::SWAP:
+                            insert_edge(rule._to, rule._op_label, t->_to, true);
+                            break;
+                        case PDA::NOOP:
+                            insert_edge(rule._to, t->_label, t->_to, true);
+                            break;
+                        case PDA::PUSH:
                         {
-                            if(e->_to == ns && e->_label == std::numeric_limits<uint32_t>::max())
+                            auto ns = state_id(t->_to, rule._to, rule._op_label);
+                            insert_edge(rule._to, rule._op_label, ns, true);
+                            auto re = insert_edge(ns, t->_label, t->_to, false);
+                            if(re != nullptr && !re->_in_rel)
                             {
-                                insert_edge(e->_from, t->_label, t->_to, true);
+                                re->_in_rel = true;
+                                rel.push_back(re);
+                            }
+                            for(auto e : rel)
+                            {
+                                if(e == nullptr) continue;
+                                if(e->_to == ns && e->_label == std::numeric_limits<uint32_t>::max())
+                                {
+                                    insert_edge(e->_from, t->_label, t->_to, true);
+                                }
                             }
                         }
+                        break;
+                        default:
+                            assert(false);
+                        }
                     }
-                    default:
-                        assert(false);
-                    }
+                }
+                else
+                {
+                    assert(false);
                 }
             }
             else {
                 // do some ordering/indexing on rel?
                 for (auto o : rel) {
+                    if(o == nullptr) continue;
                     if (o->_from == t->_to) {
                         insert_edge(t->_from, o->_label, o->_to, true);
                     }

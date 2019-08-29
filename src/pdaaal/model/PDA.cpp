@@ -30,6 +30,7 @@
 
 #include <queue>
 #include <cassert>
+#include <algorithm>
 
 namespace pdaaal
 {
