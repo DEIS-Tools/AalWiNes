@@ -52,7 +52,7 @@ namespace pdaaal
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf page 48
         std::vector<std::unique_ptr<edge_t>> edges;
 
-        std::stack<edge_t*> trans;
+        std::queue<edge_t*> trans;
         std::vector<edge_t*> rel;
         auto dummy = std::make_unique<edge_t>();
         ptrie::set_stable<> stateacts;
@@ -98,7 +98,7 @@ namespace pdaaal
 
         
         while (!trans.empty()) {
-            auto t = trans.top();
+            auto t = trans.front();
             if (t->_to == 0)
                 return true;
             trans.pop();
@@ -111,7 +111,7 @@ namespace pdaaal
                 t->_in_rel = true;
                 rel.push_back(t);
             }
-//            std::cerr << "(" << t->_from << ", " << t->_label << ", " << t->_to << ")" << std::endl;
+            //std::cerr << "(" << t->_from << ", " << t->_label << ", " << t->_to << ")" << std::endl;
 
             t->_in_waiting = false;
             if (t->_label != std::numeric_limits<uint32_t>::max()) {
