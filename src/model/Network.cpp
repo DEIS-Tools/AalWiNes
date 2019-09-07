@@ -188,5 +188,14 @@ namespace mpls2pda
         }
         s << "}" << std::endl;
     }
+    void Network::print_simple(std::ostream& s)
+    {
+        for(auto& r : _routers)
+        {
+            s << "router: \"" << r->name() << "\":\n";
+            r->print_simple(s);
+        }
+    }
 
+    
 }

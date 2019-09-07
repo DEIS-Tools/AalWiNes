@@ -184,4 +184,31 @@ namespace mpls2pda
         return n;
     }
 
+    void Router::print_simple(std::ostream& s)
+    {
+        for(auto& i : _interfaces)
+        {
+            auto name = interface_name(i->id());
+            s << "\tinterface: \"" << name.get() << "\"\n";
+            const RoutingTable& table = i->table();
+            for(auto& e : table.entries())
+            {
+                s << "\t\t[" << e._top_label << "] {\n";
+                for(auto& fwd : e._rules)
+                {
+                    s << "\t\t\t" << fwd._weight << " |-[";
+                    for(auto& o : fwd._ops)
+                    {
+                        o.print_json(s, false, false);
+                    }
+                    s << "]-> " << fwd._via->source()->name() << ".";
+                    auto tn = fwd._via->source()->interface_name(fwd._via->id());
+                    s << tn.get() << "\n";
+                }
+                s << "\t\t}\n";
+            }
+        }
+    }
+
+
 }

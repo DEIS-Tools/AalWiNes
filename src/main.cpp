@@ -178,7 +178,7 @@ int main(int argc, const char** argv)
         PRexBuilder::parse(prex_topo, prex_routing, warnings) :
         JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
-    
+
     if (print_dot) {
         network.print_dot(std::cout);
     }

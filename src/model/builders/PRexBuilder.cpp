@@ -261,7 +261,15 @@ namespace mpls2pda {
                     entry._ingoing = inf;
                     if(lblattr != nullptr)
                     {
-                        entry._top_label.set_value(Query::MPLS, atoi(lblattr->value()), 0);
+                        auto val = lblattr->value();
+                        if(strlen(val) == 0)
+                        {
+                            entry._top_label.set_value(Query::ANYIP, 0, 0);
+                        }
+                        else
+                        {
+                            entry._top_label.set_value(Query::MPLS, atoi(lblattr->value()), 0);
+                        }
                     }
                     else if(ipattr != nullptr)
                     {
@@ -410,7 +418,7 @@ namespace mpls2pda {
             {
                 inf->table().merge(table, *inf, warnings);
             }
-            router_table = routers_xml->next_sibling("routing");
+            router_table = router_table->next_sibling("routing");
         }
     }
 }
