@@ -227,13 +227,11 @@ namespace pdaaal
     {
         size_t cnt = size();
         if (aggresivity == 0)
-            forwards_prune();
+            return std::make_pair(cnt, cnt);
+
+        forwards_prune();
         backwards_prune();
         std::queue<size_t> waiting;
-        if (aggresivity == 0) {
-            size_t after_cnt = size();
-            return std::make_pair(cnt, after_cnt);
-        }
         auto ds = (aggresivity >= 2);
         std::vector<tos_t> approximation(_states.size());
         // initialize
