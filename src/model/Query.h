@@ -38,7 +38,7 @@ namespace mpls2pda {
     public:
 
         enum mode_t {
-            OVER, UNDER, EXACT
+            OVER, UNDER, DUAL, EXACT
         };
 
         enum type_t {
@@ -216,7 +216,12 @@ namespace mpls2pda {
         pdaaal::NFA<label_t> & path() {
             return _path;
         }
-
+        
+        void set_approximation(mode_t approx)
+        {
+            _mode = approx;
+        }
+        
         mode_t approximation() const {
             return _mode;
         }

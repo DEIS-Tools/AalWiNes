@@ -37,6 +37,7 @@
 #include "pdaaal/engine/PostStar.h"
 
 #include "utils/stopwatch.h"
+#include "utils/outcome.h"
 
 #include <ptrie/ptrie_map.h>
 
@@ -217,48 +218,102 @@ int main(int argc, const char** argv)
             std::cout << "\t\"answers\":{\n";
         }
         Moped moped;
+        PostStar post_star;
+
         for(auto& q : builder._result)
         {
             ++query_no;
-            stopwatch compilation_time;
-            NetworkPDAFactory factory(q, network);
-            auto pda = factory.compile();
-            compilation_time.stop();
-            stopwatch reduction_time;
-            auto reduction = pda.reduce(tos);
-            reduction_time.stop();
+            stopwatch compilation_time(false);
             if(dump_to_moped)
             {
+                compilation_time.start();
+                NetworkPDAFactory factory(q, network);
+                auto pda = factory.compile();
                 Moped::dump_pda(pda, std::cout);
             }
             else
             {
-                // move this into function that generalizes
-                // and extracts trace at the same time.
-                stopwatch verification_time;
-                PostStar post_star;
-                bool result;
-                switch(engine)
+                std::vector<Query::mode_t> modes{q.approximation()};
+                bool was_dual = q.approximation() == Query::DUAL;
+                if(was_dual)
+                    modes = std::vector<Query::mode_t>{Query::OVER, Query::UNDER};
+                std::pair<size_t,size_t> reduction;
+                utils::outcome_t result = utils::MAYBE;
+                stopwatch reduction_time(false);
+                stopwatch verification_time(false);
+                std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
+                std::unique_ptr<NetworkPDAFactory> factory;
+                std::stringstream proof;
+                for(auto m : modes)
                 {
-                case 1:
-                    result = moped.verify(pda, get_trace);
-                    break;
-                case 2:
-                    result = post_star.verify(pda, get_trace);
-                    break;
-                case 3:
-                    // break;
-                default:
-                    throw base_error("Unsupported --engine value given");
+                    compilation_time.start();
+                    q.set_approximation(m);
+                    factory = std::make_unique<NetworkPDAFactory>(q, network);
+                    auto pda = factory->compile();
+                    compilation_time.stop();
+                    reduction_time.start();
+                    reduction = pda.reduce(tos);
+                    reduction_time.stop();
+                    verification_time.start();
+                    bool engine_outcome;
+                    bool need_trace = (was_dual && m == Query::UNDER) || get_trace;
+                    switch(engine)
+                    {
+                    case 1:
+                        engine_outcome = moped.verify(pda, need_trace);
+                        verification_time.stop();
+                        if(need_trace && engine_outcome)
+                        {
+                            trace = moped.get_trace(pda);
+                            if(factory->write_json_trace(proof, trace))
+                                result = utils::YES;
+                        }
+                        break;
+                    case 2:
+                        engine_outcome = post_star.verify(pda, need_trace);
+                        verification_time.stop();
+                        if(need_trace && engine_outcome)
+                        {
+                            trace = post_star.get_trace(pda);
+                            if(factory->write_json_trace(proof, trace))
+                                result = utils::YES;
+                        }
+                        break;
+                    case 3:
+                        // break;
+                    default:
+                        throw base_error("Unsupported --engine value given");
+                    }
+                    if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
+                        result = utils::NO;
+                    if(result != utils::MAYBE)
+                        break;
+                    /*else
+                        trace.clear();*/
                 }
 
-                verification_time.stop();
-                std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":" << (result ? "true" : "false") << ",\n";
+                // move this into function that generalizes
+                // and extracts trace at the same time.
+
+                std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":";
+                switch(result)
+                {
+                case utils::MAYBE:
+                    std::cout << "null";
+                    break;
+                case utils::NO:
+                    std::cout << "false";
+                    break;
+                case utils::YES:
+                    std::cout << "true";
+                    break;
+                }
+                std::cout << ",\n";
                 std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
                 if(get_trace && result)
                 {
                     std::cout << ",\n\t\t\"trace\":[\n";
-                    factory.write_json_trace(std::cout, moped.get_trace(pda));    
+                    std::cout << proof.str();
                     std::cout << "\n\t\t]";
                 }
                 if(!no_timing)

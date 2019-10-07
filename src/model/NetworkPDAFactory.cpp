@@ -154,7 +154,7 @@ namespace mpls2pda
                 return nm;
         }
         case Query::EXACT:
-
+        case Query::DUAL:
         default:
             return err;
         }
@@ -222,9 +222,10 @@ namespace mpls2pda
 
     std::vector<NetworkPDAFactory::PDAFactory::rule_t> NetworkPDAFactory::rules(size_t id)
     {
-        if(_query.approximation() == Query::EXACT)
+        if(_query.approximation() == Query::EXACT ||
+           _query.approximation() == Query::DUAL)
         {
-            throw base_error("Exact analysis method not yet supported");
+            throw base_error("Exact and Dual analysis method not yet supported");
         }
         nstate_t s;
         _states.unpack(id, (unsigned char*) &s);
@@ -385,8 +386,56 @@ namespace mpls2pda
         stream << "}";
     }
 
-    void NetworkPDAFactory::write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>&& trace)
+    bool NetworkPDAFactory::add_interfaces(std::unordered_set<const Interface*>& interfaces, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const
     {
+        Router* src = fwd._via->source();
+        if(interfaces.count(fwd._via) > 0) 
+            return false; // should be down!
+        // find all rules with a "covered" pre but lower weight.
+        // these must have been disabled!
+        if(fwd._weight == 0)
+            return true;
+        std::unordered_set<const Interface*> tmp = interfaces;
+        for(auto& alt : src->interfaces())
+        {
+            bool brk = false;
+            if(tmp.count(alt.get()) > 0)
+                continue; // already disabled, no need to add
+            
+            for(auto& alt_ent : alt->table().entries())
+            {
+                if(alt_ent._top_label.overlaps(entry._top_label))
+                {
+                    for(auto& alt_rule : alt_ent._rules)
+                    {
+                        if(alt_rule._weight < fwd._weight)
+                        {
+                            tmp.insert(alt.get());
+                            if(tmp.size() > (uint32_t)_query.number_of_failures())
+                                return false;
+                            brk = true;
+                            break;
+                        }
+                    }
+                }
+                if(brk)
+                    break;
+            }
+        }
+        if(tmp.size() > (uint32_t)_query.number_of_failures())
+            return false;
+        else
+        {
+            interfaces.swap(tmp);
+            return true;
+        }
+    }
+
+
+
+    bool NetworkPDAFactory::write_json_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace)
+    {
+        std::unordered_set<const Interface*> interfaces;
         bool first = true;
         for(size_t sno = 0; sno < trace.size(); ++sno)
         {
@@ -425,6 +474,11 @@ namespace mpls2pda
                         {
                             // we get the rule we use, print
                             auto& entry = next._inf->table().entries()[next._eid];
+                            if(!add_interfaces(interfaces, entry, entry._rules[next._rid]))
+                            {
+                                stream << "{\"pre\":\"error\"}";
+                                return false;
+                            }
                             print_trace_rule(stream, next._inf->source(), entry, entry._rules[next._rid]);
                         }
                         else 
@@ -450,6 +504,8 @@ namespace mpls2pda
                                     case Query::OVER:
                                         ok = ((ssize_t)r._weight) <= _query.number_of_failures();
                                         break;
+                                    case Query::DUAL:
+                                        throw base_error("Tracing for DUAL not yet implemented");
                                     case Query::EXACT:
                                         throw base_error("Tracing for EXACT not yet implemented");
                                     }
@@ -473,6 +529,8 @@ namespace mpls2pda
                                                     {
                                                         continue;
                                                     }
+                                                    if(!add_interfaces(interfaces, entry, r))
+                                                        continue;
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
                                                     break;
@@ -484,6 +542,8 @@ namespace mpls2pda
                                                 assert(r._ops[0]._op == RoutingTable::PUSH || r._ops[0]._op == RoutingTable::POP);
                                                 if(r._ops[0]._op == RoutingTable::POP && nstep._stack.size() == step._stack.size() - 1)
                                                 {
+                                                    if(!add_interfaces(interfaces, entry, r))
+                                                        continue;
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
                                                     break;
@@ -491,6 +551,9 @@ namespace mpls2pda
                                                 else if(r._ops[0]._op == RoutingTable::PUSH && nstep._stack.size() == step._stack.size() + 1 &&
                                                         r._ops[0]._op_label == nstep._stack.front())
                                                 {
+                                                    if(!add_interfaces(interfaces, entry, r))
+                                                        continue;
+
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
                                                     break;                                                        
@@ -500,9 +563,14 @@ namespace mpls2pda
                                     }
                                 }
                             }
+                            
+                            // check if we violate the soundness of the network
+                            
+                            
                             if(!found)
                             {
-                                stream << "{\"pre\":\"unknown\"}";
+                                stream << "{\"pre\":\"error\"}";
+                                return false;
                             }
                         }
                     }
@@ -515,6 +583,7 @@ namespace mpls2pda
                 // SKIP
             }
         }
+        return true;
     }
     
     std::function<void(std::ostream&, const Query::label_t&) > NetworkPDAFactory::label_writer() const

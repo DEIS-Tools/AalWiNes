@@ -77,7 +77,7 @@ namespace pdaaal {
     template<typename T>
     std::vector<typename TypedPDA<T>::tracestate_t> PostStar::get_trace(TypedPDA<T>& pda) const
     {
-        
+        return  {};
     }
     
 }
