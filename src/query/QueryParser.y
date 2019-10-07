@@ -100,6 +100,7 @@
         
         OVER      "OVER"
         UNDER     "UNDER"
+        DUAL      "DUAL"
         EXACT     "EXACT"
         ANYIP     "@"
         ANYMPLS   "¤"
@@ -142,6 +143,7 @@ query
 mode 
     : OVER { $$ = Query::OVER; }
     | UNDER { $$ = Query::UNDER; }
+    | DUAL { $$ = Query::DUAL; }
     | EXACT { $$ = Query::EXACT; }
     ;
     

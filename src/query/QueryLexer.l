@@ -97,6 +97,7 @@ literal  \"(\\.|[^\\"])*\"
 ":"     return token::COLON;
 "OVER"  return token::OVER;
 "UNDER" return token::UNDER;
+"DUAL"  return token::DUAL;
 "EXACT" return token::EXACT;
 "⊙"     return token::ANYIP;
 "@"     return token::ANYIP;
