@@ -284,6 +284,10 @@ int main(int argc, const char** argv)
                     default:
                         throw base_error("Unsupported --engine value given");
                     }
+                    
+                    if(q.number_of_failures() == 0)
+                        result = engine_outcome ? utils::YES : utils::NO;
+                    
                     if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
                         result = utils::NO;
                     if(result != utils::MAYBE)
