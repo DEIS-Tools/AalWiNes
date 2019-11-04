@@ -88,9 +88,12 @@ namespace mpls2pda {
         labelset_t find_label(uint64_t label, uint64_t mask);
         labelset_t any_ip();
         labelset_t any_mpls();
+        labelset_t any_sticky();
         labelset_t match_ip4(int i1, int i2, int i3, int i4, int mask);
         labelset_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int mask);
         labelset_t expand_labels(Query::label_t label);
+        void set_sticky() { _sticky = true; }
+        void unset_sticky() { _sticky = false; }
         void invert(bool val)
         {
             _inverted = val;
@@ -115,6 +118,7 @@ namespace mpls2pda {
         bool _link = false;
         bool _inverted = false;
         bool _expand = false;
+        bool _sticky = false;
     };
 }
 

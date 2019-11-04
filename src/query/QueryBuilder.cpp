@@ -101,13 +101,23 @@ namespace mpls2pda
         return expand_labels(Query::label_t::any_mpls);
     }
 
+    Builder::labelset_t Builder::any_sticky()
+    {
+        return expand_labels(Query::label_t::any_sticky_mpls);
+    }
+
+
     Builder::labelset_t Builder::expand_labels(Query::label_t label)
     {
         if(!_expand) return {label};
         
         if(label.type() == Query::ANYMPLS)
         {
-            return _network.get_labels(0, 255, Query::MPLS);
+            return _network.get_labels(0, 255, _sticky ? Query::STICKY_MPLS : Query::MPLS);
+        }
+        else if(label.type() == Query::ANYSTICKY)
+        {
+            return _network.get_labels(0, 255, Query::STICKY_MPLS);
         }
         return _network.get_labels(label.value(), label.mask(), label.type());        
     }
@@ -215,7 +225,7 @@ namespace mpls2pda
     
     Builder::labelset_t Builder::find_label(uint64_t label, uint64_t mask)
     {
-        return _network.get_labels(label, mask, Query::MPLS);
+        return _network.get_labels(label, mask, _sticky ? Query::STICKY_MPLS : Query::MPLS);
     }
     
     filter_t Builder::discard_id()

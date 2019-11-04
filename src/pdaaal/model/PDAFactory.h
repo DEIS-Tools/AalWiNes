@@ -97,7 +97,7 @@ namespace pdaaal {
 
             // Destruct the stack!
             build_destruction(result);
-
+            std::cerr << "DES DONE" << std::endl;
             return result;
         }
 

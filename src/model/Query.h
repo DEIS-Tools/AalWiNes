@@ -42,7 +42,7 @@ namespace mpls2pda {
         };
 
         enum type_t {
-            ANYMPLS = 1, ANYIP = 2, IP4 = 4, IP6 = 8, MPLS = 16, INTERFACE = 32, NONE = 128
+            ANYMPLS = 1, ANYIP = 2, IP4 = 4, IP6 = 8, MPLS = 16, STICKY = 32, INTERFACE = 64, NONE = 128, ANYSTICKY = ANYMPLS | STICKY, STICKY_MPLS = MPLS | STICKY
         };
 
         struct label_t {
@@ -73,13 +73,23 @@ namespace mpls2pda {
                         _mask = 64;
                         _value = 0;
                         break;
+                    case ANYSTICKY:
                     case ANYMPLS:
                         _mask = 64;
                         _value = 0;
                         break;
+                    case STICKY_MPLS:
                     case MPLS:
                         _mask = std::min<uint8_t>(64, _mask);
                         _value = (_value >> _mask) << _mask;
+                        if(_mask == 64)
+                        {
+                            if(_type == STICKY_MPLS)
+                                *this = any_sticky_mpls;
+                            else 
+                                *this = any_mpls;
+                        }
+                            
                         break;
                     case IP4:
                         _mask = std::min<uint8_t>(32, _mask);
@@ -97,7 +107,6 @@ namespace mpls2pda {
             }
             
             label_t(type_t type, uint8_t mask, uint64_t val)
-                    : _type(type), _mask(mask), _value(val)
             {
                 set_value(type, val, mask);
             }
@@ -142,6 +151,8 @@ namespace mpls2pda {
                 uint8_t mx = 255;
                 switch(label._type)
                 {
+                    case STICKY_MPLS:
+                        stream << "s";
                     case MPLS:
                         stream << ((label._value >> label._mask) << label._mask);
                         break;
@@ -159,12 +170,16 @@ namespace mpls2pda {
                     case ANYIP:
                         stream << "ip";
                         break;
+                    case ANYSTICKY:
+                        stream << "s";
                     case ANYMPLS:
                         stream << "mpls";
                         break;
                     case NONE:
                         stream << "NONE";
                         break;
+                    default:
+                        throw base_error("Unknown error");
                 }
                 if(label.uses_mask())
                 {                    
@@ -184,13 +199,17 @@ namespace mpls2pda {
                     return true;
                 if(std::min(_type, other._type) == ANYMPLS && std::max(_type, other._type) == MPLS)
                     return true;
+                if(std::min(_type, other._type) == ANYSTICKY && std::max(_type, other._type) == STICKY_MPLS)
+                    return true;
                 return false;
             }
             
             const static label_t unused_mpls;
+            const static label_t unused_sticky_mpls;
             const static label_t unused_ip4;
             const static label_t unused_ip6;
             const static label_t any_mpls;
+            const static label_t any_sticky_mpls;
             const static label_t any_ip;
             const static label_t any_ip4;
             const static label_t any_ip6;

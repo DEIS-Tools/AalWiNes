@@ -170,10 +170,12 @@ namespace mpls2pda
         
         switch(pre.type())
         {
+        case Query::ANYSTICKY:
         case Query::ANYMPLS:
             mask = 64;
             val = 0;
             // fall through to MPLS
+        case Query::STICKY_MPLS:
         case Query::MPLS:
         {
             if(mask == 0)
@@ -181,11 +183,14 @@ namespace mpls2pda
                 rules.push_back(cpy);
                 rules.back()._pre = pre;
                 rules.push_back(cpy);
-                rules.back()._pre = Query::label_t::any_mpls;
+                if(pre.type() & Query::STICKY)
+                    rules.back()._pre = Query::label_t::any_sticky_mpls;
+                else
+                    rules.back()._pre = Query::label_t::any_mpls;
             }
             else
             {
-                for(auto& l : _network.get_labels(val, mask, Query::MPLS))
+                for(auto& l : _network.get_labels(val, mask, (Query::type_t)(Query::MPLS | (pre.type() & Query::STICKY))))
                 {
                     rules.push_back(cpy);
                     rules.back()._pre = l;
@@ -263,11 +268,11 @@ namespace mpls2pda
                                 switch (forward._ops[0]._op) {
                                 case RoutingTable::POP:
                                     nr._op = PDA::POP;
-                                    assert(entry._top_label.type() == Query::MPLS);
+                                    assert(entry._top_label.type() == Query::MPLS || entry._top_label.type() == Query::STICKY_MPLS);
                                     break;
                                 case RoutingTable::PUSH:
                                     nr._op = PDA::PUSH;
-                                    assert(forward._ops[0]._op_label.type() == Query::MPLS);
+                                    assert(forward._ops[0]._op_label.type() == Query::MPLS || entry._top_label.type() == Query::STICKY_MPLS);
                                     nr._op_label = forward._ops[0]._op_label;
                                     break;
                                 case RoutingTable::SWAP:
@@ -278,7 +283,8 @@ namespace mpls2pda
                             }
                             else {
                                 if(entry._top_label.type() != Query::ANYIP &&
-                                   entry._top_label.type() != Query::ANYMPLS)
+                                   entry._top_label.type() != Query::ANYMPLS &&
+                                   entry._top_label.type() != Query::ANYSTICKY)
                                 {
                                     nr._op = PDA::SWAP;
                                     nr._op_label = entry._top_label;
@@ -386,21 +392,21 @@ namespace mpls2pda
         stream << "}";
     }
 
-    bool NetworkPDAFactory::add_interfaces(std::unordered_set<const Interface*>& interfaces, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const
+    bool NetworkPDAFactory::add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const
     {
         Router* src = fwd._via->source();
-        if(interfaces.count(fwd._via) > 0) 
+        if(disabled.count(fwd._via) > 0) 
             return false; // should be down!
         // find all rules with a "covered" pre but lower weight.
         // these must have been disabled!
         if(fwd._weight == 0)
             return true;
-        std::unordered_set<const Interface*> tmp = interfaces;
+        std::unordered_set<const Interface*> tmp = disabled;
         for(auto& alt : src->interfaces())
         {
             bool brk = false;
             if(tmp.count(alt.get()) > 0)
-                continue; // already disabled, no need to add
+                continue; // already disabled, no need to add or check
             
             for(auto& alt_ent : alt->table().entries())
             {
@@ -410,6 +416,7 @@ namespace mpls2pda
                     {
                         if(alt_rule._weight < fwd._weight)
                         {
+                            if(active.count(alt.get()) > 0) return false;
                             tmp.insert(alt.get());
                             if(tmp.size() > (uint32_t)_query.number_of_failures())
                                 return false;
@@ -426,7 +433,8 @@ namespace mpls2pda
             return false;
         else
         {
-            interfaces.swap(tmp);
+            disabled.swap(tmp);
+            active.insert(entry._ingoing);
             return true;
         }
     }
@@ -435,7 +443,7 @@ namespace mpls2pda
 
     bool NetworkPDAFactory::write_json_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace)
     {
-        std::unordered_set<const Interface*> interfaces;
+        std::unordered_set<const Interface*> disabled, active;
         bool first = true;
         for(size_t sno = 0; sno < trace.size(); ++sno)
         {
@@ -474,7 +482,7 @@ namespace mpls2pda
                         {
                             // we get the rule we use, print
                             auto& entry = next._inf->table().entries()[next._eid];
-                            if(!add_interfaces(interfaces, entry, entry._rules[next._rid]))
+                            if(!add_interfaces(disabled, active, entry, entry._rules[next._rid]))
                             {
                                 stream << "{\"pre\":\"error\"}";
                                 return false;
@@ -529,7 +537,7 @@ namespace mpls2pda
                                                     {
                                                         continue;
                                                     }
-                                                    if(!add_interfaces(interfaces, entry, r))
+                                                    if(!add_interfaces(disabled, active, entry, r))
                                                         continue;
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
@@ -542,7 +550,7 @@ namespace mpls2pda
                                                 assert(r._ops[0]._op == RoutingTable::PUSH || r._ops[0]._op == RoutingTable::POP);
                                                 if(r._ops[0]._op == RoutingTable::POP && nstep._stack.size() == step._stack.size() - 1)
                                                 {
-                                                    if(!add_interfaces(interfaces, entry, r))
+                                                    if(!add_interfaces(disabled, active, entry, r))
                                                         continue;
                                                     print_trace_rule(stream, s._inf->source(), entry, r);
                                                     found = true;
@@ -551,7 +559,7 @@ namespace mpls2pda
                                                 else if(r._ops[0]._op == RoutingTable::PUSH && nstep._stack.size() == step._stack.size() + 1 &&
                                                         r._ops[0]._op_label == nstep._stack.front())
                                                 {
-                                                    if(!add_interfaces(interfaces, entry, r))
+                                                    if(!add_interfaces(disabled, active, entry, r))
                                                         continue;
 
                                                     print_trace_rule(stream, s._inf->source(), entry, r);

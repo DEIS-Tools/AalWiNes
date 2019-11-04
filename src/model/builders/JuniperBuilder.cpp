@@ -469,12 +469,12 @@ namespace mpls2pda
                     e << "expect only (S=0) notation as postfix of <rt-destination> in table " << name << " of router " << parent->name() << std::endl;
                     throw base_error(e.str());
                 }
-                entry._decreasing = true;
+                entry._sticky_label = true;
                 tl = tl.substr(0, pos);
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
             {
-                entry._top_label.set_value(Query::MPLS, atoll(tl.c_str()), 0);
+                entry._top_label.set_value(entry._sticky_label ? Query::STICKY_MPLS : Query::MPLS, atoll(tl.c_str()), 0);
             }
             else if (tl == "default") {
                 // we ignore these! (I suppose, TODO, check)
@@ -549,7 +549,7 @@ namespace mpls2pda
                     }
                     else {
                         std::string ostr = ops->value();
-                        parse_ops(r, ostr);
+                        parse_ops(r, ostr, entry._sticky_label);
                         skipvia = false;
                     }
                 }
@@ -610,7 +610,7 @@ namespace mpls2pda
         return nr;
     }
 
-    void JuniperBuilder::parse_ops(RoutingTable::forward_t& f, std::string& ostr)
+    void JuniperBuilder::parse_ops(RoutingTable::forward_t& f, std::string& ostr, bool sticky)
     {
         auto pos = ostr.find("(top)");
         if (pos != std::string::npos) {
@@ -624,7 +624,9 @@ namespace mpls2pda
         // parse ops
         bool parse_label = false;
         f._ops.emplace_back();
+        int depth = 1;
         for (size_t i = 0; i < ostr.size(); ++i) {
+            bool sticky_type = false;
             if (ostr[i] == ' ') continue;
             if (ostr[i] == ',') continue;
             if (!parse_label) {
@@ -632,17 +634,27 @@ namespace mpls2pda
                     f._ops.back()._op = RoutingTable::SWAP;
                     i += 4;
                     parse_label = true;
+                    sticky_type = depth == 1 && sticky;
                 }
                 else if (ostr[i] == 'P') {
                     if (ostr[i + 1] == 'u') {
                         f._ops.back()._op = RoutingTable::PUSH;
                         parse_label = true;
                         i += 4;
+                        ++depth;                        
+                        sticky_type = depth == 1 && sticky;
                     }
                     else if (ostr[i + 1] == 'o') {
                         f._ops.back()._op = RoutingTable::POP;
                         i += 2;
                         f._ops.emplace_back();
+                        --depth;
+                        if(depth < 0 && sticky) 
+                        {
+                            std::stringstream e;
+                            e << "unexpected pop below stack-size with sticky label \"" << (&ostr[i]) << "\"." << std::endl;
+                            throw base_error(e.str());                            
+                        }
                         continue;
                     }
                 }
@@ -658,7 +670,7 @@ namespace mpls2pda
                         }
                         auto n = ostr.substr(i, (j - i));
                         auto olabel = std::atoi(n.c_str());
-                        f._ops.back()._op_label.set_value(Query::MPLS, olabel, 0);
+                        f._ops.back()._op_label.set_value(sticky_type ? Query::STICKY_MPLS : Query::MPLS, olabel, 0);
                         i = j;
                         parse_label = false;
                         f._ops.emplace_back();

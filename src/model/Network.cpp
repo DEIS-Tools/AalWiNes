@@ -93,13 +93,16 @@ namespace mpls2pda
             if(pr == Query::label_t::unused_ip4 ||
                pr == Query::label_t::unused_ip6 ||
                pr == Query::label_t::unused_mpls ||
+               pr == Query::label_t::unused_sticky_mpls ||
                pr == Query::label_t::any_ip ||
                pr == Query::label_t::any_ip4 ||
                pr == Query::label_t::any_ip6 ||
-               pr == Query::label_t::any_mpls) continue;
+               pr == Query::label_t::any_mpls ||
+               pr == Query::label_t::any_sticky_mpls) continue;
             switch (type) {
             case Query::IP6:
             case Query::IP4:
+            case Query::STICKY_MPLS:
             case Query::MPLS:
             {
                 if ((pr.value() << msk) == (label << msk))
@@ -121,6 +124,9 @@ namespace mpls2pda
             case Query::IP6:
                 res.emplace(Query::label_t::unused_ip6);
                 break;
+            case Query::STICKY_MPLS:
+                res.emplace(Query::label_t::unused_sticky_mpls);
+                break;
             case Query::MPLS:
                 res.emplace(Query::label_t::unused_mpls);
                 break;
@@ -134,6 +140,9 @@ namespace mpls2pda
             break;
         case Query::IP6:
             res.emplace(Query::label_t::any_ip6);
+            break;
+        case Query::STICKY_MPLS:
+            res.emplace(Query::label_t::any_sticky_mpls);
             break;
         case Query::MPLS:
             res.emplace(Query::label_t::any_mpls);
@@ -153,10 +162,12 @@ namespace mpls2pda
             res.insert(Query::label_t::unused_ip4);
             res.insert(Query::label_t::unused_ip6);
             res.insert(Query::label_t::unused_mpls);
+            res.insert(Query::label_t::unused_sticky_mpls);
             res.insert(Query::label_t::any_ip);
             res.insert(Query::label_t::any_ip4);
             res.insert(Query::label_t::any_ip6);
             res.insert(Query::label_t::any_mpls);
+            res.insert(Query::label_t::any_sticky_mpls);
             for (auto& r : _routers) {
                 for (auto& inf : r->interfaces()) {
                     for (auto& e : inf->table().entries()) {

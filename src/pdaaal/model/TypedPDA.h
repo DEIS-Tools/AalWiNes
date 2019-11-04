@@ -37,6 +37,7 @@
 #include <unordered_map>
 #include <set>
 #include <cassert>
+#include <iostream>
 
 namespace pdaaal {
     template<typename T>
@@ -137,6 +138,10 @@ namespace pdaaal {
             for(size_t i = 0; i < pre.size(); ++i)
             {
                 auto& p = pre[i];
+                if(_label_map.count(p) != 1)
+                {
+                    std::cerr << "could not find " << p << std::endl;
+                }
                 assert(_label_map.count(p) == 1);
                 auto res = _label_map.find(p);
                 assert(res != std::end(_label_map));

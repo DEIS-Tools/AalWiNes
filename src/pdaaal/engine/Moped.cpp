@@ -141,7 +141,7 @@ namespace pdaaal
     {
         _raw_trace.clear();
         std::fstream file;
-        file.open(_tmpfilepath, std::fstream::out);
+        file.open(_tmpfilepath, std::fstream::out | std::fstream::trunc);
         dump_pda(pda, file);
         file.close();
         return verify(_tmpfilepath, build_trace);

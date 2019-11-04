@@ -64,7 +64,7 @@ namespace mpls2pda
         void expand_back(std::vector<rule_t>& rules, const Query::label_t& pre);
 
     private:
-        bool add_interfaces(std::unordered_set<const Interface*>& interfaces, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const;
+        bool add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const;
         void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;
 
         void construct_initial();

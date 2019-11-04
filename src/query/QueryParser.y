@@ -102,8 +102,9 @@
         UNDER     "UNDER"
         DUAL      "DUAL"
         EXACT     "EXACT"
-        ANYIP     "@"
-        ANYMPLS   "¤"
+        ANYIP     "ip"
+        ANYMPLS   "mpls"
+        ANYSTICKYMPLS "smpls"
 ;
 
 
@@ -112,7 +113,7 @@
 %type  <Query> query;
 %type  <NFA<Query::label_t>> regex cregex;
 %type  <Query::mode_t> mode;
-%type  <std::unordered_set<Query::label_t>> atom_list label ip4 ip6;
+%type  <std::unordered_set<Query::label_t>> atom_list label slabel ip4 ip6;
 %type  <filter_t> atom identifier name;
 %type  <std::string> literal;
 //%printer { yyoutput << $$; } <*>;
@@ -173,6 +174,7 @@ regex
     | LSQBRCKT HAT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($3), true); } // negated set
     | ANYIP { $$ = builder.any_ip(); }
     | ANYMPLS { $$ = builder.any_mpls(); }
+    | ANYSTICKYMPLS { $$ = builder.any_sticky(); }
     | LPAREN regex RPAREN { $$ = std::move($2); }
     ;
 
@@ -193,8 +195,8 @@ hexnumber
 atom_list
     : atom COMMA atom_list { $$ = builder.filter_and_merge($1, $3); }
     | atom { $$ = builder.filter($1); }
-    | label COMMA atom_list{ $$ = std::move($3); $$.insert($1.begin(), $1.end()); }
-    | label { $$ = std::move($1); }
+    | slabel COMMA atom_list{ $$ = std::move($3); $$.insert($1.begin(), $1.end()); }
+    | slabel { $$ = std::move($1); }
     ;
     
 atom 
@@ -240,6 +242,11 @@ name
     | literal {  $$ = builder.match_re(std::move($1)); }
     ;
 
+slabel 
+    : "s" { builder.set_sticky(); } label { builder.unset_sticky(); }
+    | label
+    ;
+    
 label
     : number "/" number  { $$ = builder.find_label($1, $3); }
     | number  { $$ = builder.find_label($1, 0); }

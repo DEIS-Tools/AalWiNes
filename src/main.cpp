@@ -314,7 +314,7 @@ int main(int argc, const char** argv)
                 }
                 std::cout << ",\n";
                 std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
-                if(get_trace && result)
+                if(get_trace && result == utils::YES)
                 {
                     std::cout << ",\n\t\t\"trace\":[\n";
                     std::cout << proof.str();

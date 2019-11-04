@@ -100,14 +100,14 @@ namespace mpls2pda
     {
         if (other._ingoing != _ingoing)
             return _ingoing < other._ingoing;
-        if (other._decreasing != _decreasing)
-            return _decreasing < other._decreasing;
+        if (other._sticky_label != _sticky_label)
+            return _sticky_label < other._sticky_label;
         return _top_label < other._top_label;
     }
 
     bool RoutingTable::entry_t::operator==(const entry_t& other) const
     {
-        return _decreasing == other._decreasing && _top_label == other._top_label && _ingoing == other._ingoing;
+        return _sticky_label == other._sticky_label && _top_label == other._top_label && _ingoing == other._ingoing;
     }
 
     void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex) const
@@ -163,10 +163,14 @@ namespace mpls2pda
     {
         if (quote) s << "\"";
         switch (label.type()) {
+        case Query::STICKY_MPLS:
+            s << "s"; // fall through on purpose
         case Query::MPLS:
             s << 'l' << std::hex << label.value() << std::dec;
             assert(label.mask() == 0);
             break;
+        case Query::ANYSTICKY:
+            s << "s"; // fall through on purpose
         case Query::ANYMPLS:
             s << "am";
             break;
@@ -178,9 +182,7 @@ namespace mpls2pda
             s << "ip6" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
             assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
             break;
-        case Query::INTERFACE:
-        case Query::NONE:
-        case Query::ANYIP:
+        default:
             assert(false);
             throw base_error("Interfaces cannot be pushdown-labels.");
             break;

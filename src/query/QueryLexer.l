@@ -105,6 +105,7 @@ literal  \"(\\.|[^\\"])*\"
 "⊕"     return token::ANYMPLS;
 "¤"     return token::ANYMPLS;
 "mpls"  return token::ANYMPLS;
+"smpls" return token::ANYSTICKYMPLS;
 
 {int}      {
   long int n = strtol (yytext, NULL, 10);
