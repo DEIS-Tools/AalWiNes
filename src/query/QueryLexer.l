@@ -107,6 +107,7 @@ literal  \"(\\.|[^\\"])*\"
 "$"     return token::STICKY;
 "mpls"  return token::ANYMPLS;
 "smpls" return token::ANYSTICKYMPLS;
+"$mpls" return token::ANYSTICKYMPLS;
 
 {int}      {
   long int n = strtol (yytext, NULL, 10);

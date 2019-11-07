@@ -176,7 +176,7 @@ regex
     | ANYIP { $$ = builder.any_ip(); }
     | ANYMPLS { $$ = builder.any_mpls(); }
     | ANYSTICKYMPLS { $$ = builder.any_sticky(); }
-    | LPAREN regex RPAREN { $$ = std::move($2); }
+    | LPAREN cregex RPAREN { $$ = std::move($2); }
     ;
 
     
