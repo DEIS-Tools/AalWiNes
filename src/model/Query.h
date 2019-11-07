@@ -61,6 +61,11 @@ namespace mpls2pda {
             type_t type() const { return _type; }
             uint8_t mask() const { return _mask; }
             uint64_t value() const { return _value; }
+        
+            void set_type(type_t type)
+            {
+                set_value(type, _value, _mask);
+            }
             
             void set_value(type_t type, uint64_t val, uint32_t mask)
             {
@@ -95,10 +100,14 @@ namespace mpls2pda {
                         _mask = std::min<uint8_t>(32, _mask);
                         _value = std::min<uint64_t>(std::numeric_limits<uint32_t>::max(), _value);
                         _value = (_value >> _mask) << _mask;
+                        if(_mask >= 32)
+                            _value = 0;
                         break;
                     case IP6:
                         _mask = std::min<uint8_t>(64, _mask);
                         _value = (_value >> _mask) << _mask;
+                        if(_mask >= 64)
+                            _value = 0;
                         break;
                     default:
                         _mask = 0;

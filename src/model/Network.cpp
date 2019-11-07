@@ -105,11 +105,11 @@ namespace mpls2pda
             case Query::STICKY_MPLS:
             case Query::MPLS:
             {
-                if ((pr.value() << msk) == (label << msk))
+                if ((pr.value() << msk) == (label << msk) && 
+                     (pr.type() & Query::STICKY) == (type & Query::STICKY))
+                {
                     res.insert(pr);
-                else
-                    
-                break;
+                }
             }
             default:
                 break;

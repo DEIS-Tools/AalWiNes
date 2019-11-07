@@ -50,7 +50,7 @@ namespace mpls2pda {
         static RoutingTable parse_table(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& , std::ostream& warnings, bool skip_pfe);
         static Interface* parse_via(Router* parent, rapidxml::xml_node<char>* via, std::vector<const Interface*>&);
         static int parse_weight(rapidxml::xml_node<char>* nh);
-        static void parse_ops(RoutingTable::forward_t& f, std::string& opstr, bool sticky);
+        static void parse_ops(RoutingTable::forward_t& f, std::string& opstr, int sticky);
 
     };
 }

@@ -104,6 +104,7 @@ literal  \"(\\.|[^\\"])*\"
 "ip"    return token::ANYIP;
 "⊕"     return token::ANYMPLS;
 "¤"     return token::ANYMPLS;
+"$"     return token::STICKY;
 "mpls"  return token::ANYMPLS;
 "smpls" return token::ANYSTICKYMPLS;
 

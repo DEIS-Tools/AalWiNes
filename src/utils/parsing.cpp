@@ -52,7 +52,7 @@ uint32_t parse_ip4(const char* s)
     return res;
 }
 
-void write_ip6(std::ostream& s, uint32_t ip)
+void write_ip6(std::ostream& s, uint64_t ip)
 {
     uint8_t* add = (uint8_t*) & ip;
     for (size_t i = 0; i < 8; ++i) {

@@ -219,7 +219,7 @@ int main(int argc, const char** argv)
         }
         Moped moped;
         PostStar post_star;
-
+        
         for(auto& q : builder._result)
         {
             ++query_no;
@@ -256,7 +256,7 @@ int main(int argc, const char** argv)
                     reduction_time.stop();
                     verification_time.start();
                     bool engine_outcome;
-                    bool need_trace = (was_dual && m == Query::UNDER) || get_trace;
+                    bool need_trace = was_dual || get_trace;
                     switch(engine)
                     {
                     case 1:

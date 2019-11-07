@@ -96,6 +96,7 @@
         COMMA     ","
         HAT       "^"
         HASH      "#"
+        STICKY    "$"
         COLON     ":"
         
         OVER      "OVER"
@@ -243,7 +244,7 @@ name
     ;
 
 slabel 
-    : "s" { builder.set_sticky(); } label { builder.unset_sticky(); }
+    : STICKY { builder.set_sticky(); } label { builder.unset_sticky(); $$ = $3; }
     | label
     ;
     

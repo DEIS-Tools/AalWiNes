@@ -272,7 +272,7 @@ namespace mpls2pda
                                     break;
                                 case RoutingTable::PUSH:
                                     nr._op = PDA::PUSH;
-                                    assert(forward._ops[0]._op_label.type() == Query::MPLS || entry._top_label.type() == Query::STICKY_MPLS);
+                                    assert(forward._ops[0]._op_label.type() == Query::MPLS || forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
                                     nr._op_label = forward._ops[0]._op_label;
                                     break;
                                 case RoutingTable::SWAP:
@@ -392,49 +392,44 @@ namespace mpls2pda
         stream << "}";
     }
 
-    bool NetworkPDAFactory::add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const
+    bool NetworkPDAFactory::add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, 
+                                           const RoutingTable::forward_t& fwd) const
     {
-        Router* src = fwd._via->source();
-        if(disabled.count(fwd._via) > 0) 
+        auto* inf = fwd._via;
+        if(disabled.count(inf) > 0) 
             return false; // should be down!
         // find all rules with a "covered" pre but lower weight.
         // these must have been disabled!
         if(fwd._weight == 0)
             return true;
         std::unordered_set<const Interface*> tmp = disabled;
-        for(auto& alt : src->interfaces())
+        bool brk = false;
+        for(auto& alt_ent : inf->table().entries())
         {
-            bool brk = false;
-            if(tmp.count(alt.get()) > 0)
-                continue; // already disabled, no need to add or check
-            
-            for(auto& alt_ent : alt->table().entries())
+            if(alt_ent._top_label.overlaps(entry._top_label))
             {
-                if(alt_ent._top_label.overlaps(entry._top_label))
+                for(auto& alt_rule : alt_ent._rules)
                 {
-                    for(auto& alt_rule : alt_ent._rules)
+                    if(alt_rule._weight < fwd._weight)
                     {
-                        if(alt_rule._weight < fwd._weight)
-                        {
-                            if(active.count(alt.get()) > 0) return false;
-                            tmp.insert(alt.get());
-                            if(tmp.size() > (uint32_t)_query.number_of_failures())
-                                return false;
-                            brk = true;
-                            break;
-                        }
+                        if(active.count(alt_rule._via) > 0) return false;
+                        tmp.insert(alt_rule._via);
+                        if(tmp.size() > (uint32_t)_query.number_of_failures())
+                            return false;
+                        brk = true;
+                        break;
                     }
                 }
-                if(brk)
-                    break;
             }
+            if(brk)
+                break;
         }
         if(tmp.size() > (uint32_t)_query.number_of_failures())
             return false;
         else
         {
             disabled.swap(tmp);
-            active.insert(entry._ingoing);
+            active.insert(fwd._via);
             return true;
         }
     }

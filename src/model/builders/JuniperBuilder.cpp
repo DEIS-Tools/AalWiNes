@@ -463,6 +463,7 @@ namespace mpls2pda
             auto pos = tl.find("(S=0)");
             RoutingTable::entry_t& entry = nr.push_entry();
 
+            int sticky = std::numeric_limits<int>::max();
             if (pos != std::string::npos) {
                 if (pos != tl.size() - 5) {
                     std::stringstream e;
@@ -470,6 +471,7 @@ namespace mpls2pda
                     throw base_error(e.str());
                 }
                 entry._sticky_label = true;
+                sticky = 1;
                 tl = tl.substr(0, pos);
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
@@ -486,6 +488,7 @@ namespace mpls2pda
                 auto inf = parent->get_interface(all_interfaces, tl);
                 entry._ingoing = inf;
                 entry._top_label = Query::label_t::any_ip;
+                sticky = 0;
             }
 
             auto nh = rule->first_node("nh");
@@ -549,7 +552,7 @@ namespace mpls2pda
                     }
                     else {
                         std::string ostr = ops->value();
-                        parse_ops(r, ostr, entry._sticky_label);
+                        parse_ops(r, ostr, sticky);
                         skipvia = false;
                     }
                 }
@@ -610,7 +613,7 @@ namespace mpls2pda
         return nr;
     }
 
-    void JuniperBuilder::parse_ops(RoutingTable::forward_t& f, std::string& ostr, bool sticky)
+    void JuniperBuilder::parse_ops(RoutingTable::forward_t& f, std::string& ostr, int sticky)
     {
         auto pos = ostr.find("(top)");
         if (pos != std::string::npos) {
@@ -624,9 +627,7 @@ namespace mpls2pda
         // parse ops
         bool parse_label = false;
         f._ops.emplace_back();
-        int depth = 1;
         for (size_t i = 0; i < ostr.size(); ++i) {
-            bool sticky_type = false;
             if (ostr[i] == ' ') continue;
             if (ostr[i] == ',') continue;
             if (!parse_label) {
@@ -634,27 +635,17 @@ namespace mpls2pda
                     f._ops.back()._op = RoutingTable::SWAP;
                     i += 4;
                     parse_label = true;
-                    sticky_type = depth == 1 && sticky;
                 }
                 else if (ostr[i] == 'P') {
                     if (ostr[i + 1] == 'u') {
                         f._ops.back()._op = RoutingTable::PUSH;
                         parse_label = true;
                         i += 4;
-                        ++depth;                        
-                        sticky_type = depth == 1 && sticky;
                     }
                     else if (ostr[i + 1] == 'o') {
                         f._ops.back()._op = RoutingTable::POP;
                         i += 2;
                         f._ops.emplace_back();
-                        --depth;
-                        if(depth < 0 && sticky) 
-                        {
-                            std::stringstream e;
-                            e << "unexpected pop below stack-size with sticky label \"" << (&ostr[i]) << "\"." << std::endl;
-                            throw base_error(e.str());                            
-                        }
                         continue;
                     }
                 }
@@ -670,7 +661,7 @@ namespace mpls2pda
                         }
                         auto n = ostr.substr(i, (j - i));
                         auto olabel = std::atoi(n.c_str());
-                        f._ops.back()._op_label.set_value(sticky_type ? Query::STICKY_MPLS : Query::MPLS, olabel, 0);
+                        f._ops.back()._op_label.set_value(Query::MPLS, olabel, 0);
                         i = j;
                         parse_label = false;
                         f._ops.emplace_back();
@@ -684,6 +675,35 @@ namespace mpls2pda
         }
         f._ops.pop_back();
         assert(!f._ops.empty());
+        std::reverse(f._ops.begin(), f._ops.end());
+        if(sticky >= 0)
+        {
+            int depth = sticky;
+            for(RoutingTable::action_t& op : f._ops)
+            {
+                switch(op._op)
+                {
+                case RoutingTable::PUSH:
+                    if(depth == 0)
+                        op._op_label.set_type(Query::STICKY_MPLS);
+                    ++depth;
+                    break;
+                case RoutingTable::POP:
+                    --depth;
+                    if(depth < 0) 
+                    {
+                        std::stringstream e;
+                        e << "unexpected pop below stack-size : " << ostr << std::endl;
+                        throw base_error(e.str());                            
+                    }
+                    break;
+                case RoutingTable::SWAP:
+                    if(depth == 1)
+                        op._op_label.set_type(Query::STICKY_MPLS);
+                    break;
+                }
+            }
+        }
     }
     
     Interface* JuniperBuilder::parse_via(Router* parent, rapidxml::xml_node<char>* via, std::vector<const Interface*>& all_interfaces)

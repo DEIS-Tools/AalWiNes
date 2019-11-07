@@ -201,9 +201,18 @@ namespace mpls2pda
                     {
                         o.print_json(s, false, false);
                     }
-                    s << "]-> " << fwd._via->source()->name() << ".";
-                    auto tn = fwd._via->source()->interface_name(fwd._via->id());
-                    s << tn.get() << "\n";
+                    s << "]-> ";
+                    auto via = fwd._via;
+                    if(via)
+                    {
+                        s << via->source()->name() << ".";
+                        auto tn = fwd._via->source()->interface_name(fwd._via->id());
+                        s << tn.get() << "\n";
+                    }
+                    else
+                    {
+                        s << "NULL\n";
+                    }
                 }
                 s << "\t\t}\n";
             }
