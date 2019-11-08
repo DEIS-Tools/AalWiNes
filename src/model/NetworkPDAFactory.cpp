@@ -61,6 +61,7 @@ namespace mpls2pda
             for (auto& e : i->_edges) {
                 if (e.wildcard(_network.all_interfaces().size())) {
                     for (auto inf : _network.all_interfaces()) {
+                        
                         add_initial(e._destination, inf->match());
                     }
                 }
@@ -75,7 +76,9 @@ namespace mpls2pda
                     for (auto inf : _network.all_interfaces()) {
                         auto iid = Query::label_t{Query::INTERFACE, 0, inf->global_id()};
                         auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
-                        if (lb == std::end(e._symbols) || *lb != iid) {
+                        assert(std::is_sorted(e._symbols.begin(), e._symbols.end()));
+                        if (lb == std::end(e._symbols) || *lb != iid)
+                        {
                             add_initial(e._destination, inf->match());
                         }
                     }
@@ -224,6 +227,80 @@ namespace mpls2pda
         }
     }
 
+    bool NetworkPDAFactory::start_rule(nstate_t& s, const RoutingTable::forward_t& forward, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result)
+    {
+        rule_t nr;                            
+        auto appmode = s._appmode;
+        if (!forward._via->is_virtual()) {
+            appmode = set_approximation(s, forward);
+            if (appmode == std::numeric_limits<int32_t>::max())
+                return false;
+        }
+        if (forward._ops.size() > 0) {
+            switch (forward._ops[0]._op) {
+            case RoutingTable::POP:
+                nr._op = PDA::POP;
+                assert(entry._top_label.type() == Query::MPLS || entry._top_label.type() == Query::STICKY_MPLS);
+                break;
+            case RoutingTable::PUSH:
+                nr._op = PDA::PUSH;
+                assert(forward._ops[0]._op_label.type() == Query::MPLS || forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
+                nr._op_label = forward._ops[0]._op_label;
+                break;
+            case RoutingTable::SWAP:
+                nr._op = PDA::SWAP;
+                nr._op_label = forward._ops[0]._op_label;
+                break;
+            }
+        }
+        else {
+            if(entry._top_label.type() != Query::ANYIP &&
+               entry._top_label.type() != Query::ANYMPLS &&
+               entry._top_label.type() != Query::ANYSTICKY)
+            {
+                nr._op = PDA::SWAP;
+                nr._op_label = entry._top_label;
+                assert(entry._top_label.mask() == 0);
+                assert(entry._top_label.type() == Query::MPLS);
+            }
+            else
+            {
+                nr._op = PDA::NOOP;
+            }
+        }
+        if (forward._ops.size() <= 1) {
+            std::vector<NFA::state_t*> next{destination};
+            if (forward._via->is_virtual())
+                next = {s._nfastate};
+            else
+                NFA::follow_epsilon(next);
+            for (auto& n : next) {
+                result.emplace_back(nr);
+                auto& ar = result.back();
+                auto res = add_state(n, forward._via->match(), appmode);
+                ar._dest = res.second;
+                expand_back(result, entry._top_label);
+            }
+        }
+        else {
+            std::vector<NFA::state_t*> next{destination};
+            if (forward._via->is_virtual())
+                next = {s._nfastate};
+            else
+                NFA::follow_epsilon(next);
+            for (auto& n : next) {
+                result.emplace_back(nr);
+                auto& ar = result.back();
+                auto eid = ((&entry) - s._inf->table().entries().data());
+                auto rid = ((&forward) - entry._rules.data());
+                auto res = add_state(n, s._inf, appmode, eid, rid, 0);
+                ar._dest = res.second;
+                expand_back(result, entry._top_label);
+            }
+        }        
+        return true;
+    }
+    
 
     std::vector<NetworkPDAFactory::PDAFactory::rule_t> NetworkPDAFactory::rules(size_t id)
     {
@@ -244,87 +321,28 @@ namespace mpls2pda
                     {
                         continue; // drop/discard/lookup
                     }
-                    for (auto& e : s._nfastate->_edges) {
-                        if (e.empty(_network.all_interfaces().size()))
-                        {
+                    if(forward._via->is_virtual())
+                    {
+                        if(!start_rule(s, forward, entry, s._nfastate, result))
                             continue;
-                        }
-                        auto iid = Query::label_t{Query::INTERFACE, 0, forward._via->global_id()};
-                        auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
-                        bool found = lb != std::end(e._symbols) && *lb == iid;
+                    }
+                    else
+                    {
+                        for (auto& e : s._nfastate->_edges) {
+                            if (e.empty(_network.all_interfaces().size()))
+                            {
+                                continue;
+                            }
+                            auto iid = Query::label_t{Query::INTERFACE, 0, forward._via->global_id()};
+                            auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
+                            bool found = lb != std::end(e._symbols) && *lb == iid;
 
-                        if (found != (!e._negated)) {
-                            continue;
-                        }
-                        else {
-                            rule_t nr;                            
-                            auto appmode = s._appmode;
-                            if (!forward._via->is_virtual()) {
-                                appmode = set_approximation(s, forward);
-                                if (appmode == std::numeric_limits<int32_t>::max())
+                            if (found != (!e._negated)) {
+                                continue;
+                            }
+                            else {
+                                if(!start_rule(s, forward, entry, e._destination, result))
                                     continue;
-                            }
-                            if (forward._ops.size() > 0) {
-                                switch (forward._ops[0]._op) {
-                                case RoutingTable::POP:
-                                    nr._op = PDA::POP;
-                                    assert(entry._top_label.type() == Query::MPLS || entry._top_label.type() == Query::STICKY_MPLS);
-                                    break;
-                                case RoutingTable::PUSH:
-                                    nr._op = PDA::PUSH;
-                                    assert(forward._ops[0]._op_label.type() == Query::MPLS || forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
-                                    nr._op_label = forward._ops[0]._op_label;
-                                    break;
-                                case RoutingTable::SWAP:
-                                    nr._op = PDA::SWAP;
-                                    nr._op_label = forward._ops[0]._op_label;
-                                    break;
-                                }
-                            }
-                            else {
-                                if(entry._top_label.type() != Query::ANYIP &&
-                                   entry._top_label.type() != Query::ANYMPLS &&
-                                   entry._top_label.type() != Query::ANYSTICKY)
-                                {
-                                    nr._op = PDA::SWAP;
-                                    nr._op_label = entry._top_label;
-                                    assert(entry._top_label.mask() == 0);
-                                    assert(entry._top_label.type() == Query::MPLS);
-                                }
-                                else
-                                {
-                                    nr._op = PDA::NOOP;
-                                }
-                            }
-                            if (forward._ops.size() <= 1) {
-                                std::vector<NFA::state_t*> next{e._destination};
-                                if (forward._via->is_virtual())
-                                    next = {s._nfastate};
-                                else
-                                    NFA::follow_epsilon(next);
-                                for (auto& n : next) {
-                                    result.emplace_back(nr);
-                                    auto& ar = result.back();
-                                    auto res = add_state(n, forward._via->match(), appmode);
-                                    ar._dest = res.second;
-                                    expand_back(result, entry._top_label);
-                                }
-                            }
-                            else {
-                                std::vector<NFA::state_t*> next{e._destination};
-                                if (forward._via->is_virtual())
-                                    next = {s._nfastate};
-                                else
-                                    NFA::follow_epsilon(next);
-                                for (auto& n : next) {
-                                    result.emplace_back(nr);
-                                    auto& ar = result.back();
-                                    auto eid = ((&entry) - s._inf->table().entries().data());
-                                    auto rid = ((&forward) - entry._rules.data());
-                                    auto res = add_state(n, s._inf, appmode, eid, rid, 0);
-                                    ar._dest = res.second;
-                                    expand_back(result, entry._top_label);
-                                }
                             }
                         }
                     }

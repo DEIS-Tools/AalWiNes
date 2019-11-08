@@ -62,7 +62,7 @@ namespace mpls2pda
         bool accepting(size_t) override;
         std::vector<rule_t> rules(size_t ) override;
         void expand_back(std::vector<rule_t>& rules, const Query::label_t& pre);
-
+        bool start_rule(nstate_t& s, const RoutingTable::forward_t& fwd, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result);
     private:
         bool add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const;
         void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;

@@ -91,7 +91,8 @@ namespace pdaaal {
                 {
                     if(!e._negated && !e._symbols.empty())
                         return true;
-                    else if(e._negated) return true;
+                    else if(e._negated) 
+                        return true;
                 }
                 return false;
             }
