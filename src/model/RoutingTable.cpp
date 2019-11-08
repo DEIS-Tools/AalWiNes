@@ -27,6 +27,7 @@
 #include "RoutingTable.h"
 #include "Router.h"
 #include "utils/errors.h"
+#include "Network.h"
 
 #include <algorithm>
 #include <sstream>
@@ -110,7 +111,7 @@ namespace mpls2pda
         return _sticky_label == other._sticky_label && _top_label == other._top_label && _ingoing == other._ingoing;
     }
 
-    void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex) const
+    void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex, const Network* network) const
     {
         switch (_op) {
         case SWAP:
@@ -122,7 +123,12 @@ namespace mpls2pda
             if (use_hex)
                 entry_t::print_label(_op_label, s, quote);
             else
-                s << (quote ? "\"" : "") << _op_label << (quote ? "\"" : "");
+            {
+                s << (quote ? "\"" : "") << _op_label;
+                if(network && network->is_service_label(_op_label))
+                    s << "^";
+                s << (quote ? "\"" : "");
+            }
             s << "}";
             break;
         case PUSH:
@@ -134,7 +140,12 @@ namespace mpls2pda
             if (use_hex)
                 entry_t::print_label(_op_label, s, quote);
             else
-                s << (quote ? "\"" : "") << _op_label << (quote ? "\"" : "");
+            {
+                s << (quote ? "\"" : "") << _op_label;
+                if(network && network->is_service_label(_op_label))
+                    s << "^";
+                s << (quote ? "\"" : "");
+            }
             s << "}";
             break;
         case POP:
@@ -190,7 +201,7 @@ namespace mpls2pda
         if (quote) s << "\"";
     }
 
-    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex) const
+    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex, const Network* network) const
     {
         s << "{";
         s << "\"weight\":" << _weight;
@@ -211,7 +222,7 @@ namespace mpls2pda
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)
                     s << ", ";
-                _ops[i].print_json(s, true, use_hex);
+                _ops[i].print_json(s, true, use_hex, network);
             }
             s << "]";
         }

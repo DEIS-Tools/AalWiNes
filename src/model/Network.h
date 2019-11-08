@@ -53,6 +53,7 @@ public:
     const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);
     void print_simple(std::ostream& s);
+    bool is_service_label(const Query::label_t&) const;
 private:
     // NO TOUCHEE AFTER INIT!
     ptrie::map<Router*> _mapping;
@@ -60,6 +61,7 @@ private:
     std::unordered_map<Query::label_t,std::vector<std::pair<const RoutingTable::entry_t*, const Router*>>> _label_map;
     std::vector<const Interface*> _all_interfaces;
     std::unordered_set<Query::label_t> _label_cache;
+    std::unordered_set<Query::label_t> _non_service_label;
     
 
 };

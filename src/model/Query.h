@@ -125,7 +125,7 @@ namespace mpls2pda {
             }
             
             bool uses_mask() const {
-                return _mask != 0 && _type != INTERFACE && _type != ANYIP && _type != ANYMPLS;
+                return _mask != 0 && _type != INTERFACE && _type != ANYIP && _type != ANYMPLS && _type != ANYSTICKY;
             }
             bool operator<(const label_t& other) const {
                 if(_type != other._type)
@@ -161,7 +161,7 @@ namespace mpls2pda {
                 switch(label._type)
                 {
                     case STICKY_MPLS:
-                        stream << "s";
+                        stream << "$";
                     case MPLS:
                         stream << ((label._value >> label._mask) << label._mask);
                         break;
@@ -180,7 +180,7 @@ namespace mpls2pda {
                         stream << "ip";
                         break;
                     case ANYSTICKY:
-                        stream << "s";
+                        stream << "$";
                     case ANYMPLS:
                         stream << "mpls";
                         break;

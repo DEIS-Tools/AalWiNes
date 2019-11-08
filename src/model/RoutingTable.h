@@ -37,7 +37,8 @@
 namespace mpls2pda {
     class Router;
     class Interface;
-
+    class Network;
+    
     class RoutingTable {
     public:
 
@@ -54,7 +55,7 @@ namespace mpls2pda {
         struct action_t {
             op_t _op = POP;
             label_t _op_label;
-            void print_json(std::ostream& s, bool quote = true, bool use_hex = true) const;
+            void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
         };
 
         struct forward_t {
@@ -62,7 +63,7 @@ namespace mpls2pda {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _weight = 0;
-            void print_json(std::ostream&, bool use_hex = true) const;
+            void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
         };
 

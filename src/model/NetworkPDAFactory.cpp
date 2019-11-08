@@ -403,7 +403,10 @@ namespace mpls2pda
         }
         else
         {
-            stream << "\"" << entry._top_label << "\"";
+            stream << "\"" << entry._top_label;
+            if(_network.is_service_label(entry._top_label))
+                stream << "^";
+            stream << "\"";
         }
         stream << ",\"rule\":";
         rule.print_json(stream, false);
@@ -480,7 +483,10 @@ namespace mpls2pda
                     {
                         if(!first_symbol)
                             stream << ",";
-                        stream << "\"" << symbol << "\"";
+                        stream << "\"" << symbol;
+                        if(_network.is_service_label(symbol))
+                            stream << "^";
+                        stream << "\"";
                         first_symbol = false;
                     }                    
                     stream << "]}";

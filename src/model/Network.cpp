@@ -168,6 +168,7 @@ namespace mpls2pda
             res.insert(Query::label_t::any_ip6);
             res.insert(Query::label_t::any_mpls);
             res.insert(Query::label_t::any_sticky_mpls);
+            _non_service_label = res;
             for (auto& r : _routers) {
                 for (auto& inf : r->interfaces()) {
                     for (auto& e : inf->table().entries()) {
@@ -178,6 +179,7 @@ namespace mpls2pda
                                 case RoutingTable::SWAP:
                                 case RoutingTable::PUSH:
                                     res.insert(o._op_label);
+                                    _non_service_label.insert(o._op_label);
                                 default:
                                     break;
                                 }
@@ -207,6 +209,12 @@ namespace mpls2pda
             r->print_simple(s);
         }
     }
+
+    bool Network::is_service_label(const Query::label_t& l) const
+    {
+        return _non_service_label.count(l) == 0;
+    }
+
 
     
 }
