@@ -677,8 +677,12 @@ namespace mpls2pda
                             case Query::ANYIP:
                             case Query::IP4:
                             case Query::IP6:
-                                concrete = entries[cnt]->_top_label;
-                                some = true;
+                                if(entries[cnt]->_top_label != Query::label_t::any_ip &&
+                                   entries[cnt]->_top_label.mask() < step._stack.front().mask())
+                                {
+                                    concrete = entries[cnt]->_top_label;
+                                    some = true;
+                                }
                                 break;
                             default:
                                 break;
