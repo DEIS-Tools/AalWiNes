@@ -106,14 +106,14 @@ namespace mpls2pda
             }
         }
         /*if(res.first) std::cerr << "## NEW " << std::endl;
-        std::string rn;
-        if(inf)
-            rn = inf->source()->name();
-        else
-            rn = "SINK";
-        std::cerr << "ADDED STATE " << state << " R " << rn << "(" << inf << ")" << " M" << mode << " F" << fid << " O" << op << " E" << eid << std::endl;
-        std::cerr << "\tID " << res.second << std::endl;
-        if(_states.get_data(res.second))
+            std::string rn;
+            if(inf)
+                rn = inf->source()->name();
+            else
+                rn = "SINK";
+            std::cerr << "ADDED STATE " << state << " R " << rn << "(" << inf << ")" << " M" << mode << " F" << fid << " O" << op << " E" << eid << std::endl;
+            std::cerr << "\tID " << res.second << std::endl;
+            if(_states.get_data(res.second))
             std::cerr << "\t\tACCEPTING !" << std::endl;*/
 
         return res;
@@ -385,7 +385,7 @@ namespace mpls2pda
                 break;
             }
             if (s._opid + 2 == (int) r._ops.size()) {
-                auto res = add_state(s._nfastate, r._via);
+                auto res = add_state(s._nfastate, r._via->match());
                 nr._dest = res.second;
             }
             else {
