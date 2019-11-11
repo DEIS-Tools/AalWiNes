@@ -675,7 +675,7 @@ namespace mpls2pda
         }
         f._ops.pop_back();
         assert(!f._ops.empty());
-        std::reverse(f._ops.begin(), f._ops.end());
+        //std::reverse(f._ops.begin(), f._ops.end());
         if(sticky >= 0)
         {
             int depth = sticky;
