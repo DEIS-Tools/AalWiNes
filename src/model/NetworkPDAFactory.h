@@ -49,7 +49,7 @@ namespace mpls2pda
             const Interface* _inf = nullptr;
         };
     public:
-        NetworkPDAFactory(Query& q, Network& network);
+        NetworkPDAFactory(Query& q, Network& network, bool only_mpls_swap);
         
         std::function<void(std::ostream&, const Query::label_t&) > label_writer() const;
         
@@ -86,6 +86,7 @@ namespace mpls2pda
         NFA& _path;
         std::vector<size_t> _initial;
         ptrie::map<bool> _states;
+        bool _only_mpls_swap = false;
     };
 }
 

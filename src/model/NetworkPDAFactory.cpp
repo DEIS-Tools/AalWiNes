@@ -30,8 +30,8 @@
 namespace mpls2pda
 {
 
-    NetworkPDAFactory::NetworkPDAFactory(Query& query, Network& network)
-    : PDAFactory(query.construction(), query.destruction(), network.all_labels()), _network(network), _query(query), _path(query.path())
+    NetworkPDAFactory::NetworkPDAFactory(Query& query, Network& network, bool only_mpls_swap)
+    : PDAFactory(query.construction(), query.destruction(), network.all_labels()), _network(network), _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap)
     {
         // add special NULL state initially
         NFA::state_t* ns = nullptr;
@@ -237,6 +237,14 @@ namespace mpls2pda
                 return false;
         }
         if (forward._ops.size() > 0) {
+            // check if no-ip-swap is set
+            
+            if(_only_mpls_swap && (
+               forward._ops[0]._op_label.type() == Query::ANYIP ||
+               forward._ops[0]._op_label.type() == Query::IP4 ||
+               forward._ops[0]._op_label.type() == Query::IP6))
+                return false;
+
             switch (forward._ops[0]._op) {
             case RoutingTable::POP:
                 nr._op = PDA::POP;
@@ -254,6 +262,13 @@ namespace mpls2pda
             }
         }
         else {
+            if(_only_mpls_swap && (
+                entry._top_label.type() == Query::ANYIP ||
+                entry._top_label.type() == Query::IP4 ||
+                entry._top_label.type() == Query::IP6))
+            {
+                return false;
+            }
             if(entry._top_label.type() != Query::ANYIP &&
                entry._top_label.type() != Query::ANYMPLS &&
                entry._top_label.type() != Query::ANYSTICKY)

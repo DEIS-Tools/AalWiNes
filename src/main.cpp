@@ -103,10 +103,12 @@ int main(int argc, const char** argv)
     size_t tos = 0;
     size_t engine = 0;
     bool get_trace = false;
+    bool no_ip_swap = false;
     verification.add_options()
             ("query,q", po::value<std::string>(&query_file),
             "A file containing valid queries over the input network.")
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
+            ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
@@ -225,7 +227,7 @@ int main(int argc, const char** argv)
             if(dump_to_moped)
             {
                 compilation_time.start();
-                NetworkPDAFactory factory(q, network);
+                NetworkPDAFactory factory(q, network, no_ip_swap);
                 auto pda = factory.compile();
                 Moped::dump_pda(pda, std::cout);
             }
@@ -246,7 +248,7 @@ int main(int argc, const char** argv)
                 {
                     compilation_time.start();
                     q.set_approximation(m);
-                    factory = std::make_unique<NetworkPDAFactory>(q, network);
+                    factory = std::make_unique<NetworkPDAFactory>(q, network, no_ip_swap);
                     auto pda = factory->compile();
                     compilation_time.stop();
                     reduction_time.start();
