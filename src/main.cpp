@@ -56,8 +56,6 @@ using namespace pdaaal;
 
 /*
  TODO:
- * Sep. networkmodel from parsing
- * Move parsing of junos into sep. structure
  * fix error-handling
  * improve on throws/exception-types
  * fix slots

@@ -166,12 +166,24 @@ namespace mpls2pda {
                         stream << ((label._value >> label._mask) << label._mask);
                         break;
                     case IP4:
-                        write_ip4(stream, (label._value >> label._mask) << label._mask);
                         mx = 32;
+                        if(label._mask < 32)
+                            write_ip4(stream, (label._value >> label._mask) << label._mask);
+                        else
+                        {
+                            stream << "ip4";
+                            mx = 0;
+                        }
                         break;
                     case IP6:
-                        write_ip6(stream, (label._value >> label._mask) << label._mask);
                         mx = 64;
+                        if(label._mask < 64)
+                            write_ip6(stream, (label._value >> label._mask) << label._mask);
+                        else
+                        {
+                            stream << "ip6";
+                            mx = 0;
+                        }
                         break;
                     case INTERFACE:
                         stream << "i" << label._value;
@@ -190,7 +202,7 @@ namespace mpls2pda {
                     default:
                         throw base_error("Unknown error");
                 }
-                if(label.uses_mask())
+                if(label.uses_mask() && mx != 0)
                 {                    
                     stream << "/" << (int)std::min(label._mask, mx);
                 }

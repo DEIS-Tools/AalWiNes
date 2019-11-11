@@ -313,7 +313,8 @@ namespace mpls2pda
         _states.unpack(id, (unsigned char*) &s);
         std::vector<NetworkPDAFactory::PDAFactory::rule_t> result;
         if (s._opid < 0) {
-            if (s._inf == nullptr) return result;
+            if (s._inf == nullptr) 
+                return result;
             // all clean! start pushing.
             for (auto& entry : s._inf->table().entries()) {
                 for (auto& forward : entry._rules) {
@@ -455,12 +456,12 @@ namespace mpls2pda
         }
     }
 
-
-
-    bool NetworkPDAFactory::write_json_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace)
+    bool NetworkPDAFactory::concreterize_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace, 
+                                               std::vector<const RoutingTable::entry_t*>& entries, 
+                                               std::vector<const RoutingTable::forward_t*>& rules)
     {
         std::unordered_set<const Interface*> disabled, active;
-        bool first = true;
+
         for(size_t sno = 0; sno < trace.size(); ++sno)
         {
             auto& step = trace[sno];
@@ -475,25 +476,8 @@ namespace mpls2pda
                 }
                 else
                 {
-                    if(!first)
-                        stream << ",\n";
-                    stream << "\t\t\t{\"router\":\"" << s._inf->source()->name() << "\",\"stack\":[";
-                    bool first_symbol = true;
-                    for(auto& symbol : step._stack)
-                    {
-                        if(!first_symbol)
-                            stream << ",";
-                        stream << "\"" << symbol;
-                        if(_network.is_service_label(symbol))
-                            stream << "^";
-                        stream << "\"";
-                        first_symbol = false;
-                    }                    
-                    stream << "]}";
-
                     if(sno != trace.size() - 1 && trace[sno + 1]._pdastate < _num_pda_states && !step._stack.empty())
                     {
-                        stream << ",\n\t\t\t";
                         // peek at next element, we want to write the ops here
                         nstate_t next;
                         _states.unpack(trace[sno + 1]._pdastate, (unsigned char*)&next);
@@ -506,7 +490,8 @@ namespace mpls2pda
                                 stream << "{\"pre\":\"error\"}";
                                 return false;
                             }
-                            print_trace_rule(stream, next._inf->source(), entry, entry._rules[next._rid]);
+                            rules.push_back(&entry._rules[next._rid]);
+                            entries.push_back(&entry);
                         }
                         else 
                         {
@@ -558,7 +543,8 @@ namespace mpls2pda
                                                     }
                                                     if(!add_interfaces(disabled, active, entry, r))
                                                         continue;
-                                                    print_trace_rule(stream, s._inf->source(), entry, r);
+                                                    rules.push_back(&r);
+                                                    entries.push_back(&entry);
                                                     found = true;
                                                     break;
                                                 }
@@ -571,7 +557,8 @@ namespace mpls2pda
                                                 {
                                                     if(!add_interfaces(disabled, active, entry, r))
                                                         continue;
-                                                    print_trace_rule(stream, s._inf->source(), entry, r);
+                                                    rules.push_back(&r);
+                                                    entries.push_back(&entry);
                                                     found = true;
                                                     break;
                                                 }
@@ -581,7 +568,8 @@ namespace mpls2pda
                                                     if(!add_interfaces(disabled, active, entry, r))
                                                         continue;
 
-                                                    print_trace_rule(stream, s._inf->source(), entry, r);
+                                                    rules.push_back(&r);
+                                                    entries.push_back(&entry);
                                                     found = true;
                                                     break;                                                        
                                                 }
@@ -592,8 +580,6 @@ namespace mpls2pda
                             }
                             
                             // check if we violate the soundness of the network
-                            
-                            
                             if(!found)
                             {
                                 stream << "{\"pre\":\"error\"}";
@@ -601,7 +587,6 @@ namespace mpls2pda
                             }
                         }
                     }
-                    first = false;                    
                 }
             }
             else
@@ -609,7 +594,135 @@ namespace mpls2pda
                 // construction, destruction, BORRING!
                 // SKIP
             }
-        }
+        }    
+        return true;
+    }
+    
+    void NetworkPDAFactory::write_concrete_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace, 
+                                                    std::vector<const RoutingTable::entry_t*>& entries, 
+                                                    std::vector<const RoutingTable::forward_t*>& rules)
+    {
+        bool first = true;
+        size_t cnt = 0;
+        for(size_t sno = 0; sno < trace.size(); ++sno)
+        {
+            auto& step = trace[sno];
+            if(step._pdastate < _num_pda_states)
+            {
+                nstate_t s;
+                _states.unpack(step._pdastate, (unsigned char*) &s);
+                if(s._opid >= 0)
+                {
+                    // Skip, we are just doing a bunch of ops here, printed elsewhere.
+                }
+                else
+                {
+                    if(!first)
+                        stream << ",\n";
+                    stream << "\t\t\t{\"router\":\"" << s._inf->source()->name() << "\",\"stack\":[";
+                    bool first_symbol = true;
+                    for(auto& symbol : step._stack)
+                    {
+                        if(!first_symbol)
+                            stream << ",";
+                        stream << "\"" << symbol;
+                        if(_network.is_service_label(symbol))
+                            stream << "^";
+                        stream << "\"";
+                        first_symbol = false;
+                    }                    
+                    stream << "]}";
+                    if(cnt < entries.size())
+                    {
+                        stream << ",\n\t\t\t";
+                        print_trace_rule(stream, s._inf->source(), *entries[cnt], *rules[cnt]);                        
+                        ++cnt;
+                    }
+                    first = false;
+                }
+            }
+        }        
+    }
+    
+    void NetworkPDAFactory::substitute_wildcards(std::vector<PDA::tracestate_t>& trace, 
+                                                    std::vector<const RoutingTable::entry_t*>& entries, 
+                                                    std::vector<const RoutingTable::forward_t*>& rules) 
+    {
+        size_t cnt = 0;
+        for(size_t sno = 0; sno < trace.size(); ++sno)
+        {
+            auto& step = trace[sno];
+            if(step._pdastate < _num_pda_states)
+            {
+                nstate_t s;
+                _states.unpack(step._pdastate, (unsigned char*) &s);
+                if(s._opid >= 0)
+                {
+                    // Skip, we are just doing a bunch of ops here, printed elsewhere.
+                }
+                else
+                {
+                    if(cnt < entries.size())
+                    {
+                        Query::label_t concrete;
+                        bool some = false;
+
+                        if(!step._stack.empty())
+                        {
+                            //            ANYMPLS = 1, ANYIP = 2, IP4 = 4, IP6 = 8, MPLS = 16, STICKY = 32, INTERFACE = 64, NONE = 128, ANYSTICKY = ANYMPLS | STICKY, STICKY_MPLS = MPLS | STICKY
+                            switch(step._stack.front().type())
+                            {
+                            case Query::ANYMPLS:
+                            case Query::ANYSTICKY:
+                            case Query::ANYIP:
+                            case Query::IP4:
+                            case Query::IP6:
+                                concrete = entries[cnt]->_top_label;
+                                some = true;
+                                break;
+                            default:
+                                break;
+                            }
+                        }
+                        if(some)
+                        {
+                            for(size_t upd = 0; upd <= sno; ++upd)
+                            {
+                                for(auto& s : trace[upd]._stack)
+                                {
+                                    if(s.type() == Query::ANYIP ||
+                                       s.type() == Query::IP4 ||
+                                       s.type() == Query::IP6 ||
+                                       s.type() == Query::ANYSTICKY ||
+                                       s.type() == Query::ANYMPLS)
+                                    {
+                                        s = concrete;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        ++cnt;
+                    }
+                }
+            }
+        }        
+    }
+
+    bool NetworkPDAFactory::write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>& trace)
+    {
+
+        std::vector<const RoutingTable::entry_t*> entries;
+        std::vector<const RoutingTable::forward_t*> rules;
+        
+        if(!concreterize_trace(stream, trace, entries, rules))
+            return false;
+        
+        // Fix trace
+        substitute_wildcards(trace, entries, rules);
+
+        // Do the printing
+        write_concrete_trace(stream, trace, entries, rules);
         return true;
     }
     

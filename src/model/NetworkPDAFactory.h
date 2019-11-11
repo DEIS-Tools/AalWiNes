@@ -53,7 +53,7 @@ namespace mpls2pda
         
         std::function<void(std::ostream&, const Query::label_t&) > label_writer() const;
         
-        bool write_json_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace);
+        bool write_json_trace(std::ostream& stream, std::vector<PDA::tracestate_t>& trace);
         
         
     protected:
@@ -70,6 +70,17 @@ namespace mpls2pda
         void construct_initial();
         std::pair<bool,size_t> add_state(NFA::state_t* state, const Interface* router, int32_t mode = 0, int32_t eid = 0, int32_t fid = 0, int32_t op = -1);
         int32_t set_approximation(const nstate_t& state, const RoutingTable::forward_t& forward);
+        
+        bool concreterize_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace, 
+                                                std::vector<const RoutingTable::entry_t*>& entries, 
+                                                std::vector<const RoutingTable::forward_t*>& rules);
+        void write_concrete_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace, 
+                                                std::vector<const RoutingTable::entry_t*>& entries, 
+                                                std::vector<const RoutingTable::forward_t*>& rules);
+        void substitute_wildcards(std::vector<PDA::tracestate_t>& trace, 
+                                                std::vector<const RoutingTable::entry_t*>& entries, 
+                                                std::vector<const RoutingTable::forward_t*>& rules);
+        
         Network& _network;
         Query& _query;
         NFA& _path;
