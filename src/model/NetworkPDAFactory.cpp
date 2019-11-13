@@ -49,7 +49,7 @@ namespace mpls2pda
             std::vector<NFA::state_t*> next{state};
             NFA::follow_epsilon(next);
             for (auto& n : next) {
-                auto res = add_state(n, inf, 0, 0, 0, -1);
+                auto res = add_state(n, inf, 0, 0, 0, -1, true);
                 if (res.first)
                     _initial.push_back(res.second);
             }
@@ -88,7 +88,7 @@ namespace mpls2pda
         std::sort(_initial.begin(), _initial.end());
     }
 
-    std::pair<bool, size_t> NetworkPDAFactory::add_state(NFA::state_t* state, const Interface* inf, int32_t mode, int32_t eid, int32_t fid, int32_t op)
+    std::pair<bool, size_t> NetworkPDAFactory::add_state(NFA::state_t* state, const Interface* inf, int32_t mode, int32_t eid, int32_t fid, int32_t op, bool initial)
     {
         nstate_t ns;
         ns._appmode = mode;
@@ -97,6 +97,7 @@ namespace mpls2pda
         ns._inf = inf;
         ns._rid = fid;
         ns._eid = eid;
+        ns._initial = initial && _only_mpls_swap; // only need for this when restricting labels
         auto res = _states.insert((unsigned char*) &ns, sizeof (ns));
         if (res.first) {
             if(res.second != 0)
@@ -238,6 +239,7 @@ namespace mpls2pda
                 return false;
         }
         if(_only_mpls_swap && (
+            entry._top_label.type() == Query::INTERFACE ||
             entry._top_label.type() == Query::ANYIP ||
             entry._top_label.type() == Query::IP4 ||
             entry._top_label.type() == Query::IP6))
@@ -258,11 +260,13 @@ namespace mpls2pda
             switch (forward._ops[0]._op) {
             case RoutingTable::POP:
                 nr._op = PDA::POP;
-                assert(entry._top_label.type() == Query::MPLS || entry._top_label.type() == Query::STICKY_MPLS);
+                assert(entry._top_label.type() == Query::MPLS || 
+                       entry._top_label.type() == Query::STICKY_MPLS);
                 break;
             case RoutingTable::PUSH:
                 nr._op = PDA::PUSH;
-                assert(forward._ops[0]._op_label.type() == Query::MPLS || forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
+                assert(forward._ops[0]._op_label.type() == Query::MPLS || 
+                       forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
                 nr._op_label = forward._ops[0]._op_label;
                 break;
             case RoutingTable::SWAP:
@@ -287,13 +291,16 @@ namespace mpls2pda
                 nr._op = PDA::SWAP;
                 nr._op_label = entry._top_label;
                 assert(entry._top_label.mask() == 0);
-                assert(entry._top_label.type() == Query::MPLS);
+                assert(entry._top_label.type() == Query::MPLS ||
+                       entry._top_label.type() == Query::STICKY_MPLS);
             }
             else
             {
                 nr._op = PDA::NOOP;
             }
         }
+        
+        
         if (forward._ops.size() <= 1) {
             std::vector<NFA::state_t*> next{destination};
             if (forward._via->is_virtual())

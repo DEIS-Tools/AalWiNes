@@ -470,9 +470,13 @@ namespace mpls2pda
                     e << "expect only (S=0) notation as postfix of <rt-destination> in table " << name << " of router " << parent->name() << std::endl;
                     throw base_error(e.str());
                 }
-                entry._sticky_label = true;
-                sticky = 1;
+                entry._sticky_label = false;
                 tl = tl.substr(0, pos);
+            }
+            else
+            {
+                entry._sticky_label = true;
+                sticky = 1; 
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
             {
@@ -675,7 +679,7 @@ namespace mpls2pda
         }
         f._ops.pop_back();
         assert(!f._ops.empty());
-        std::reverse(f._ops.begin(), f._ops.end());
+        //std::reverse(f._ops.begin(), f._ops.end());
         if(sticky >= 0)
         {
             int depth = sticky;
