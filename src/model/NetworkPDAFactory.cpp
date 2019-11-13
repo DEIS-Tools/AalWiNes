@@ -634,12 +634,12 @@ namespace mpls2pda
                 {
                     if(!first)
                         stream << ",\n";
-                    stream << "\t\t\t{\"router\":\"";
+                    stream << "\t\t\t{\"router\":";
                     if(s._inf)
-                        stream << s._inf->source()->name();
+                        stream << "\"" << s._inf->source()->name() << "\"";
                     else
                         stream << "null";
-                    stream << "\",\"stack\":[";
+                    stream << ",\"stack\":[";
                     bool first_symbol = true;
                     for(auto& symbol : step._stack)
                     {
