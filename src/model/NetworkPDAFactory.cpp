@@ -85,6 +85,7 @@ namespace mpls2pda
                 }
             }
         }
+        std::sort(_initial.begin(), _initial.end());
     }
 
     std::pair<bool, size_t> NetworkPDAFactory::add_state(NFA::state_t* state, const Interface* inf, int32_t mode, int32_t eid, int32_t fid, int32_t op)
@@ -227,7 +228,7 @@ namespace mpls2pda
         }
     }
 
-    bool NetworkPDAFactory::start_rule(nstate_t& s, const RoutingTable::forward_t& forward, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result)
+    bool NetworkPDAFactory::start_rule(size_t id, nstate_t& s, const RoutingTable::forward_t& forward, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result)
     {
         rule_t nr;                            
         auto appmode = s._appmode;
@@ -235,6 +236,15 @@ namespace mpls2pda
             appmode = set_approximation(s, forward);
             if (appmode == std::numeric_limits<int32_t>::max())
                 return false;
+        }
+        if(_only_mpls_swap && (
+            entry._top_label.type() == Query::ANYIP ||
+            entry._top_label.type() == Query::IP4 ||
+            entry._top_label.type() == Query::IP6))
+        {
+            auto lb = std::lower_bound(_initial.begin(), _initial.end(), id);
+            if(lb == std::end(_initial) || *lb != id) // allow for IP-routing on initial
+                return false;            
         }
         if (forward._ops.size() > 0) {
             // check if no-ip-swap is set
@@ -262,6 +272,7 @@ namespace mpls2pda
             }
         }
         else {
+            // recheck here; no IP-IP swap.
             if(_only_mpls_swap && (
                 entry._top_label.type() == Query::ANYIP ||
                 entry._top_label.type() == Query::IP4 ||
@@ -339,7 +350,7 @@ namespace mpls2pda
                     }
                     if(forward._via->is_virtual())
                     {
-                        if(!start_rule(s, forward, entry, s._nfastate, result))
+                        if(!start_rule(id, s, forward, entry, s._nfastate, result))
                             continue;
                     }
                     else
@@ -357,7 +368,7 @@ namespace mpls2pda
                                 continue;
                             }
                             else {
-                                if(!start_rule(s, forward, entry, e._destination, result))
+                                if(!start_rule(id, s, forward, entry, e._destination, result))
                                     continue;
                             }
                         }
