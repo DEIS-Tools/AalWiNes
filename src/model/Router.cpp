@@ -113,7 +113,10 @@ namespace mpls2pda
         if (_target == nullptr)
             return;
         if (_target == _parent)
+        {
+            _matching = this;
             return;
+        }
         _matching = nullptr;
         for (auto& i : _target->_interfaces) {
             if(matcher(this, i.get()))

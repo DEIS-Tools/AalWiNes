@@ -721,7 +721,10 @@ namespace mpls2pda
         }
         if (iname.find("lsi.") == 0) {
             // self-looping interface
-            return parent->get_interface(all_interfaces, iname, parent);
+            auto inf = parent->get_interface(all_interfaces, iname, parent);
+            assert(inf);
+            assert(inf->source() == inf->target());
+            return inf;
         }
         else {
             return parent->get_interface(all_interfaces, iname);
