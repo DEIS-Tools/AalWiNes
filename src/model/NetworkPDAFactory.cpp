@@ -46,6 +46,8 @@ namespace mpls2pda
         // there is potential for some serious pruning here!
         auto add_initial = [&, this](NFA::state_t* state, const Interface * inf)
         {
+            if(inf != nullptr && inf->is_virtual()) // don't start on a virtual interface.
+                return;
             std::vector<NFA::state_t*> next{state};
             NFA::follow_epsilon(next);
             for (auto& n : next) {
@@ -104,7 +106,7 @@ namespace mpls2pda
             {
                 // don't check null-state
                 auto& d = _states.get_data(res.second);
-                d = op == -1 ? state->_accepting : false;
+                d = op == -1 && (inf == nullptr || !inf->is_virtual()) ? state->_accepting : false;
             }
         }
         /*if(res.first) std::cerr << "## NEW " << std::endl;
@@ -238,7 +240,8 @@ namespace mpls2pda
             if (appmode == std::numeric_limits<int32_t>::max())
                 return false;
         }
-        if(_only_mpls_swap && (
+        bool is_virtual = entry._ingoing != nullptr && entry._ingoing->is_virtual();
+        if(_only_mpls_swap && !is_virtual && (
             entry._top_label.type() == Query::INTERFACE ||
             entry._top_label.type() == Query::ANYIP ||
             entry._top_label.type() == Query::IP4 ||
@@ -246,16 +249,20 @@ namespace mpls2pda
         {
             auto lb = std::lower_bound(_initial.begin(), _initial.end(), id);
             if(lb == std::end(_initial) || *lb != id) // allow for IP-routing on initial
+            {
                 return false;            
+            }
         }
         if (forward._ops.size() > 0) {
             // check if no-ip-swap is set
             
-            if(_only_mpls_swap && (
+            if(_only_mpls_swap && !is_virtual && (
                forward._ops[0]._op_label.type() == Query::ANYIP ||
                forward._ops[0]._op_label.type() == Query::IP4 ||
                forward._ops[0]._op_label.type() == Query::IP6))
+            {
                 return false;
+            }
 
             switch (forward._ops[0]._op) {
             case RoutingTable::POP:
@@ -277,7 +284,7 @@ namespace mpls2pda
         }
         else {
             // recheck here; no IP-IP swap.
-            if(_only_mpls_swap && (
+            if(_only_mpls_swap && !is_virtual && (
                 entry._top_label.type() == Query::ANYIP ||
                 entry._top_label.type() == Query::IP4 ||
                 entry._top_label.type() == Query::IP6))
@@ -452,7 +459,9 @@ namespace mpls2pda
     {
         auto* inf = fwd._via;
         if(disabled.count(inf) > 0) 
+        {
             return false; // should be down!
+        }
         // find all rules with a "covered" pre but lower weight.
         // these must have been disabled!
         if(fwd._weight == 0)
@@ -470,7 +479,9 @@ namespace mpls2pda
                         if(active.count(alt_rule._via) > 0) return false;
                         tmp.insert(alt_rule._via);
                         if(tmp.size() > (uint32_t)_query.number_of_failures())
+                        {
                             return false;
+                        }
                         brk = true;
                         break;
                     }
@@ -480,7 +491,9 @@ namespace mpls2pda
                 break;
         }
         if(tmp.size() > (uint32_t)_query.number_of_failures())
+        {
             return false;
+        }
         else
         {
             disabled.swap(tmp);
@@ -520,7 +533,6 @@ namespace mpls2pda
                             auto& entry = next._inf->table().entries()[next._eid];
                             if(!add_interfaces(disabled, active, entry, entry._rules[next._rid]))
                             {
-                                stream << "{\"pre\":\"error\"}";
                                 return false;
                             }
                             rules.push_back(&entry._rules[next._rid]);
@@ -758,7 +770,9 @@ namespace mpls2pda
         std::vector<const RoutingTable::forward_t*> rules;
         
         if(!concreterize_trace(stream, trace, entries, rules))
+        {
             return false;
+        }
         
         // Fix trace
         substitute_wildcards(trace, entries, rules);
