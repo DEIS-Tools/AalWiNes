@@ -225,7 +225,7 @@ namespace mpls2pda
     
     Builder::labelset_t Builder::find_label(uint64_t label, uint64_t mask)
     {
-        return _network.get_labels(label, mask, _sticky ? Query::STICKY_MPLS : Query::MPLS);
+        return _network.get_labels(label, mask, _sticky ? Query::STICKY_MPLS : Query::MPLS, !_expand);
     }
     
     filter_t Builder::discard_id()

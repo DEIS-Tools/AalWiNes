@@ -84,7 +84,7 @@ namespace mpls2pda
         return res;
     }
 
-    std::unordered_set<Query::label_t> Network::get_labels(uint64_t label, uint64_t mask, Query::type_t type)
+    std::unordered_set<Query::label_t> Network::get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact)
     {
         std::unordered_set<Query::label_t> res;
         for (auto& pr : all_labels()) {
@@ -131,25 +131,28 @@ namespace mpls2pda
                 res.emplace(Query::label_t::unused_mpls);
                 break;
             default:
-                throw base_error("Unknown exapnsion");
+                throw base_error("Unknown expansion");
             }
         }
-        switch (type) {
-        case Query::IP4:
-            res.emplace(Query::label_t::any_ip4);
-            break;
-        case Query::IP6:
-            res.emplace(Query::label_t::any_ip6);
-            break;
-        case Query::STICKY_MPLS:
-            res.emplace(Query::label_t::any_sticky_mpls);
-            break;
-        case Query::MPLS:
-            res.emplace(Query::label_t::any_mpls);
-            break;
-        default:
-            throw base_error("Unknown exapnsion");
-        }        
+        if(!exact)
+        {
+            switch (type) {
+            case Query::IP4:
+                res.emplace(Query::label_t::any_ip4);
+                break;
+            case Query::IP6:
+                res.emplace(Query::label_t::any_ip6);
+                break;
+            case Query::STICKY_MPLS:
+                res.emplace(Query::label_t::any_sticky_mpls);
+                break;
+            case Query::MPLS:
+                res.emplace(Query::label_t::any_mpls);
+                break;
+            default:
+                throw base_error("Unknown expansion");
+            }        
+        }
         return res;
     }
 
