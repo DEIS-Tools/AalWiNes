@@ -19,7 +19,7 @@ add_executable(mpls2pda ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.c
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp 
     pdaaal/model/PDA.cpp pdaaal/engine/Moped.cpp pdaaal/engine/PostStar.cpp
     utils/parsing.cpp utils/system.cpp)
-target_link_libraries(mpls2pda PRIVATE stdc++fs  ${Boost_LIBRARIES} rapidxml ptrie)
+target_link_libraries(mpls2pda PRIVATE ${Boost_LIBRARIES} rapidxml ptrie)
 
 install(TARGETS mpls2pda
 	RUNTIME DESTINATION bin
