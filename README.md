@@ -16,8 +16,6 @@ For Ubuntu 19.10 (ssh keys already configured for github):
     git submodule update
     cmake .
     make
-    vim src/model/builders/JuniperBuilder.cpp #fix compilation error
-    make
 
 ## Usage
 
