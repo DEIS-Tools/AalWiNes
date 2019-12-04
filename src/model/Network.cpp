@@ -24,10 +24,10 @@
  * Created on July 17, 2019, 2:17 PM
  */
 
-#include <unistd.h>
-
 #include "Network.h"
 #include "filter.h"
+
+#include <cassert>
 
 namespace mpls2pda
 {
@@ -217,7 +217,4 @@ namespace mpls2pda
     {
         return _non_service_label.count(l) == 0;
     }
-
-
-    
 }

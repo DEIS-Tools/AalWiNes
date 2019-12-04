@@ -48,6 +48,7 @@ public:
             _running = false;
         }
     }
+    
     double duration() const { return std::chrono::duration_cast<std::chrono::duration<double>>(_stop-_start).count(); }
 
     std::ostream &operator<<(std::ostream &os){
