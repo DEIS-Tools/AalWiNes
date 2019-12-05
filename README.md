@@ -84,3 +84,42 @@ will produce following output:
 ```
 
 ## Query Syntax
+
+A query file contains one or more queries. They can be separated by space or new line. Each query consists out of following parts:
+
+```
+<preCondition> path <postCondition> linkFailures mode
+```
+| part           | type       | description |
+| -------------: | ---------- | ----------- |
+| `preCondition` | regex-list | labels before first router |
+| `path`         | regex-list | path through the network |
+| `postCondition`| regex-list | labels after last router |
+| `linkFailures` | number     | maximum failed links |
+| `mode`         | enum       | simulation mode: one out of OVER, UNDER, DUAL, EXACT |
+
+The type regex-list is a space separated list of regular expressions (syntax see below).
+For `preCondition` and `postCondition` it defines the labels on the stack of the packet. For `path` it defines the interfaces(routers) the packet must, can or must not follow.
+
+The `mode` can be OVER or UNDER. DUAL is a combination of OVER and UNDER. EXACT is not supported yet.
+
+## Regular Expression Syntax (regex)
+
+Every regular expression in the regex-list is built out of following components:
+
+| syntax          | description |
+| --------------: | ----------- |
+| regex `&` regex | AND: both regex must be fulfilled |
+| regex `|` regex | OR: one or both regex must be fulfilled |
+| `.`             | matches everything |
+| regex`+`        | multiple: regex must match once or multiple times |
+| regex`*`        | optional multiple: regex must match zero, one or multiple times |
+| regex`?`        | optional: regex must match zero or one time |
+| `[`atom_list`]` | matches the atom_list (see below) |
+| `[^`atom_list`]`| matches everything except the atom_list |
+| `ip`            | matches any ip address |
+| `mpls`          | matches any mpls label |
+| `smpls`         | matches any sticky mpls label |
+| `(`regex-list`)`| must match the given sub regex-list |
+
+
