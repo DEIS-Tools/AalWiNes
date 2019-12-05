@@ -110,7 +110,7 @@ Every regular expression in the regex-list is built out of following components:
 | syntax          | description |
 | --------------: | ----------- |
 | regex `&` regex | AND: both regex must be fulfilled |
-| regex `|` regex | OR: one or both regex must be fulfilled |
+| regex `\|` regex | OR: one or both regex must be fulfilled |
 | `.`             | matches everything |
 | regex`+`        | multiple: regex must match once or multiple times |
 | regex`*`        | optional multiple: regex must match zero, one or multiple times |
