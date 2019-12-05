@@ -140,6 +140,7 @@ with multiple entries the syntax is:
 `[`entry_if1`#`exit_if1`,`entry_if2`#`exit_if2`,`...`]`
 
 Following possibilities can be used for entry_if and exit_if:
+
 | syntax          | description |
 | --------------: | ----------- |
 | name            | the interface name |
@@ -150,6 +151,7 @@ name itself can be either an identifier (starting with a character; defining an 
 
 ## Label Syntax
 The syntax of a list with labels is:
+
 | syntax          | description |
 | --------------: | ----------- |
 | `[$`label`]`        | A sticky label. Can be used with all following types |
