@@ -84,3 +84,78 @@ will produce following output:
 ```
 
 ## Query Syntax
+
+A query file contains one or more queries. They can be separated by space or new line. Each query consists out of following parts:
+
+```
+<preCondition> path <postCondition> linkFailures mode
+```
+| part           | type       | description |
+| -------------: | ---------- | ----------- |
+| `preCondition` | regex-list | labels before first router |
+| `path`         | regex-list | path through the network |
+| `postCondition`| regex-list | labels after last router |
+| `linkFailures` | number     | maximum failed links |
+| `mode`         | enum       | simulation mode: one out of OVER, UNDER, DUAL, EXACT |
+
+The type regex-list is a space separated list of regular expressions (syntax see below).
+For `preCondition` and `postCondition` it defines the labels on the stack of the packet. Packets must have at least 1 label when entering or leaving the network. For `path` it defines the interfaces(routers) the packet must, can or must not follow.
+
+The `mode` can be OVER or UNDER. DUAL is a combination of OVER and UNDER. EXACT is not supported yet.
+
+## Regular Expression Syntax (regex)
+
+Every regular expression in the regex-list is built out of following components:
+
+| syntax          | description |
+| --------------: | ----------- |
+| regex `&` regex | AND: both regex must be fulfilled |
+| regex `\|` regex | OR: one or both regex must be fulfilled |
+| `.`             | matches everything |
+| regex`+`        | multiple: regex must match once or multiple times |
+| regex`*`        | optional multiple: regex must match zero, one or multiple times |
+| regex`?`        | optional: regex must match zero or one time |
+| `[`atom-list`]` | matches the atom_list (see below) |
+| `[^`atom-list`]`| matches everything except the atom_list |
+| `ip`            | matches any ip address |
+| `mpls`          | matches any non-sticky mpls label |
+| `smpls`         | matches any sticky mpls label |
+| `(`regex-list`)`| must match the given sub regex-list |
+
+The atom-list contains a comma separated list of atoms (for `path`) or labels(for `preCondition` and `postCondition`).
+
+Only labels are allowed in `preCondition` and `postCondition` and only `Atoms` in the `path`.
+
+The semantics of an atom-list is that of union (OR) and the negation-symbol `^` is intepreted as complement of the following `atom-list`.
+
+## Atom Syntax
+An atom defines a hop between routers via their exit and entry interfaces. An atom-list with one entry looks like:
+
+`[`exit_if`#`entry_if`]`
+
+with multiple entries the syntax is:
+
+`[`exit_if1`#`entry_if1`,`exit_if2`#`entry_if2`,`...`]`
+
+Following possibilities can be used for entry_if and exit_if:
+
+| syntax          | description |
+| --------------: | ----------- |
+| name            | the router name (matches any interface of that router) |
+| name`.`name     | specific interface of router |
+| `.`             | any interface on any router |
+
+name itself can be either an identifier (starting with a character; defining an exact interface) or a literal (a double-quoted regular expression matching interfaces `"`regex`"`). 
+The regex-matching of `name` is implemented via `boost::basic_regex` and follows this semantics.
+
+## Label Syntax
+The syntax of a list with labels is:
+
+| syntax          | description |
+| --------------: | ----------- |
+| `[$`label`]`        | A sticky label. Can be used with all following types |
+| `[`label1`,`label2`]`        | A list of labels. Can be used with all following types |
+| `[`number`]`        | A mpls label with number |
+| `[`number`/`mask`]`   | A range of mpls labels, specified by number and a mask in bits |
+| `[`ip`]`            | An ip label. Can be an ipv4 or an ipv6 address |
+| `[`ip`/`mask`]`   | An ip network. An ipv4 or an ipv6 address together with a mask in bits |
