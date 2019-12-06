@@ -118,36 +118,35 @@ Every regular expression in the regex-list is built out of following components:
 | `[`atom-list`]` | matches the atom_list (see below) |
 | `[^`atom-list`]`| matches everything except the atom_list |
 | `ip`            | matches any ip address |
-| `mpls`          | matches any mpls label |
+| `mpls`          | matches any non-sticky mpls label |
 | `smpls`         | matches any sticky mpls label |
 | `(`regex-list`)`| must match the given sub regex-list |
 
 The atom-list contains a comma separated list of atoms (for `path`) or labels(for `preCondition` and `postCondition`).
 
-TODO: can there be atoms in conditions or labels in path? Tests say no...
+Only labels are allowed in `preCondition` and `postCondition` and only `Atoms` in the `path`.
 
-TODO: how will be multiple atoms or labels combined? For labels it seems to be an OR. For atoms an concat..
+The semantics of an atom-list is that of union (OR) and the negation-symbol `^` is intepreted as complement of the following `atom-list`.
 
 ## Atom Syntax
-An atom defines a router via its entry and exit interface. An atom-list with one entry looks like:
+An atom defines a hop between routers via their exit and entry interfaces. An atom-list with one entry looks like:
 
-`[`entry_if`#`exit_if`]`
-
-TODO: is this with entry_if and exit_if correct?
+`[`exit_if`#`entry_if`]`
 
 with multiple entries the syntax is:
 
-`[`entry_if1`#`exit_if1`,`entry_if2`#`exit_if2`,`...`]`
+`[`exit_if1`#`entry_if1`,`exit_if2`#`entry_if2`,`...`]`
 
 Following possibilities can be used for entry_if and exit_if:
 
 | syntax          | description |
 | --------------: | ----------- |
-| name            | the interface name |
-| name`.`name     | TODO: second part some sort of link? |
-| `.`             | every interface matches |
+| name            | the router name (matches any interface of that router) |
+| name`.`name     | specific interface of router |
+| `.`             | any interface on any router |
 
 name itself can be either an identifier (starting with a character; defining an exact interface) or a literal (a double-quoted regular expression matching interfaces `"`regex`"`). 
+The regex-matching of `name` is implemented via `boost::basic_regex` and follows this semantics.
 
 ## Label Syntax
 The syntax of a list with labels is:
