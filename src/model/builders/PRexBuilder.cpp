@@ -195,7 +195,43 @@ namespace mpls2pda {
                 (inter1 == nullptr ? inter1 : inter2) = interface;
             }
             inter1->make_pairing(inter2);
+            assert(inter1->match() == inter2);
+            assert(inter2->match() == inter1);
             link = link->next_sibling("link");
+        }
+        Router* nullrouter = nullptr;
+        for(auto& r : routers)
+        {
+            for(auto& inf : r->interfaces())
+            {
+                if(inf->match() == nullptr)
+                {
+                    if(nullrouter == nullptr)
+                    {
+                        size_t id = routers.size();
+                        routers.emplace_back(std::make_unique<Router>(id));
+                        Router& router = *routers.back().get();
+                        router.add_name("NULL");
+                        auto res = mapping.insert((const unsigned char*)"NULL", 4);
+                        if(!res.first)
+                        {
+                            es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
+                            throw base_error(es.str());
+                        }
+                        mapping.get_data(res.second) = &router;
+                        nullrouter = routers.back().get();
+                    }
+                    std::stringstream ss;
+                    ss << "i" << inf->global_id();
+                    auto interface = nullrouter->get_interface(all_interfaces, ss.str(), r.get()); // will add the interface
+                    if(interface == nullptr)
+                    {
+                        es << "Could not find interface " << ss.str() << " for matching of links in router " << nullrouter->name();
+                        throw base_error(es.str());                    
+                    }
+                    interface->make_pairing(inf.get());
+                }
+            }
         }
     }
 

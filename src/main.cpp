@@ -75,6 +75,8 @@ int main(int argc, const char** argv)
     bool silent = false;
     bool dump_to_moped = false;
     bool no_timing = false;
+    std::string topology_destination;
+    std::string routing_destination;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -82,6 +84,8 @@ int main(int argc, const char** argv)
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
             ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
+            ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
+            ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
     ;
 
 
@@ -183,7 +187,30 @@ int main(int argc, const char** argv)
     if (print_dot) {
         network.print_dot(std::cout);
     }
-
+    
+    if(!topology_destination.empty())
+    {
+        std::ofstream out(topology_destination);
+        if(out.is_open())
+            network.write_prex_topology(out);
+        else
+        {
+            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl,
+            exit(-1);
+        }
+    }
+    if(!routing_destination.empty())
+    {
+        std::ofstream out(routing_destination);
+        if(out.is_open())
+            network.write_prex_routing(out);
+        else
+        {
+            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl,
+            exit(-1);
+        }
+    }
+    
     if(!query_file.empty())
     {
         stopwatch queryparsingwatch;

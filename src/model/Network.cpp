@@ -217,4 +217,108 @@ namespace mpls2pda
     {
         return _non_service_label.count(l) == 0;
     }
+
+    void Network::write_prex_routing(std::ostream& s)
+    {
+        s << "<routes>\n";
+        s << "  <routings>\n";
+        for(auto& r : _routers)
+        {
+            Router* rr = r.get();
+            s << "    <routing for=\"" << r->name() << "\">\n";
+            s << "      <destinations>\n";
+            for(auto& inf : rr->interfaces())
+            {
+                auto fname = r->interface_name(inf->id());
+                for(auto& e : inf->table().entries())
+                {
+                    s << "        <destination from=\"" << fname.get() << "\" label=\"" << e._top_label << "\">\n";
+                    s << "          <te-groups>\n";
+                    s << "            <te-group>\n";
+                    s << "              <routes>\n";
+                    auto cpy = e._rules;
+                    std::sort(cpy.begin(), cpy.end(), [](auto& a, auto& b) {
+                        return a._weight < b._weight;
+                    });
+                    auto ow = cpy.empty() ? 0 : cpy.back()._weight;                    
+                    for(auto& rule : cpy)
+                    {
+                        if(rule._weight > ow)
+                        {
+                            s << "              </routes>\n";
+                            s << "            </te-group>\n";
+                            s << "            <te-group>\n";
+                            s << "              <routes>\n";                            
+                        }
+                        assert(rule._via->source() == rr);
+                        auto tname = r->interface_name(rule._via->id());
+                        s << "                <route to=\"" << tname.get() << "\">\n";
+                        s << "                  <actions>\n";
+                        for(auto& o : rule._ops)
+                        {
+                            switch(o._op)
+                            {
+                            case RoutingTable::PUSH:
+                                s << "                    <action arg=\"" << o._op_label << "\" type=\"push\"/>\n";
+                                break;
+                            case RoutingTable::POP:
+                                s << "                    <action type=\"pop\"/>\n";
+                                break;
+                            case RoutingTable::SWAP:
+                                s << "                    <action arg=\"" << o._op_label << "\" type=\"swap\"/>\n";
+                                break;
+                            default:
+                                throw base_error("Unknown op-type");
+                            }
+                        }
+                        s << "                  </actions>\n";
+                        s << "                </route>\n";
+                    }
+                    s << "              </routes>\n";
+                    s << "            </te-group>\n";
+                    s << "          </te-groups>\n";
+                    s << "        </destination>\n";
+                }
+            }
+            s << "      </destinations>\n";
+            s << "    </routing>\n";
+        }
+        s << "  </routings>\n";
+        s << "</routes>\n";
+    }
+
+    void Network::write_prex_topology(std::ostream& s)
+    {
+        s << "<network>\n  <routers>\n";
+        for(auto& r : _routers)
+        {
+            s << "    <router name=\"" << r->name() << "\">\n";
+            s << "      <interfaces>\n";
+            for(auto& inf : r->interfaces())
+            {
+                auto fname = r->interface_name(inf->id());
+                s << "        <interface name=\"" << fname.get() << "\"/>\n";
+            }
+            s << "      </interfaces>\n";
+            s << "    </router>\n";
+        }
+        s << "  </routers>\n  <links>\n";
+        for(auto& r : _routers)
+        {
+            for(auto& inf : r->interfaces())
+            {
+                if(inf->source()->index() > inf->target()->index())
+                    continue;
+                auto fname = r->interface_name(inf->id());
+                auto oname = inf->target()->interface_name(inf->match()->id());
+                s << "    <link>\n      <sides>\n" <<
+                     "        <shared_interface interface=\"" << fname.get() <<
+                     "\" router=\"" << inf->source()->name() << "\"/>\n" <<
+                     "        <shared_interface interface=\"" << oname.get() <<
+                     "\" router=\"" << inf->target()->name() << "\"/>\n" <<
+                     "      </sides>\n    </link>\n";
+            }
+        }
+        s << "  </links>\n</network>\n";
+    }
 }
