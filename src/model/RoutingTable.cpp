@@ -177,7 +177,7 @@ namespace mpls2pda
         case Query::STICKY_MPLS:
             s << "s"; // fall through on purpose
         case Query::MPLS:
-            s << 'l' << std::hex << label.value() << std::dec;
+            s << 'l' << std::dec << label.value() << std::dec;
             assert(label.mask() == 0);
             break;
         case Query::ANYSTICKY:

@@ -268,7 +268,7 @@ namespace mpls2pda {
                 throw base_error(es.str());
             }
             auto router = mapping.get_data(res.second);
-            RoutingTable table;
+            
             auto dests = router_table->first_node("destinations");
             if(dests != nullptr)
             {
@@ -293,6 +293,7 @@ namespace mpls2pda {
                             throw base_error(es.str());
                         }
                     }
+                    RoutingTable table;
                     auto& entry = table.push_entry();
                     entry._ingoing = inf;
                     if(lblattr != nullptr)
@@ -304,7 +305,12 @@ namespace mpls2pda {
                         }
                         else
                         {
-                            entry._top_label.set_value(Query::MPLS, atoi(lblattr->value()), 0);
+                            auto sticky = dest->first_attribute("sticky");
+                            Query::type_t type = Query::MPLS;
+                            if(sticky != nullptr && strcmp(sticky->value(), "1") == 0)
+                                type = Query::STICKY_MPLS;
+                            entry._top_label.set_value(type, atoi(lblattr->value()), 0);
+                            
                         }
                     }
                     else if(ipattr != nullptr)
@@ -419,6 +425,10 @@ namespace mpls2pda {
                                                     op._op = RoutingTable::SWAP;
                                                     ok = true;
                                                 }
+                                                else
+                                                {
+                                                    assert(false);
+                                                }
                                             }
                                             if(!ok)
                                             {
@@ -440,19 +450,15 @@ namespace mpls2pda {
                             if(any) ++weight;
                         }
                     }
-                    dest = dests->next_sibling("destination");
+                    table.sort();
+                    std::stringstream e;
+                    if(!table.check_nondet(e))
+                    {
+                        throw base_error(e.str());
+                    }
+                    inf->table().merge(table, *inf, warnings);
+                    dest = dest->next_sibling("destination");
                 }
-            }
-            // otherwise empty table
-            table.sort();
-            std::stringstream e;
-            if(!table.check_nondet(e))
-            {
-                throw base_error(e.str());
-            }
-            for(auto& inf : router->interfaces())
-            {
-                inf->table().merge(table, *inf, warnings);
             }
             router_table = router_table->next_sibling("routing");
         }

@@ -224,15 +224,18 @@ namespace mpls2pda
         s << "  <routings>\n";
         for(auto& r : _routers)
         {
-            Router* rr = r.get();
             s << "    <routing for=\"" << r->name() << "\">\n";
             s << "      <destinations>\n";
-            for(auto& inf : rr->interfaces())
+            for(auto& inf : r->interfaces())
             {
                 auto fname = r->interface_name(inf->id());
+                assert(std::is_sorted(inf->table().entries().begin(), inf->table().entries().end()));
                 for(auto& e : inf->table().entries())
                 {
-                    s << "        <destination from=\"" << fname.get() << "\" label=\"" << e._top_label << "\">\n";
+                    s << "        <destination from=\"" << fname.get() << "\" label=\"" << e._top_label << "\"";
+                    if((e._top_label.type() & Query::STICKY) != 0)    
+                        s << " sticky=\"1\"";
+                    s << ">\n";
                     s << "          <te-groups>\n";
                     s << "            <te-group>\n";
                     s << "              <routes>\n";
@@ -250,7 +253,7 @@ namespace mpls2pda
                             s << "            <te-group>\n";
                             s << "              <routes>\n";                            
                         }
-                        assert(rule._via->source() == rr);
+                        assert(rule._via->source() == r.get());
                         auto tname = r->interface_name(rule._via->id());
                         s << "                <route to=\"" << tname.get() << "\">\n";
                         s << "                  <actions>\n";
