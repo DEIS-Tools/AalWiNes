@@ -463,7 +463,17 @@ namespace mpls2pda {
                     {
                         throw base_error(e.str());
                     }
-                    inf->table().merge(table, *inf, warnings);
+                    if(inf)
+                    {
+                        inf->table().merge(table, *inf, warnings);
+                    }
+                    else
+                    {
+                        for(auto& inf : router->interfaces())
+                        {
+                            inf->table().merge(table, *inf, warnings);
+                        }
+                    }
                     dest = dest->next_sibling("destination");
                 }
             }

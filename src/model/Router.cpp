@@ -160,29 +160,28 @@ namespace mpls2pda
 
     void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*>& mapping)
     {
-        Router* nullrouter = nullptr;
         std::stringstream es;
+        Router* nullrouter = nullptr;
+        {
+            size_t id = routers.size();
+            routers.emplace_back(std::make_unique<Router>(id, true));
+            Router& router = *routers.back().get();
+            router.add_name("NULL");
+            auto res = mapping.insert((const unsigned char*)"NULL", 4);
+            if(!res.first)
+            {
+                es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
+                throw base_error(es.str());
+            }
+            mapping.get_data(res.second) = &router;
+            nullrouter = routers.back().get();           
+        }
         for(auto& r : routers)
         {
             for(auto& inf : r->interfaces())
             {
                 if(inf->match() == nullptr)
                 {
-                    if(nullrouter == nullptr)
-                    {
-                        size_t id = routers.size();
-                        routers.emplace_back(std::make_unique<Router>(id, true));
-                        Router& router = *routers.back().get();
-                        router.add_name("NULL");
-                        auto res = mapping.insert((const unsigned char*)"NULL", 4);
-                        if(!res.first)
-                        {
-                            es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
-                            throw base_error(es.str());
-                        }
-                        mapping.get_data(res.second) = &router;
-                        nullrouter = routers.back().get();
-                    }
                     std::stringstream ss;
                     ss << "i" << inf->global_id();
                     auto interface = nullrouter->get_interface(all_interfaces, ss.str(), r.get()); // will add the interface
