@@ -70,7 +70,6 @@ namespace mpls2pda {
         struct entry_t {
             label_t _top_label;
             const Interface* _ingoing = nullptr;
-            bool _sticky_label = false;
             std::vector<forward_t> _rules;
             bool operator==(const entry_t& other) const;
 

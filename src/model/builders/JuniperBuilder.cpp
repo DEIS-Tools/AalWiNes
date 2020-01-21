@@ -474,23 +474,24 @@ namespace mpls2pda
             RoutingTable::entry_t& entry = nr.push_entry();
 
             int sticky = std::numeric_limits<int>::max();
+            bool sticky_label = false;
             if (pos != std::string::npos) {
                 if (pos != tl.size() - 5) {
                     std::stringstream e;
                     e << "expect only (S=0) notation as postfix of <rt-destination> in table " << name << " of router " << parent->name() << std::endl;
                     throw base_error(e.str());
                 }
-                entry._sticky_label = false;
+                sticky_label = false;
                 tl = tl.substr(0, pos);
             }
             else
             {
-                entry._sticky_label = true;
+                sticky_label = true;
                 sticky = 1; 
             }
             if (std::all_of(std::begin(tl), std::end(tl), [](auto& c) {return std::isdigit(c);})) 
             {
-                entry._top_label.set_value(entry._sticky_label ? Query::STICKY_MPLS : Query::MPLS, atoll(tl.c_str()), 0);
+                entry._top_label.set_value(sticky_label ? Query::STICKY_MPLS : Query::MPLS, atoll(tl.c_str()), 0);
             }
             else if (tl == "default") {
                 // we ignore these! (I suppose, TODO, check)
