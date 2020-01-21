@@ -224,18 +224,42 @@ namespace mpls2pda
         s << "  <routings>\n";
         for(auto& r : _routers)
         {
+            if(r->is_null()) continue;
             s << "    <routing for=\"" << r->name() << "\">\n";
             s << "      <destinations>\n";
+            
+            // make uniformly sorted output, easier for debugging
+            std::vector<std::pair<std::string,Interface*>> sinfs;
             for(auto& inf : r->interfaces())
             {
                 auto fname = r->interface_name(inf->id());
+                sinfs.emplace_back(fname.get(), inf.get());
+            }
+            std::sort(sinfs.begin(), sinfs.end(), [](auto& a, auto& b){
+                return strcmp(a.first.c_str(), b.first.c_str()) < 0;
+            });
+            for(auto& sinf : sinfs)
+            {
+                auto inf = sinf.second;
                 assert(std::is_sorted(inf->table().entries().begin(), inf->table().entries().end()));
+                
                 for(auto& e : inf->table().entries())
                 {
-                    s << "        <destination from=\"" << fname.get() << "\" label=\"" << e._top_label << "\"";
-                    if((e._top_label.type() & Query::STICKY) != 0)    
-                        s << " sticky=\"1\"";
-                    s << ">\n";
+                    assert(e._ingoing == nullptr || e._ingoing == inf);
+                    s << "        <destination from=\"" << sinf.first << "\" ";
+                    if((e._top_label.type() & Query::MPLS) != 0)
+                    {
+                        s << "label=\"";
+                    }
+                    else if((e._top_label.type() & (Query::IP4 | Query::IP6 | Query::ANYIP)) != 0)
+                    {
+                        s << "ip=\"";
+                    }
+                    else
+                    {
+                        assert(false);
+                    }
+                    s << e._top_label << "\">\n";
                     s << "          <te-groups>\n";
                     s << "            <te-group>\n";
                     s << "              <routes>\n";
@@ -243,7 +267,7 @@ namespace mpls2pda
                     std::sort(cpy.begin(), cpy.end(), [](auto& a, auto& b) {
                         return a._weight < b._weight;
                     });
-                    auto ow = cpy.empty() ? 0 : cpy.back()._weight;                    
+                    auto ow = cpy.empty() ? 0 : cpy.front()._weight;                    
                     for(auto& rule : cpy)
                     {
                         if(rule._weight > ow)
@@ -251,31 +275,58 @@ namespace mpls2pda
                             s << "              </routes>\n";
                             s << "            </te-group>\n";
                             s << "            <te-group>\n";
-                            s << "              <routes>\n";                            
+                            s << "              <routes>\n";
+                            ow = rule._weight;
                         }
-                        assert(rule._via->source() == r.get());
-                        auto tname = r->interface_name(rule._via->id());
-                        s << "                <route to=\"" << tname.get() << "\">\n";
-                        s << "                  <actions>\n";
-                        for(auto& o : rule._ops)
+                        assert(ow == rule._weight);
+                        bool handled = false;
+                        switch(rule._type)
                         {
-                            switch(o._op)
-                            {
-                            case RoutingTable::PUSH:
-                                s << "                    <action arg=\"" << o._op_label << "\" type=\"push\"/>\n";
-                                break;
-                            case RoutingTable::POP:
-                                s << "                    <action type=\"pop\"/>\n";
-                                break;
-                            case RoutingTable::SWAP:
-                                s << "                    <action arg=\"" << o._op_label << "\" type=\"swap\"/>\n";
-                                break;
-                            default:
-                                throw base_error("Unknown op-type");
-                            }
+                        case RoutingTable::DISCARD:
+                            s << "                <discard/>\n";
+                            handled = true;
+                            break;
+                        case RoutingTable::RECEIVE:
+                            s << "                <receive/>\n";
+                            handled = true;
+                            break;
+                        case RoutingTable::ROUTE:
+                            s << "                <reroute/>\n";
+                            handled = true;
+                            break;
+                        default:
+                            break;
                         }
-                        s << "                  </actions>\n";
-                        s << "                </route>\n";
+                        if(!handled)
+                        {
+                            assert(rule._via->source() == r.get());
+                            auto tname = r->interface_name(rule._via->id());
+                            s << "                <route to=\"" << tname.get() << "\">\n";
+                            s << "                  <actions>\n";
+                            for(auto& o : rule._ops)
+                            {
+                                switch(o._op)
+                                {
+                                case RoutingTable::PUSH:
+                                    s << "                    <action arg=\"" << o._op_label << "\" type=\"push\"/>\n";
+                                    break;
+                                case RoutingTable::POP:
+                                    s << "                    <action type=\"pop\"/>\n";
+                                    break;
+                                case RoutingTable::SWAP:
+                                    s << "                    <action arg=\"" << o._op_label << "\" type=\"swap\"/>\n";
+                                    break;
+                                default:
+                                    throw base_error("Unknown op-type");
+                                }
+                            }
+                            s << "                  </actions>\n";
+                            s << "                </route>\n";
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                     s << "              </routes>\n";
                     s << "            </te-group>\n";
@@ -295,6 +346,7 @@ namespace mpls2pda
         s << "<network>\n  <routers>\n";
         for(auto& r : _routers)
         {
+            if(r->is_null()) continue;
             s << "    <router name=\"" << r->name() << "\">\n";
             s << "      <interfaces>\n";
             for(auto& inf : r->interfaces())
@@ -308,10 +360,15 @@ namespace mpls2pda
         s << "  </routers>\n  <links>\n";
         for(auto& r : _routers)
         {
+            if(r->is_null()) continue;
             for(auto& inf : r->interfaces())
             {
                 if(inf->source()->index() > inf->target()->index())
                     continue;
+                
+                if(inf->source()->is_null()) continue;
+                if(inf->target()->is_null()) continue;
+                
                 auto fname = r->interface_name(inf->id());
                 auto oname = inf->target()->interface_name(inf->match()->id());
                 s << "    <link>\n      <sides>\n" <<

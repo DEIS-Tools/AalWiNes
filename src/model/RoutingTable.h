@@ -43,7 +43,7 @@ namespace mpls2pda {
     public:
 
         enum type_t {
-            DISCARD, RECIEVE, ROUTE, MPLS
+            DISCARD, RECEIVE, ROUTE, MPLS
         };
 
         enum op_t {

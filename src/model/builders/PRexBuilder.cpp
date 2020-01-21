@@ -199,40 +199,7 @@ namespace mpls2pda {
             assert(inter2->match() == inter1);
             link = link->next_sibling("link");
         }
-        Router* nullrouter = nullptr;
-        for(auto& r : routers)
-        {
-            for(auto& inf : r->interfaces())
-            {
-                if(inf->match() == nullptr)
-                {
-                    if(nullrouter == nullptr)
-                    {
-                        size_t id = routers.size();
-                        routers.emplace_back(std::make_unique<Router>(id));
-                        Router& router = *routers.back().get();
-                        router.add_name("NULL");
-                        auto res = mapping.insert((const unsigned char*)"NULL", 4);
-                        if(!res.first)
-                        {
-                            es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
-                            throw base_error(es.str());
-                        }
-                        mapping.get_data(res.second) = &router;
-                        nullrouter = routers.back().get();
-                    }
-                    std::stringstream ss;
-                    ss << "i" << inf->global_id();
-                    auto interface = nullrouter->get_interface(all_interfaces, ss.str(), r.get()); // will add the interface
-                    if(interface == nullptr)
-                    {
-                        es << "Could not find interface " << ss.str() << " for matching of links in router " << nullrouter->name();
-                        throw base_error(es.str());                    
-                    }
-                    interface->make_pairing(inf.get());
-                }
-            }
-        }
+        Router::add_null_router(routers, all_interfaces, mapping);
     }
 
     void PRexBuilder::build_tables(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, ptrie::map<Router*>& mapping, std::ostream& warnings)
@@ -268,13 +235,14 @@ namespace mpls2pda {
                 throw base_error(es.str());
             }
             auto router = mapping.get_data(res.second);
-            
+
             auto dests = router_table->first_node("destinations");
             if(dests != nullptr)
             {
                 auto dest = dests->first_node("destination");
                 while(dest)
                 {
+                    RoutingTable table;
                     auto ifattr = dest->first_attribute("from");
                     auto lblattr = dest->first_attribute("label");
                     auto ipattr = dest->first_attribute("ip");
@@ -293,7 +261,6 @@ namespace mpls2pda {
                             throw base_error(es.str());
                         }
                     }
-                    RoutingTable table;
                     auto& entry = table.push_entry();
                     entry._ingoing = inf;
                     if(lblattr != nullptr)
@@ -305,11 +272,12 @@ namespace mpls2pda {
                         }
                         else
                         {
-                            auto sticky = dest->first_attribute("sticky");
+                            auto sticky = val[0] == '$';;
                             Query::type_t type = Query::MPLS;
-                            if(sticky != nullptr && strcmp(sticky->value(), "1") == 0)
+                            if(sticky)
                                 type = Query::STICKY_MPLS;
-                            entry._top_label.set_value(type, atoi(lblattr->value()), 0);
+                            auto val = lblattr->value() + (sticky ? 1 : 0);
+                            entry._top_label.set_value(type, atoi(val), 0);
                             
                         }
                     }
@@ -317,38 +285,51 @@ namespace mpls2pda {
                     {
                         std::string add = ipattr->value();
                         bool ok = false;
-                        for(auto c : add)
+                        if(add == "ip4")
                         {
-                            // this is too simple, FIX!
-                            if(c == '.')
+                            entry._top_label.set_value(Query::IP6, 0, 32);
+                        }
+                        else if(add == "ip6")
+                        {
+                            entry._top_label.set_value(Query::IP6, 0, 64);
+                        }
+                        else if(add == "ip")
+                        {
+                            entry._top_label.set_value(Query::ANYIP, 0, 64);
+                        }
+                        else
+                        {
+                            for(auto c : add)
                             {
-                                entry._top_label.set_value(Query::IP4, parse_ip4(add.c_str()), 0);
-                                ok = true;
-                                break;
+                                // this is too simple, FIX!
+                                if(c == '.')
+                                {
+                                    entry._top_label.set_value(Query::IP4, parse_ip4(add.c_str()), 0);
+                                    ok = true;
+                                    break;
+                                }
+                                else if(c == ':')
+                                {
+                                    entry._top_label.set_value(Query::IP6, parse_ip6(add.c_str()), 0);
+                                    ok = true;
+                                    break;
+                                }
                             }
-                            else if(c == ':')
+                            if(!ok)
                             {
-                                entry._top_label.set_value(Query::IP6, parse_ip6(add.c_str()), 0);
-                                ok = true;
-                                break;
+                                es << add << " is not a valid ip";
+                                throw base_error(es.str());
+                            }
+                            ok = false;
+                            size_t i = 0; 
+                            for(;i < add.size(); ++i) if(add[i] == '/') break;
+                            ++i;
+                            if(i < add.size())
+                            {
+                                entry._top_label.set_mask(atoi(&add[i]));
                             }
                         }
-                        if(!ok)
-                        {
-                            es << add << " is not a valid ip";
-                            throw base_error(es.str());
-                        }
-                        ok = false;
-                        size_t i = 0; 
-                        for(;i < add.size(); ++i) if(add[i] == '/') break;
-                        ++i;
-                        if(i < add.size())
-                        {
-                            entry._top_label.set_mask(atoi(&add[i]));
-                        }
-                        
                     }
-                    assert(!ipattr);
                     auto tegrps = dest->first_node("te-groups");
                     if(tegrps) // could be empty? // Could be more?
                     {
@@ -360,6 +341,30 @@ namespace mpls2pda {
                             auto routes = grp->first_node("routes");
                             if(routes)
                             {
+                                auto el = routes->first_node("discard");
+                                if(el)
+                                {
+                                    entry._rules.emplace_back();
+                                    entry._rules.back()._via = nullptr;
+                                    entry._rules.back()._type = RoutingTable::DISCARD;
+                                    entry._rules.back()._weight = weight;
+                                }
+                                el = routes->first_node("reroute");
+                                if(el)
+                                {
+                                    entry._rules.emplace_back();
+                                    entry._rules.back()._via = nullptr;
+                                    entry._rules.back()._type = RoutingTable::ROUTE;
+                                    entry._rules.back()._weight = weight;
+                                }
+                                el = routes->first_node("receive");
+                                if(el)
+                                {
+                                    entry._rules.emplace_back();
+                                    entry._rules.back()._via = nullptr;
+                                    entry._rules.back()._type = RoutingTable::RECEIVE;
+                                    entry._rules.back()._weight = weight;
+                                }
                                 auto route = routes->first_node("route");
                                 while(route)
                                 {
@@ -414,7 +419,9 @@ namespace mpls2pda {
                                                     es << type << " needs an \"arg\"";
                                                     throw base_error(es.str());
                                                 }
-                                                op._op_label.set_value(Query::MPLS, std::atoi(aattr->value()), 0);
+                                                auto sticky = aattr->value()[0] == '$';
+                                                op._op_label.set_value(sticky ? Query::STICKY_MPLS : Query::MPLS, 
+                                                                       std::atoi(aattr->value() + (sticky ? 1 : 0)), 0);
                                                 if(type == "push")
                                                 {
                                                     op._op = RoutingTable::PUSH;

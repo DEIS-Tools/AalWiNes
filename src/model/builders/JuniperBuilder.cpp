@@ -158,6 +158,11 @@ namespace mpls2pda
                     auto path = wd;
                     path.append(std::get<2>(configs[i]));
                     id.open(path.string());
+                    if(!id.is_open())
+                    {
+                        std::cerr << "error: Could not open PFE-description for index " << i << " (i.e. router " << routers[i]->name() << ", file " << path.string() << ")" << std::endl;
+                        exit(-1);                        
+                    }
                 }
                 try {
                     router_parse_routing(*routers[i], stream, id, interfaces, warnings, skip_pfe);
@@ -180,6 +185,8 @@ namespace mpls2pda
                 return diff == 1 && i1->target() == i2->source() && i2->target() == i1->source();
             });
         }
+        
+        Router::add_null_router(routers, interfaces, mapping);
    
         return Network(std::move(mapping), std::move(routers), std::move(interfaces));
     }
@@ -420,6 +427,8 @@ namespace mpls2pda
                         // both TOS and interface
                         if(!inf->table().merge(rt, *inf, warnings))
                             warnings << "warning: nondeterministic routing discovered for " << router.name() << " in table " << n->first_node("table-name")->value() << std::endl;    
+                        for(auto& e : inf->table().entries())
+                            assert(e._ingoing == inf.get());
                     }
                 }
                 catch (base_error& ex) {
@@ -528,7 +537,7 @@ namespace mpls2pda
                     }
                     else if (strcmp(val, "receive") == 0) // check.
                     {
-                        r._type = RoutingTable::RECIEVE; // Drops out of MPLS?
+                        r._type = RoutingTable::RECEIVE; // Drops out of MPLS?
                     }
                     else if (strcmp(val, "table lookup") == 0) {
                         r._type = RoutingTable::ROUTE; // drops out of MPLS?
@@ -591,6 +600,16 @@ namespace mpls2pda
                         warnings << std::endl;
                     }
                 }
+                else if(r._type == RoutingTable::MPLS)
+                {
+                    std::stringstream e;
+                    e << "No target found for : " << name  << " from " << tl << std::endl;
+                    e << "\ttype : " << ops->value() << std::endl;
+                    if(nhid)
+                        e << "\tindirect " << nhid->value() << std::endl;
+                    throw base_error(e.str());                    
+                }
+                assert(r._via || r._type != RoutingTable::MPLS);
                 weights[r._weight] = 0;
             }
             while ((nh = nh->next_sibling("nh")));
@@ -610,11 +629,6 @@ namespace mpls2pda
             rule = rule->next_sibling("rt-entry");
         }
         nr.sort();
-        std::stringstream e;
-        if(!nr.check_nondet(e))
-        {
-            throw base_error(e.str());
-        }
         return nr;
     }
 

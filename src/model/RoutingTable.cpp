@@ -42,19 +42,20 @@ namespace mpls2pda
 
     bool RoutingTable::merge(const RoutingTable& other, Interface& parent, std::ostream& warnings)
     {
+        assert(std::is_sorted(other._entries.begin(), other._entries.end()));
         bool all_fine = true;
-        auto iit = _entries.begin();
+
         assert(std::is_sorted(other._entries.begin(), other._entries.end()));
         assert(std::is_sorted(_entries.begin(), _entries.end()));
+        auto iit = _entries.begin();
         for (auto oit = other._entries.begin(); oit != other._entries.end(); ++oit) {
             if (oit->_ingoing != nullptr && oit->_ingoing != &parent) continue;
             auto& e = (*oit);
             while (iit != std::end(_entries) && (*iit) < e)
                 ++iit;
             if (iit == std::end(_entries)) {
-                _entries.insert(_entries.end(), oit, std::end(other._entries));
-                assert(std::is_sorted(_entries.begin(), _entries.end()));
-                return all_fine;
+                iit = _entries.insert(iit, e);
+                iit->_ingoing = &parent;
             }
             else if ((*iit) == e) {
                 if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
@@ -69,8 +70,11 @@ namespace mpls2pda
             else {
                 assert(e < (*iit));
                 iit = _entries.insert(iit, e);
+                iit->_ingoing = &parent;
             }
         }
+
+        for(auto& e : _entries) assert(e._ingoing == &parent);
         assert(std::is_sorted(_entries.begin(), _entries.end()));
         return all_fine;
     }
@@ -99,16 +103,12 @@ namespace mpls2pda
 
     bool RoutingTable::entry_t::operator<(const entry_t& other) const
     {
-        if (other._ingoing != _ingoing)
-            return _ingoing < other._ingoing;
-        if (other._sticky_label != _sticky_label)
-            return _sticky_label < other._sticky_label;
         return _top_label < other._top_label;
     }
 
     bool RoutingTable::entry_t::operator==(const entry_t& other) const
     {
-        return _sticky_label == other._sticky_label && _top_label == other._top_label && _ingoing == other._ingoing;
+        return _top_label == other._top_label;
     }
 
     void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex, const Network* network) const
@@ -247,7 +247,7 @@ namespace mpls2pda
         for (size_t i = 1; i < _entries.size(); ++i) {
             if (_entries[i - 1] == _entries[i]) {
                 some = true;
-                e << "nondeterministic routing-table found, dual matches on " << _entries[i]._top_label;
+                e << "nondeterministic routing-table found, dual matches on " << _entries[i]._top_label << std::endl;
             }
         }
         return !some;

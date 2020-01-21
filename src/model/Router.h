@@ -82,13 +82,18 @@ private:
 
 class Router {
 public:
-    Router(size_t id);
+    Router(size_t id, bool is_null = false);
     Router(const Router& orig) = default;
     virtual ~Router() = default;
 
     size_t index() const {
         return _index;
     }
+    
+    bool is_null() const {
+        return _is_null;
+    }
+    
     void add_name(const std::string& name);
     const std::string& name() const;
     const std::vector<std::string>& names() const { return _names; }
@@ -102,6 +107,7 @@ public:
     }
     std::unique_ptr<char[] > interface_name(size_t i);
     void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
+    static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*>& mapping);
     void print_simple(std::ostream& s);
 private:
     size_t _index = std::numeric_limits<size_t>::max();
@@ -110,6 +116,7 @@ private:
     ptrie::map<Interface*> _interface_map;
     size_t _inamelength = 0; // for printing
     bool _has_config = false;
+    bool _is_null = false;
     friend class Interface;
 };
 }
