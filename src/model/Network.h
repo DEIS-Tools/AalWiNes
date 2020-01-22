@@ -54,6 +54,8 @@ public:
     void print_dot(std::ostream& s);
     void print_simple(std::ostream& s);
     bool is_service_label(const Query::label_t&) const;
+    void write_prex_topology(std::ostream& s);
+    void write_prex_routing(std::ostream& s);
 private:
     // NO TOUCHEE AFTER INIT!
     ptrie::map<Router*> _mapping;

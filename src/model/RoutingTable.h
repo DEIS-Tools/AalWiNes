@@ -43,7 +43,7 @@ namespace mpls2pda {
     public:
 
         enum type_t {
-            DISCARD, RECIEVE, ROUTE, MPLS
+            DISCARD, RECEIVE, ROUTE, MPLS
         };
 
         enum op_t {
@@ -69,8 +69,7 @@ namespace mpls2pda {
 
         struct entry_t {
             label_t _top_label;
-            const Interface* _ingoing = nullptr;
-            bool _sticky_label = false;
+            const Interface* _ingoing = nullptr; // this needs to be removed, it is only really used during merges of Routingtables for filtering
             std::vector<forward_t> _rules;
             bool operator==(const entry_t& other) const;
 
