@@ -37,8 +37,8 @@ namespace mpls2pda
         NFA::state_t* ns = nullptr;
         Interface* nr = nullptr;
         add_state(ns, nr);
-        construct_initial();
         _path.compile();
+        construct_initial();
     }
 
     void NetworkPDAFactory::construct_initial()
