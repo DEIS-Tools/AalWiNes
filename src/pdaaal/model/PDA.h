@@ -124,6 +124,7 @@ namespace pdaaal {
 
         const std::vector<state_t>& states() const;
         const size_t initial() const { return _initial_id; }
+        const size_t terminal() const { return 0; }
         virtual ~PDA();
 
     protected:
