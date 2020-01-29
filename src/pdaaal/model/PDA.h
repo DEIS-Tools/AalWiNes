@@ -123,6 +123,7 @@ namespace pdaaal {
         virtual size_t number_of_labels() const = 0;
 
         const std::vector<state_t>& states() const;
+        const size_t initial() const { return _initial_id; }
         virtual ~PDA();
 
     protected:
@@ -130,9 +131,24 @@ namespace pdaaal {
     protected:
         void _add_rule(size_t from, size_t to, op_t op, uint32_t label, bool negated, const std::vector<uint32_t>& pre);
         void clear_state(size_t s);
+        void finalize()
+        {
+            _initial_id = _states.size();
+            _states.emplace_back(_initial);
+            for(auto& s : _states)
+            {
+                if(!s._pre.empty() && s._pre.front() == 0)
+                {
+                    s._pre.erase(std::begin(s._pre));
+                    s._pre.emplace_back(_initial_id);
+                }
+            }
+        }
 
     protected:
         std::vector<state_t> _states;
+        state_t _initial;
+        size_t _initial_id = 0;
     };
 
 }

@@ -168,7 +168,7 @@ namespace pdaaal {
                         }
                     }
                 }
-            }
+            }            
         }
 
         bool empty_desctruction_accept() {
