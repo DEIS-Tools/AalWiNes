@@ -427,8 +427,10 @@ namespace mpls2pda
                         // both TOS and interface
                         if(!inf->table().merge(rt, *inf, warnings))
                             warnings << "warning: nondeterministic routing discovered for " << router.name() << " in table " << n->first_node("table-name")->value() << std::endl;    
+#ifndef NDEBUG
                         for(auto& e : inf->table().entries())
                             assert(e._ingoing == inf.get());
+#endif
                     }
                 }
                 catch (base_error& ex) {
