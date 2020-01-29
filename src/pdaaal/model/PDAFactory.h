@@ -97,6 +97,7 @@ namespace pdaaal {
 
             // Destruct the stack!
             build_destruction(result);
+            result.finalize();
             return result;
         }
 
