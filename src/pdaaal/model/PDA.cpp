@@ -298,6 +298,7 @@ namespace pdaaal
         }
         // DO PRUNING!
         for (size_t i = 1; i < _states.size(); ++i) {
+            if(i == initial()) continue;
             auto& app = approximation[i];
             auto& state = _states[i];
             size_t br = 0;
