@@ -184,6 +184,7 @@ namespace pdaaal
             }
         }
         for (size_t sid = 1; sid < pda.states().size(); ++sid) {
+            if(sid == pda.initial()) continue;
             const state_t& state = pda.states()[sid];
             for (auto& r : state._rules) {
                 if (r._to == 0) {
