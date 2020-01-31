@@ -330,6 +330,7 @@ namespace pdaaal
 
     void PDA::pre_t::merge(bool negated, const std::vector<uint32_t>& other, size_t all_labels)
     {
+        assert(all_labels != std::numeric_limits<size_t>::max());
         if (_wildcard) return;
         if (negated && other.empty()) {
             _wildcard = true;
@@ -697,5 +698,22 @@ namespace pdaaal
         assert(false);
         return false;
     }
+    
+    void PDA::finalize()
+    {
+        _initial_id = _states.size();
+        _states.emplace_back(_initial);
+        for (auto& s : _states) {
+            if (!s._pre.empty() && s._pre.front() == 0) {
+                s._pre.erase(std::begin(s._pre));
+                s._pre.emplace_back(_initial_id);
+            }
+        }
+        for (auto& r : _states[_initial_id]._rules) {
+            r._precondition.clear();
+            r._precondition.merge(false, _initial_stack, std::numeric_limits<size_t>::max());
+        }
+    }
 
+    
 }

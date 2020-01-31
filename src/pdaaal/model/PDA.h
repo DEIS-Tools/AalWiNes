@@ -124,6 +124,7 @@ namespace pdaaal {
 
         const std::vector<state_t>& states() const;
         const size_t initial() const { return _initial_id; }
+        const std::vector<uint32_t>& initial_stack() const { return _initial_stack; }
         const size_t terminal() const { return 0; }
         virtual ~PDA();
 
@@ -132,22 +133,11 @@ namespace pdaaal {
     protected:
         void _add_rule(size_t from, size_t to, op_t op, uint32_t label, bool negated, const std::vector<uint32_t>& pre);
         void clear_state(size_t s);
-        void finalize()
-        {
-            _initial_id = _states.size();
-            _states.emplace_back(_initial);
-            for(auto& s : _states)
-            {
-                if(!s._pre.empty() && s._pre.front() == 0)
-                {
-                    s._pre.erase(std::begin(s._pre));
-                    s._pre.emplace_back(_initial_id);
-                }
-            }
-        }
+        void finalize();
 
     protected:
         std::vector<state_t> _states;
+        const std::vector<uint32_t> _initial_stack{std::numeric_limits<uint32_t>::max()};
         state_t _initial;
         size_t _initial_id = 0;
     };
