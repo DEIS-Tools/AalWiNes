@@ -26,6 +26,23 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/rapidxml)
-add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/ptrie)
+
+option(AALWINES_GetDependencies "Fetch external dependencies from web." ON)
+if (AALWINES_GetDependencies)
+    # setup for external imports
+    include(ExternalProject)
+    find_package(Git REQUIRED)
+    set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
+
+    ExternalProject_add(ptrie-ext
+        GIT_REPOSITORY https://github.com/petergjoel/ptrie
+        GIT_TAG 1.0.3
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPTRIE_BuildTest=OFF -DCMAKE_BUILD_TYPE=Release
+    )
+    # we can now include external libraries
+    include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
+    link_directories(${EXTERNAL_INSTALL_LOCATION}/lib)
+endif (AALWINES_GetDependencies)
+
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/)
