@@ -37,7 +37,7 @@
 #include <ostream>
 #include <memory>
 
-namespace mpls2pda {
+namespace aalwines {
     class JuniperBuilder {
     public:
         static Network parse(

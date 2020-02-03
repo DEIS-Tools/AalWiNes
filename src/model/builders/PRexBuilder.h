@@ -31,7 +31,7 @@
 
 #include <rapidxml.hpp>
 
-namespace mpls2pda {
+namespace aalwines {
 
     class PRexBuilder {
     public:

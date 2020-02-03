@@ -1,7 +1,7 @@
 %skeleton "lalr1.cc" /* -*- C++ -*- */
 %require "3.0.5"
 %defines
-%define api.namespace {mpls2pda}
+%define api.namespace {aalwines}
 %define parser_class_name {Parser}
 %define api.token.constructor
 %define api.value.type variant
@@ -37,13 +37,13 @@
     #include "model/Query.h"
     #include "model/filter.h"
 
-    namespace mpls2pda {
+    namespace aalwines {
         class Builder;
         class Scanner;
     }
     
     using namespace pdaaal;
-    using namespace mpls2pda;
+    using namespace aalwines;
 }
 
 
@@ -63,7 +63,7 @@
     #include "model/filter.h"
 
     using namespace pdaaal;
-    using namespace mpls2pda;
+    using namespace aalwines;
 
     #undef yylex
     #define yylex ([&](){\
@@ -258,7 +258,7 @@ label
 %%
 
 void
-mpls2pda::Parser::error (const location_type& l,
+aalwines::Parser::error (const location_type& l,
                           const std::string& m)
 {
   builder.error(l, m);

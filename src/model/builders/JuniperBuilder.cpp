@@ -33,7 +33,7 @@
 #include <sstream>
 #include <map>
 
-namespace mpls2pda
+namespace aalwines
 {
     Network JuniperBuilder::parse(const std::string& network, std::ostream& warnings, bool skip_pfe)
     {

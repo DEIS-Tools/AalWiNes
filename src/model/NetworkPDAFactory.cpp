@@ -27,7 +27,7 @@
 #include "NetworkPDAFactory.h"
 #include "pdaaal/model/PDAFactory.h"
 
-namespace mpls2pda
+namespace aalwines
 {
 
     NetworkPDAFactory::NetworkPDAFactory(Query& query, Network& network, bool only_mpls_swap)

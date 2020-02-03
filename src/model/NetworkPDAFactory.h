@@ -32,7 +32,7 @@
 #include "pdaaal/model/PDAFactory.h"
 
 
-namespace mpls2pda
+namespace aalwines
 {
     class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t> {
         using label_t = Query::label_t;

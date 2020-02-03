@@ -33,7 +33,7 @@
  * Note: This is a horrible, convoluted and bloated format.
  * TODO: Design a new, lean one.
  */
-namespace mpls2pda {
+namespace aalwines {
     void PRexBuilder::open_xml(const std::string& fn, rapidxml::xml_document<>& doc, std::vector<char>& buffer) {
         std::ifstream stream(fn);
         std::stringstream es;

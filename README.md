@@ -1,4 +1,4 @@
-# mpls2pda
+# AalWiNes (Aalborg Wien Network Suite)
 ## Compilation
 Requirements for compilation:
 
@@ -19,9 +19,9 @@ sudo apt install build-essential flex bison cmake libboost-all-dev
 git clone git@github.com:P-RexMPLS/P-Rex.git
 export MOPED_PATH=`pwd`/P-Rex/bin/moped
 
-# get mpls2pda (P-Rex v2) and compile
-git clone --recurse-submodules git@github.com:petergjoel/mpls2pda.git
-cd mpls2pda
+# get aalwines (P-Rex v2) and compile
+git clone --recurse-submodules git@github.com:DEIS-Tools/aalwines.git
+cd aalwines
 mkdir build
 cd build
 cmake ..
@@ -32,7 +32,7 @@ make
 Option for static linkage -> binary will not need libboost and other libs installed on target system:
 
 ```bash
-cmake -DMPLS2PDA_BuildBundle=ON ..
+cmake -DAALWINES_BuildBundle=ON ..
 ```
 
 ## Usage Examples
@@ -41,7 +41,7 @@ This will run queryfile `query.txt` over the network defined in the P-Rex data f
     
 ```bash
 cd bin
-./mpls2pda --topology ../../../P-Rex/res/nestable/topo.xml --routing ../../../P-Rex/res/nestable/routing.xml -e 1 -q query.txt -t
+./aalwines --topology ../../../P-Rex/res/nestable/topo.xml --routing ../../../P-Rex/res/nestable/routing.xml -e 1 -q query.txt -t
 ```
 
 An example `query.txt` (syntax see below):

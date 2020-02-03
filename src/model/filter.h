@@ -30,7 +30,7 @@
 #include <unordered_set>
 #include <functional>
 
-namespace mpls2pda {
+namespace aalwines {
     // we are going to use some lazy function-combination here.
     // probably not the fastest or prettiest, but seems to be the easiest.
     struct filter_t {

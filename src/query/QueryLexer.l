@@ -33,12 +33,12 @@
 #include "parsererrors.h"
 #include "Scanner.h"
 #undef  YY_DECL
-#define YY_DECL int mpls2pda::Scanner::yylex()
-using token = mpls2pda::Parser::token;
+#define YY_DECL int aalwines::Scanner::yylex()
+using token = aalwines::Parser::token;
 %}
 
 %option noyywrap nounput batch noinput c++
-%option yyclass="mpls2pda::Scanner"
+%option yyclass="aalwines::Scanner"
 %x comment
 
 id    [a-zA-Z][a-zA-Z_0-9_-]*
@@ -73,7 +73,7 @@ literal  \"(\\.|[^\\"])*\"
 <comment>"*"+"/"        BEGIN(INITIAL);
 <comment><<EOF>>        {
 
-                            mpls2pda::Parser::syntax_error
+                            aalwines::Parser::syntax_error
                                        (builder._location, "Unterminated multiline comment: " + std::string(yytext));
                         }
 
@@ -112,7 +112,7 @@ literal  \"(\\.|[^\\"])*\"
 {int}      {
   long int n = strtol (yytext, NULL, 10);
   if (! (INT_MIN <= n && n <= INT_MAX))
-    throw mpls2pda::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
+    throw aalwines::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
   last_int = n;
   return token::NUMBER;
@@ -121,7 +121,7 @@ literal  \"(\\.|[^\\"])*\"
 {hex}     {
   long int n = strtol (yytext, NULL, 16);
   if (! (INT_MIN <= n && n <= INT_MAX))
-    throw mpls2pda::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
+    throw aalwines::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
   last_int = n;
   return token::HEX;
