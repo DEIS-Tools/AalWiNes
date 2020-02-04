@@ -101,7 +101,7 @@ namespace pdaaal
 
                 
         auto init = state_id(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max(), std::numeric_limits<uint32_t>::max());
-        for (auto& rule : pda.states()[0]._rules) {
+        for (auto& rule : pda.states()[pda.initial()]._rules) {
             assert(rule._operation == PDA::PUSH);
             edge_t* edge = insert_edge(rule._to, rule._op_label, init, true);
             trans.emplace(edge);

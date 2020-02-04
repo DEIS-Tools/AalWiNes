@@ -49,7 +49,7 @@ namespace pdaaal
     {
         size_t cnt = 1;
         // lets start by the initial transitions
-        auto& is = states()[0];
+        auto& is = states()[_initial_id];
         cnt += is._rules.size();
         for (size_t sid = 1; sid < states().size(); ++sid) {
             const state_t& state = states()[sid];
@@ -79,7 +79,7 @@ namespace pdaaal
         r._to = to;
         r._op_label = label;
         r._operation = op;
-        auto& rules = _states[from]._rules;
+        auto& rules = (from == 0 ? _initial : _states[from])._rules;
         auto lb = std::lower_bound(rules.begin(), rules.end(), r);
         if (lb == std::end(rules) || *lb != r)
             lb = rules.insert(lb, r); // TODO this is expensive. Use lists?
@@ -120,8 +120,8 @@ namespace pdaaal
         // lets do a forward/backward pruning first
         std::queue<size_t> waiting;
         std::vector<bool> seen(_states.size());
-        waiting.push(0);
-        seen[0] = true;
+        waiting.push(_initial_id);
+        seen[_initial_id] = true;
         while (!waiting.empty()) {
             // forward
             auto el = waiting.front();
@@ -144,7 +144,7 @@ namespace pdaaal
     {
         std::queue<size_t> waiting;
         std::vector<bool> in_waiting(_states.size());
-        in_waiting[0] = true; // we don't ever prune 0.
+        in_waiting[_initial_id] = true; // we don't ever prune initial.
         for (size_t t = 0; t < _states.size(); ++t) {
             in_waiting[t] = true;
             waiting.push(t);
@@ -153,7 +153,7 @@ namespace pdaaal
         while (!waiting.empty()) {
             auto s = waiting.front();
             waiting.pop();
-            if (s == 0) continue;
+            if (s == _initial_id) continue;
             in_waiting[s] = false;
             std::set<uint32_t> usefull_tos;
             bool cont = false;
@@ -235,7 +235,7 @@ namespace pdaaal
         auto ds = (aggresivity >= 2);
         std::vector<tos_t> approximation(_states.size());
         // initialize
-        for (auto& r : _states[0]._rules) {
+        for (auto& r : _states[_initial_id]._rules) {
             if (r._to == 0) continue;
             if (r._precondition.empty()) continue;
             auto& ss = approximation[r._to];
@@ -298,6 +298,7 @@ namespace pdaaal
         }
         // DO PRUNING!
         for (size_t i = 1; i < _states.size(); ++i) {
+            if(i == initial()) continue;
             auto& app = approximation[i];
             auto& state = _states[i];
             size_t br = 0;
@@ -329,6 +330,7 @@ namespace pdaaal
 
     void PDA::pre_t::merge(bool negated, const std::vector<uint32_t>& other, size_t all_labels)
     {
+        assert(all_labels != std::numeric_limits<size_t>::max());
         if (_wildcard) return;
         if (negated && other.empty()) {
             _wildcard = true;
@@ -696,5 +698,22 @@ namespace pdaaal
         assert(false);
         return false;
     }
+    
+    void PDA::finalize()
+    {
+        _initial_id = _states.size();
+        _states.emplace_back(_initial);
+        for (auto& s : _states) {
+            if (!s._pre.empty() && s._pre.front() == 0) {
+                s._pre.erase(std::begin(s._pre));
+                s._pre.emplace_back(_initial_id);
+            }
+        }
+        for (auto& r : _states[_initial_id]._rules) {
+            r._precondition.clear();
+            r._precondition.merge(false, _initial_stack, std::numeric_limits<size_t>::max());
+        }
+    }
 
+    
 }

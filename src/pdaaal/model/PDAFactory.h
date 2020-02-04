@@ -97,6 +97,7 @@ namespace pdaaal {
 
             // Destruct the stack!
             build_destruction(result);
+            result.finalize();
             return result;
         }
 
@@ -168,7 +169,7 @@ namespace pdaaal {
                         }
                     }
                 }
-            }
+            }            
         }
 
         bool empty_desctruction_accept() {
