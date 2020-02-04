@@ -35,9 +35,9 @@ if (AALWINES_GetDependencies)
     ExternalProject_add(ptrie-ext
         URL https://github.com/petergjoel/ptrie/archive/1.0.3.zip
         URL_HASH SHA512=3f8285a0a7008dd0a8850753b748ad2d076df3f02574005f6580fa750f9a4aaa808e297a60c2b91d705e2ca63b1eb83ecd4e4504ae420fb2fd94d8f10ea42dba
-        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPTRIE_BuildTest=OFF -DCMAKE_BUILD_TYPE=Release
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     )
-    
+    file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/include)
     ExternalProject_add(rapidxml-ext
         URL https://downloads.sourceforge.net/project/rapidxml/rapidxml/rapidxml%201.13/rapidxml-1.13.zip
         URL_HASH SHA512=6c10583e6631ccdb0217d0a5381172cb4c1046226de6ef1acf398d85e81d145228e14c3016aefcd7b70a1db8631505b048d8b4f5d4b0dbf1811d2482eefdd265
