@@ -33,8 +33,8 @@ if (AALWINES_GetDependencies)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
 
     ExternalProject_add(ptrie-ext
-        GIT_REPOSITORY https://github.com/petergjoel/ptrie
-        GIT_TAG 1.0.3
+        URL https://github.com/petergjoel/ptrie/archive/1.0.3.zip
+        URL_HASH SHA512=3f8285a0a7008dd0a8850753b748ad2d076df3f02574005f6580fa750f9a4aaa808e297a60c2b91d705e2ca63b1eb83ecd4e4504ae420fb2fd94d8f10ea42dba
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPTRIE_BuildTest=OFF -DCMAKE_BUILD_TYPE=Release
     )
     
