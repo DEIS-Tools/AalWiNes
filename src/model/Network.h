@@ -36,7 +36,7 @@
 #include <memory>
 #include <functional>
 
-namespace mpls2pda {
+namespace aalwines {
 class Network {
 public:
     Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);

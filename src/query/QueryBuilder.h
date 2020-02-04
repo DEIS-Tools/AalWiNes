@@ -59,7 +59,7 @@ namespace std {
     ostream &operator<<(ostream &os, const std::vector<std::string> &vec);
 }
 
-namespace mpls2pda {
+namespace aalwines {
 
     class Builder {
     public:

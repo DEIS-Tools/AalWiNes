@@ -32,7 +32,7 @@
 #include <functional>
 #include <ostream>
 
-namespace mpls2pda {
+namespace aalwines {
 
     class Query {
     public:
@@ -282,9 +282,9 @@ namespace mpls2pda {
 
 namespace std {
     template<>
-    struct hash<mpls2pda::Query::label_t>
+    struct hash<aalwines::Query::label_t>
     {
-        std::size_t operator()(const mpls2pda::Query::label_t& k) const {
+        std::size_t operator()(const aalwines::Query::label_t& k) const {
             std::hash<uint64_t> hf;
             return hf(k.value()) xor hf((int)k.type()) xor hf(k.mask());
         }

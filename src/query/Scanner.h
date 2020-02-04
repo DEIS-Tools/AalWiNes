@@ -34,7 +34,7 @@
 #include "location.hh"
 #include "QueryBuilder.h"
 
-namespace mpls2pda {
+namespace aalwines {
 
     class Scanner : public yyFlexLexer {
     public:

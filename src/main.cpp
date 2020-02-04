@@ -51,7 +51,7 @@
 #include <boost/filesystem/path.hpp>
 
 namespace po = boost::program_options;
-using namespace mpls2pda;
+using namespace aalwines;
 using namespace pdaaal;
 
 /*

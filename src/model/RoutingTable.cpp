@@ -33,7 +33,7 @@
 #include <sstream>
 #include <map>
 
-namespace mpls2pda
+namespace aalwines
 {
 
     RoutingTable::RoutingTable()

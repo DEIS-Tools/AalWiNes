@@ -31,7 +31,7 @@
 #include <vector>
 #include <streambuf>
 #include <sstream>
-namespace mpls2pda
+namespace aalwines
 {
 
     Router::Router(size_t id, bool is_null) : _index(id), _is_null(is_null)

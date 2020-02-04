@@ -20,7 +20,7 @@
 #include "filter.h"
 #include "Network.h"
 
-namespace mpls2pda {
+namespace aalwines {
 
     filter_t filter_t::operator&&(const filter_t& other)
     {

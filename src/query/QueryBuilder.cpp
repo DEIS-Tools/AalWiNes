@@ -46,7 +46,7 @@ namespace std
     }
 }
 
-namespace mpls2pda
+namespace aalwines
 {
 
     int Builder::do_parse(std::istream &stream)

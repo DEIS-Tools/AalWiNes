@@ -34,7 +34,7 @@
 
 #ifndef ROUTINGTABLE_H
 #define ROUTINGTABLE_H
-namespace mpls2pda {
+namespace aalwines {
     class Router;
     class Interface;
     class Network;

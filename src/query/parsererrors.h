@@ -31,7 +31,7 @@
 #include <sstream>
 #include "utils/errors.h"
 
-namespace mpls2pda {
+namespace aalwines {
 
     struct base_parser_error : public base_error {
 

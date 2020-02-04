@@ -36,7 +36,7 @@
 
 #include "RoutingTable.h"
 
-namespace mpls2pda {
+namespace aalwines {
 class Interface {
 public:
     Interface(size_t id, size_t global_id, Router* target, Router* parent);
