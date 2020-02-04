@@ -40,15 +40,20 @@ if (AALWINES_GetDependencies)
     
     ExternalProject_add(rapidxml-ext
         URL https://downloads.sourceforge.net/project/rapidxml/rapidxml/rapidxml%201.13/rapidxml-1.13.zip
+        URL_HASH SHA512=6c10583e6631ccdb0217d0a5381172cb4c1046226de6ef1acf398d85e81d145228e14c3016aefcd7b70a1db8631505b048d8b4f5d4b0dbf1811d2482eefdd265
         BUILD_COMMAND ""
-        CONFIGURE_COMMAND ls ../rapidxml-ext
+        CONFIGURE_COMMAND ""
         INSTALL_COMMAND cp -f ../rapidxml-ext/{rapidxml,rapidxml_iterators,rapidxml_print,rapidxml_utils}.hpp ${EXTERNAL_INSTALL_LOCATION}/include 
     )
 
     # we can now include external libraries
     include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
     link_directories(${EXTERNAL_INSTALL_LOCATION}/lib)
-endif (AALWINES_GetDependencies)
 
+    # download moped
+    file(MAKE_DIRECTORY bin)
+    file(DOWNLOAD https://github.com/petergjoel/P-Rex/raw/master/bin/moped bin/moped EXPECTED_HASH SHA512=f8a3bfc1914b425a9272544f639325c7799b76a5e6bf39d0500ae2453c7ccce3ddfb7a6db0d54ed5a84e623fea4002f2c09f2eb42235d3bb7cd7d52d78b73f5a)
+    execute_process(COMMAND chmod +x bin/moped)
+endif (AALWINES_GetDependencies)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/)

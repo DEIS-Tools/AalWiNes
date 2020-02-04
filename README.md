@@ -14,18 +14,15 @@ sudo apt update
 sudo apt upgrade
 sudo apt install build-essential flex bison cmake libboost-all-dev
 
-# get P-Rex v1 for moped binary and sample data
-#   maybe you want to add MOPED_PATH to your .bashrc
-git clone git@github.com:P-RexMPLS/P-Rex.git
-export MOPED_PATH=`pwd`/P-Rex/bin/moped
 
 # get aalwines (P-Rex v2) and compile
-git clone --recurse-submodules git@github.com:DEIS-Tools/aalwines.git
+git clone git@github.com:DEIS-Tools/aalwines.git
 cd aalwines
 mkdir build
 cd build
 cmake ..
 make
+export MOPED_PATH=`pwd`/../bin/moped
 # binary will be in build/bin
 ```
 
