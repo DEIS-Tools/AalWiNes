@@ -12,14 +12,15 @@ add_flex_bison_dependency(flexer bparser)
 
 
 find_package(Boost 1.66 COMPONENTS program_options regex filesystem REQUIRED)
-include_directories(${Boost_INCLUDE_DIR} rapidxml)
+include_directories(${Boost_INCLUDE_DIR})
 
 add_executable(allwines ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.cpp model/builders/PRexBuilder.cpp
     model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDAFactory.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp 
     pdaaal/model/PDA.cpp pdaaal/engine/Moped.cpp pdaaal/engine/PostStar.cpp
     utils/parsing.cpp utils/system.cpp)
-target_link_libraries(allwines PRIVATE ${Boost_LIBRARIES} rapidxml ptrie)
+add_dependencies(allwines ptrie-ext rapidxml-ext)
+target_link_libraries(allwines PRIVATE ${Boost_LIBRARIES} ptrie)
 
 install(TARGETS allwines
 	RUNTIME DESTINATION bin
