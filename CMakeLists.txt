@@ -29,7 +29,6 @@ option(AALWINES_GetDependencies "Fetch external dependencies from web." ON)
 if (AALWINES_GetDependencies)
     # setup for external imports
     include(ExternalProject)
-    find_package(Git REQUIRED)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
 
     ExternalProject_add(ptrie-ext
