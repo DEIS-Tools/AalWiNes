@@ -73,8 +73,9 @@ namespace aalwines
                 iit->_ingoing = &parent;
             }
         }
-
+#ifndef NDEBUG
         for(auto& e : _entries) assert(e._ingoing == &parent);
+#endif
         assert(std::is_sorted(_entries.begin(), _entries.end()));
         return all_fine;
     }
