@@ -32,7 +32,7 @@
 namespace aalwines
 {
 
-    Network::Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
+    Network::Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
     : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
     {
         for (auto& r : _routers) {

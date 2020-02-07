@@ -44,10 +44,10 @@ namespace aalwines {
                      const std::string& network,
                      std::ostream& warnings, bool skip_pfe);
     private:
-        static void router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router>>&routers, ptrie::map<Router*>& mapping, 
+        static void router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router>>&routers, Network::routermap_t& mapping, 
                 std::vector<const Interface*>&, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap);
         static void router_parse_routing(Router& router, std::istream& data, std::istream& indirect, std::vector<const Interface*>&, std::ostream& warnings, bool skip_pfe);
-        static RoutingTable parse_table(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>>&indirect, Router* parent, std::vector<const Interface*>& , std::ostream& warnings, bool skip_pfe);
+        static RoutingTable parse_table(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>, char>&indirect, Router* parent, std::vector<const Interface*>& , std::ostream& warnings, bool skip_pfe);
         static Interface* parse_via(Router* parent, rapidxml::xml_node<char>* via, std::vector<const Interface*>&);
         static int parse_weight(rapidxml::xml_node<char>* nh);
         static void parse_ops(RoutingTable::forward_t& f, std::string& opstr, int sticky);

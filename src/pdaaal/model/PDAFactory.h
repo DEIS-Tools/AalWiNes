@@ -261,8 +261,6 @@ namespace pdaaal {
             }
         }
 
-        
-        
         virtual const std::vector<size_t>& initial() = 0;
         virtual bool empty_accept() const = 0;
         virtual bool accepting(size_t) = 0;

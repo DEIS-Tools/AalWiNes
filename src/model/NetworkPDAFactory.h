@@ -48,7 +48,7 @@ namespace aalwines
             int32_t _rid = 0; // which rule in that entry
             NFA::state_t* _nfastate = nullptr;
             const Interface* _inf = nullptr;
-        } __attribute__((packed)); // packed is needed to make this work directly with ptries
+        } __attribute__((packed)); // packed is needed to make this work fast with ptries
     public:
         NetworkPDAFactory(Query& q, Network& network, bool only_mpls_swap);
         
@@ -86,7 +86,7 @@ namespace aalwines
         Query& _query;
         NFA& _path;
         std::vector<size_t> _initial;
-        ptrie::map<bool> _states;
+        ptrie::map<bool,nstate_t> _states;
         bool _only_mpls_swap = false;
     };
 }

@@ -39,7 +39,7 @@ namespace aalwines
     {
         std::vector<std::unique_ptr<Router> > routers;
         std::vector<const Interface*> interfaces;
-        ptrie::map<Router*> mapping;
+        Network::routermap_t mapping;
         
         // lets start by creating empty router-objects for all the alias' we have
         using tp = std::tuple<std::string, std::string, std::string>;
@@ -67,7 +67,7 @@ namespace aalwines
                 while (std::getline(ss, tmp, ',')) {
                     if (tmp.size() == 0) continue;
                     some = true;
-                    auto res = mapping.insert((unsigned char*) tmp.c_str(), tmp.size());
+                    auto res = mapping.insert({tmp.c_str(), tmp.size()});
                     if (!res.first) {
                         auto oid = mapping.get_data(res.second)->index();
                         if (oid != id) {
@@ -191,7 +191,7 @@ namespace aalwines
         return Network(std::move(mapping), std::move(routers), std::move(interfaces));
     }
 
-    void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, ptrie::map<Router*>& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap)
+    void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, Network::routermap_t& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap)
     {
         rapidxml::xml_document<> doc;
         std::vector<char> buffer((std::istreambuf_iterator<char>(data)), std::istreambuf_iterator<char>());
@@ -218,7 +218,7 @@ namespace aalwines
                     continue;
                 auto addv6 = n->first_node("ipv6-address");
                 if (addv6) {
-                    auto res = mapping.exists((unsigned char*) addv6->value(), strlen(addv6->value()));
+                    auto res = mapping.exists({addv6->value(), strlen(addv6->value())});
                     if (!res.first) {
                         warnings << "warning: Could not find ipv6 " << addv6->value() << " in adjacency of " << router.name() << std::endl;
                     }
@@ -227,7 +227,7 @@ namespace aalwines
                 }
                 auto addv4 = n->first_node("ip-address");
                 if (addv4) {
-                    auto res = mapping.exists((unsigned char*) addv4->value(), strlen(addv4->value()));
+                    auto res = mapping.exists({addv4->value(), strlen(addv4->value())});
                     if (!res.first) {
                         warnings << "warning: Could not find ipv4 " << addv4->value() << " in adjacency of " << router.name() << std::endl;
                     }
@@ -243,7 +243,7 @@ namespace aalwines
                 }
                 auto name_node = n->first_node("system-name");
                 if (name_node) {
-                    auto res = mapping.exists((unsigned char*) name_node->value(), strlen(name_node->value()));
+                    auto res = mapping.exists({name_node->value(), strlen(name_node->value())});
                     if (!res.first) {
                         warnings << "warning: Could not find name " << name_node->value() << " in adjacency of " << router.name() << std::endl;
                     }
@@ -264,14 +264,14 @@ namespace aalwines
                     routers.emplace_back(std::make_unique<Router>(nnid));
                     next = routers.back().get();
                     if (addv4) {
-                        auto res = mapping.insert((unsigned char*) addv4->value(), strlen(addv4->value()));
+                        auto res = mapping.insert({addv4->value(), strlen(addv4->value())});
                         mapping.get_data(res.second) = next;
                         std::string nn = addv4->value();
                         next->add_name(nn);
                         warnings << "\t" << nn << std::endl;
                     }
                     if (addv6) {
-                        auto res = mapping.insert((unsigned char*) addv6->value(), strlen(addv6->value()));
+                        auto res = mapping.insert({addv6->value(), strlen(addv6->value())});
                         mapping.get_data(res.second) = next;
                         std::string nn = addv6->value();
                         next->add_name(nn);
@@ -279,7 +279,7 @@ namespace aalwines
                     }
                     if (name_node) {
 
-                        auto res = mapping.insert((unsigned char*) name_node->value(), strlen(name_node->value()));
+                        auto res = mapping.insert({name_node->value(), strlen(name_node->value())});
                         mapping.get_data(res.second) = next;
                         std::string nn = name_node->value();
                         next->add_name(nn);
@@ -340,7 +340,7 @@ namespace aalwines
             throw base_error(e.str());
         }
         else {
-            ptrie::map<std::pair < std::string, std::string>> indir;
+            ptrie::map<std::pair < std::string, std::string>, char> indir;
             if (indirect.good() && indirect.peek() != EOF) {
                 std::string line;
                 while (std::getline(indirect, line)) {
@@ -398,7 +398,7 @@ namespace aalwines
                         warnings << "\t" << line << std::endl;
                     }
 
-                    auto res = indir.insert((const unsigned char*) rn.c_str(), rn.size());
+                    auto res = indir.insert(rn.c_str(), rn.size());
                     auto& data = indir.get_data(res.second);
                     if (!res.first) {
                         if (data.first != iface) {
@@ -443,7 +443,7 @@ namespace aalwines
         }
     }
 
-    RoutingTable JuniperBuilder::parse_table(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string> >& indirect, 
+    RoutingTable JuniperBuilder::parse_table(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>, char >& indirect, 
                                              Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool skip_pfe)
     {
         RoutingTable nr;
@@ -585,7 +585,7 @@ namespace aalwines
                 else if (!skipvia && indirect.size() > 0) {
                     if (nhid) {
                         auto val = nhid->value();
-                        auto alt = indirect.exists((const unsigned char*) val, strlen(val));
+                        auto alt = indirect.exists(val, strlen(val));
                         if (!alt.first) {
                             std::stringstream e;
                             e << "Could not lookup indirect : " << val << std::endl;

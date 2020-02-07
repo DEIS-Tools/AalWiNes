@@ -25,6 +25,7 @@
  */
 
 #include "Router.h"
+#include "Network.h"
 #include "utils/errors.h"
 #include "utils/parsing.h"
 
@@ -158,7 +159,7 @@ namespace aalwines
             i->make_pairing(interfaces, matcher);
     }
 
-    void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*>& mapping)
+    void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, Network::routermap_t& mapping)
     {
         std::stringstream es;
         Router* nullrouter = nullptr;
@@ -167,7 +168,7 @@ namespace aalwines
             routers.emplace_back(std::make_unique<Router>(id, true));
             Router& router = *routers.back().get();
             router.add_name("NULL");
-            auto res = mapping.insert((const unsigned char*)"NULL", 4);
+            auto res = mapping.insert("NULL", 4);
             if(!res.first)
             {
                 es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;

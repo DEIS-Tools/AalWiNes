@@ -39,7 +39,8 @@
 namespace aalwines {
 class Network {
 public:
-    Network(ptrie::map<Router*>&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
+    using routermap_t = ptrie::map<Router*, char>;
+    Network(routermap_t&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
     Network(const Network&) = default;
     Network(Network&&) = default;
     Network& operator=(const Network&) = default;
@@ -58,7 +59,7 @@ public:
     void write_prex_routing(std::ostream& s);
 private:
     // NO TOUCHEE AFTER INIT!
-    ptrie::map<Router*> _mapping;
+    routermap_t _mapping;
     std::vector<std::unique_ptr<Router>> _routers;    
     std::unordered_map<Query::label_t,std::vector<std::pair<const RoutingTable::entry_t*, const Router*>>> _label_map;
     std::vector<const Interface*> _all_interfaces;

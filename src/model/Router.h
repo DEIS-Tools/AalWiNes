@@ -107,7 +107,7 @@ public:
     }
     std::unique_ptr<char[] > interface_name(size_t i);
     void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
-    static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*>& mapping);
+    static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*, char>& mapping);
     void print_simple(std::ostream& s);
 private:
     size_t _index = std::numeric_limits<size_t>::max();
