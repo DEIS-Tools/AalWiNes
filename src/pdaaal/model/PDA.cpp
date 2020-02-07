@@ -330,7 +330,6 @@ namespace pdaaal
 
     void PDA::pre_t::merge(bool negated, const std::vector<uint32_t>& other, size_t all_labels)
     {
-        assert(all_labels != std::numeric_limits<size_t>::max());
         if (_wildcard) return;
         if (negated && other.empty()) {
             _wildcard = true;
