@@ -269,20 +269,21 @@ namespace pdaaal {
     protected:
         size_t nfa_id(const nfastate_t* state)
         {
-            auto id = _ptr_to_state.find(state);
-            if(id == std::end(_ptr_to_state) || id->first != state)
+            auto id = _ptr_to_state.insert(state);
+            if(id.first)
             {
                 size_t nid = _nfamap.size() + _num_pda_states;
-                id = _ptr_to_state.insert(id, std::make_pair(state, nid));
+                _ptr_to_state.get_data(id.second) = nid;
                 _nfamap.push_back(state);
+                return nid;
             }
-            return id->second;
+            return _ptr_to_state.get_data(id.second);
         }
         NFA<T> _cons_stack, _des_stack;
         std::unordered_set<T> _all_labels;
         size_t _num_pda_states = 0;
         std::vector<const nfastate_t*> _nfamap;
-        std::unordered_map<const nfastate_t*, size_t> _ptr_to_state;
+        ptrie::map<size_t, const nfastate_t*> _ptr_to_state;
     private:
 
     };
