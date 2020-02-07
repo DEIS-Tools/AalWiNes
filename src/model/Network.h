@@ -61,7 +61,7 @@ private:
     // NO TOUCHEE AFTER INIT!
     routermap_t _mapping;
     std::vector<std::unique_ptr<Router>> _routers;    
-    std::unordered_map<Query::label_t,std::vector<std::pair<const RoutingTable::entry_t*, const Router*>>> _label_map;
+    size_t _total_labels = 0;
     std::vector<const Interface*> _all_interfaces;
     std::unordered_set<Query::label_t> _label_cache;
     std::unordered_set<Query::label_t> _non_service_label;

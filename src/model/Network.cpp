@@ -35,10 +35,12 @@ namespace aalwines
     Network::Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
     : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
     {
+        ptrie::set<Query::label_t> all_labels;
+        _total_labels = 0;
         for (auto& r : _routers) {
             for (auto& inf : r->interfaces()) {
                 for (auto& e : inf->table().entries()) {
-                    _label_map[e._top_label].emplace_back(&e, r.get());
+                    if(all_labels.insert(e._top_label).first) ++_total_labels;
                 }
             }
         }
@@ -161,7 +163,7 @@ namespace aalwines
         if(_label_cache.size() == 0)
         {
             std::unordered_set<Query::label_t> res;
-            res.reserve(_label_map.size() + 7);
+            res.reserve(_total_labels + 7);
             res.insert(Query::label_t::unused_ip4);
             res.insert(Query::label_t::unused_ip6);
             res.insert(Query::label_t::unused_mpls);
