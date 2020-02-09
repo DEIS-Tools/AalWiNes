@@ -86,7 +86,7 @@ namespace aalwines
         Query& _query;
         NFA& _path;
         std::vector<size_t> _initial;
-        ptrie::map<bool,nstate_t> _states;
+        ptrie::map<nstate_t,bool> _states;
         bool _only_mpls_swap = false;
     };
 }

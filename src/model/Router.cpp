@@ -59,7 +59,7 @@ namespace aalwines
             }
         }
         size_t l = strlen(iface.c_str());
-        auto res = _interface_map.exists((unsigned char*)iface.c_str(), l);
+        auto res = _interface_map.exists(iface.c_str(), l);
         if(!res.first)
             return nullptr;
         else
@@ -76,7 +76,7 @@ namespace aalwines
         }
         size_t l = strlen(iface.c_str());
         _inamelength = std::max(_inamelength, l);
-        auto res = _interface_map.insert((unsigned char*) iface.c_str(), iface.length());
+        auto res = _interface_map.insert(iface.c_str(), iface.length());
         if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {
             auto tgt = _interface_map.get_data(res.second)->target();
             auto tname = tgt != nullptr ? tgt->name() : "SINK";
@@ -204,7 +204,7 @@ namespace aalwines
             return;
         auto n = std::make_unique<char[]>(_inamelength + 1);
         for (auto& i : _interfaces) {
-            auto res = _interface_map.unpack(i->id(), (unsigned char*) n.get());
+            auto res = _interface_map.unpack(i->id(), n.get());
             n[res] = 0;
             auto tgtstring = i->target() != nullptr ? i->target()->name() : "SINK";
             out << "\"" << name() << "\" -> \"" << tgtstring
@@ -222,7 +222,7 @@ namespace aalwines
     std::unique_ptr<char[] > Router::interface_name(size_t i)
     {
         auto n = std::make_unique<char[]>(_inamelength + 1);
-        auto res = _interface_map.unpack(i, (unsigned char*) n.get());
+        auto res = _interface_map.unpack(i, n.get());
         n[res] = 0;
         return n;
     }

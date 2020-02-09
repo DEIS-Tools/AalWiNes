@@ -39,7 +39,7 @@
 namespace aalwines {
 class Network {
 public:
-    using routermap_t = ptrie::map<Router*, char>;
+    using routermap_t = ptrie::map<char, Router*>;
     Network(routermap_t&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
     Network(const Network&) = default;
     Network(Network&&) = default;

@@ -340,7 +340,7 @@ namespace aalwines
             throw base_error(e.str());
         }
         else {
-            ptrie::map<std::pair < std::string, std::string>, char> indir;
+            indirmap_t indir;
             if (indirect.good() && indirect.peek() != EOF) {
                 std::string line;
                 while (std::getline(indirect, line)) {
@@ -443,7 +443,7 @@ namespace aalwines
         }
     }
 
-    RoutingTable JuniperBuilder::parse_table(rapidxml::xml_node<char>* node, ptrie::map<std::pair<std::string, std::string>, char >& indirect, 
+    RoutingTable JuniperBuilder::parse_table(rapidxml::xml_node<char>* node, indirmap_t& indirect, 
                                              Router* parent, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, bool skip_pfe)
     {
         RoutingTable nr;

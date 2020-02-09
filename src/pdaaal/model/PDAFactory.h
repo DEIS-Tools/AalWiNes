@@ -283,7 +283,7 @@ namespace pdaaal {
         std::unordered_set<T> _all_labels;
         size_t _num_pda_states = 0;
         std::vector<const nfastate_t*> _nfamap;
-        ptrie::map<size_t, const nfastate_t*> _ptr_to_state;
+        ptrie::map<const nfastate_t*, size_t> _ptr_to_state;
     private:
 
     };
