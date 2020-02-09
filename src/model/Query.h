@@ -319,7 +319,7 @@ namespace ptrie {
         
         static constexpr size_t element_size()
         {
-            return sizeof(aalwines::Query::type_t) + sizeof(uint8_t) + sizeof(uint64_t);
+            return sizeof(uint8_t)*2 + sizeof(uint64_t);
         }
         
         static constexpr bool continious()

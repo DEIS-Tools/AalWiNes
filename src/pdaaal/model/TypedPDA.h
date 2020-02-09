@@ -68,23 +68,15 @@ namespace pdaaal {
 
         TypedPDA(std::unordered_set<T>& all_labels) {
             std::set<T> sorted(all_labels.begin(), all_labels.end());
-            size_t id = 0;
             for(auto& l : sorted)
             {
-                _label_map[l] = id;
-                ++id;
-                if(l.type() == 4)
-                {
-                    std::cerr << (int)l.type() << ", " << (int)l.mask() << ", " << (int)l.value() << std::endl;
-                    std::cerr << "SIZE " << _label_map.size() << std::endl;
-                    std::cerr << l << std::endl;
-                }
-            }
-            id = 0;
-            for(auto& l : sorted)
-            {
-                assert(_label_map[l] == id);
-                ++id;
+#ifndef NDEBUG
+                auto r = 
+#endif
+                _label_map.insert(l);
+#ifndef NDEBUG
+                assert(r.first);
+#endif
             }
         }
 
@@ -155,7 +147,7 @@ namespace pdaaal {
             return tpre;
         }
                 
-        ptrie::map<uint32_t, T> _label_map;
+        ptrie::set_stable<T> _label_map;
 
     };
 }
