@@ -38,6 +38,7 @@
 #include <set>
 #include <cassert>
 #include <iostream>
+#include <ptrie/ptrie_map.h>
 
 namespace pdaaal {
     template<typename T>
@@ -57,14 +58,7 @@ namespace pdaaal {
         
         T get_symbol(size_t i) {
             T res;
-            for(auto& l : _label_map)
-            {
-                if(l.second == i)
-                {
-                    res = l.first;
-                    break;
-                }
-            }
+            _label_map.unpack(i, &res);
             return res;
         }
         
@@ -74,11 +68,15 @@ namespace pdaaal {
 
         TypedPDA(std::unordered_set<T>& all_labels) {
             std::set<T> sorted(all_labels.begin(), all_labels.end());
-            size_t id = 0;
             for(auto& l : sorted)
             {
-                _label_map[l] = id;
-                ++id;
+#ifndef NDEBUG
+                auto r = 
+#endif
+                _label_map.insert(l);
+#ifndef NDEBUG
+                assert(r.first);
+#endif
             }
         }
 
@@ -88,10 +86,9 @@ namespace pdaaal {
                 size_t last = 0;
                 for(auto& l : labels)
                 {
-                    assert(_label_map.count(l) == 1);
-                    auto res = _label_map.find(l);
-                    assert(res != std::end(_label_map));
-                    for(; last < res->second; ++last)
+                    auto res = _label_map.exists(l);
+                    assert(res.first);
+                    for(; last < res.second; ++last)
                     {
                         _add_rule(from, to, op, last, negated_pre, tpre);
                     }
@@ -119,10 +116,10 @@ namespace pdaaal {
         {
             if(op != POP && op != NOOP)
             {
-                auto res = _label_map.find(label);
-                if(res != std::end(_label_map))
+                auto res = _label_map.exists(label);
+                if(res.first)
                 {
-                    return res->second;
+                    return res.second;
                 }
                 else
                 {
@@ -138,19 +135,19 @@ namespace pdaaal {
             for(size_t i = 0; i < pre.size(); ++i)
             {
                 auto& p = pre[i];
-                if(_label_map.count(p) != 1)
+                auto res = _label_map.exists(p);
+                if(!res.first)
                 {
-                    std::cerr << "could not find " << p << std::endl;
+                    std::cerr << (int)p.type() << ", " << (int)p.mask() << ", " << (int)p.value() << std::endl;
+                    std::cerr << "SIZE " << _label_map.size() << std::endl;
+                    assert(false);
                 }
-                assert(_label_map.count(p) == 1);
-                auto res = _label_map.find(p);
-                assert(res != std::end(_label_map));
-                tpre[i] = res->second;
+                tpre[i] = res.second;
             }     
             return tpre;
         }
                 
-        std::unordered_map<T, uint32_t> _label_map;
+        ptrie::set_stable<T> _label_map;
 
     };
 }

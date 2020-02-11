@@ -31,6 +31,7 @@
 
 #include <functional>
 #include <ostream>
+#include <ptrie/ptrie.h>
 
 namespace aalwines {
 
@@ -51,6 +52,7 @@ namespace aalwines {
             uint8_t _mask = 0;
             uint64_t _value = 0;               
         public:
+            friend class ptrie::byte_iterator<label_t>;
             label_t()
             {
                 _type = NONE;
@@ -289,7 +291,42 @@ namespace std {
             return hf(k.value()) xor hf((int)k.type()) xor hf(k.mask());
         }
     };
-    
+}
+
+namespace ptrie {
+    template<>
+    struct byte_iterator<aalwines::Query::label_t>
+    {
+        using label_t = aalwines::Query::label_t;
+        static constexpr unsigned char& access(label_t* data, size_t id)
+        {
+            auto el = id / element_size();
+            id = id % element_size();
+            switch(id){
+                case 0:
+                    return (uchar&)data[el]._type;
+                case 1:
+                    return (uchar&)data[el]._mask;
+                default:
+                    return ((uchar*)&data[el]._value)[id-2];
+            }
+        }
+        
+        static constexpr unsigned char& const_access(const label_t* data, size_t id)
+        {
+            return access(const_cast<label_t*>(data), id);
+        }
+        
+        static constexpr size_t element_size()
+        {
+            return sizeof(uint8_t)*2 + sizeof(uint64_t);
+        }
+        
+        static constexpr bool continious()
+        {
+            return false;
+        }
+    };
 }
 #endif /* QUERY_H */
 

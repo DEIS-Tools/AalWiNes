@@ -55,7 +55,7 @@ namespace aalwines {
     {
         std::vector<std::unique_ptr<Router> > routers;
         std::vector<const Interface*> interfaces;
-        ptrie::map<Router*> mapping;        
+        Network::routermap_t mapping;        
 
         {
             rapidxml::xml_document<> topo_xml;
@@ -75,7 +75,7 @@ namespace aalwines {
     }
 
     
-    void PRexBuilder::build_routers(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*>& mapping, std::ostream& warnings)
+    void PRexBuilder::build_routers(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& all_interfaces, Network::routermap_t& mapping, std::ostream& warnings)
     {
         std::stringstream es;
         auto nw = topo_xml.first_node("network");
@@ -105,7 +105,7 @@ namespace aalwines {
             routers.emplace_back(std::make_unique<Router>(id));
             Router& router = *routers.back().get();
             router.add_name(name);
-            auto res = mapping.insert((const unsigned char*)name.c_str(), name.length());
+            auto res = mapping.insert(name.c_str(), name.length());
             if(!res.first)
             {
                 es << "error: Duplicate definition of \"" << name << "\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
@@ -179,7 +179,7 @@ namespace aalwines {
                 }
                 std::string rn = rattr->value();
                 std::string in = iattr->value();
-                auto res = mapping.exists((unsigned char*)rn.c_str(), rn.length());
+                auto res = mapping.exists(rn.c_str(), rn.length());
                 if(!res.first)
                 {
                     es << "Could not find router " << rn << " for matching of links.";
@@ -202,7 +202,7 @@ namespace aalwines {
         Router::add_null_router(routers, all_interfaces, mapping);
     }
 
-    void PRexBuilder::build_tables(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, ptrie::map<Router*>& mapping, std::ostream& warnings)
+    void PRexBuilder::build_tables(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, Network::routermap_t& mapping, std::ostream& warnings)
     {
         std::stringstream es;
         auto nw = topo_xml.first_node("routes");
@@ -228,7 +228,7 @@ namespace aalwines {
                 throw base_error(es.str());
             }
             std::string rn = for_attr->value();
-            auto res = mapping.exists((unsigned char*)rn.c_str(), rn.length());
+            auto res = mapping.exists(rn.c_str(), rn.length());
             if(!res.first)
             {
                 es << "Could not find router " << rn << " for building routing-tables.";

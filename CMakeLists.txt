@@ -30,10 +30,10 @@ if (AALWINES_GetDependencies)
     # setup for external imports
     include(ExternalProject)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
-
+    
     ExternalProject_add(ptrie-ext
-        URL https://github.com/petergjoel/ptrie/archive/1.0.3.zip
-        URL_HASH SHA512=3f8285a0a7008dd0a8850753b748ad2d076df3f02574005f6580fa750f9a4aaa808e297a60c2b91d705e2ca63b1eb83ecd4e4504ae420fb2fd94d8f10ea42dba
+        URL https://github.com/petergjoel/ptrie/archive/v1.1.0.zip
+        URL_HASH SHA512=092a8f50ca21d1199b19a10c4e0273c93a717a9f6491998a16bf21d21d37e6537ffd8a06ac41a2b623241da6036546d44b754567441944565e2a16646378cf29
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     )
     file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/include)

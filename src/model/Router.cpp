@@ -25,6 +25,7 @@
  */
 
 #include "Router.h"
+#include "Network.h"
 #include "utils/errors.h"
 #include "utils/parsing.h"
 
@@ -58,7 +59,7 @@ namespace aalwines
             }
         }
         size_t l = strlen(iface.c_str());
-        auto res = _interface_map.exists((unsigned char*)iface.c_str(), l);
+        auto res = _interface_map.exists(iface.c_str(), l);
         if(!res.first)
             return nullptr;
         else
@@ -75,7 +76,7 @@ namespace aalwines
         }
         size_t l = strlen(iface.c_str());
         _inamelength = std::max(_inamelength, l);
-        auto res = _interface_map.insert((unsigned char*) iface.c_str(), iface.length());
+        auto res = _interface_map.insert(iface.c_str(), iface.length());
         if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {
             auto tgt = _interface_map.get_data(res.second)->target();
             auto tname = tgt != nullptr ? tgt->name() : "SINK";
@@ -158,7 +159,7 @@ namespace aalwines
             i->make_pairing(interfaces, matcher);
     }
 
-    void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<Router*>& mapping)
+    void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, Network::routermap_t& mapping)
     {
         std::stringstream es;
         Router* nullrouter = nullptr;
@@ -167,7 +168,7 @@ namespace aalwines
             routers.emplace_back(std::make_unique<Router>(id, true));
             Router& router = *routers.back().get();
             router.add_name("NULL");
-            auto res = mapping.insert((const unsigned char*)"NULL", 4);
+            auto res = mapping.insert("NULL", 4);
             if(!res.first)
             {
                 es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
@@ -203,7 +204,7 @@ namespace aalwines
             return;
         auto n = std::make_unique<char[]>(_inamelength + 1);
         for (auto& i : _interfaces) {
-            auto res = _interface_map.unpack(i->id(), (unsigned char*) n.get());
+            auto res = _interface_map.unpack(i->id(), n.get());
             n[res] = 0;
             auto tgtstring = i->target() != nullptr ? i->target()->name() : "SINK";
             out << "\"" << name() << "\" -> \"" << tgtstring
@@ -221,7 +222,7 @@ namespace aalwines
     std::unique_ptr<char[] > Router::interface_name(size_t i)
     {
         auto n = std::make_unique<char[]>(_inamelength + 1);
-        auto res = _interface_map.unpack(i, (unsigned char*) n.get());
+        auto res = _interface_map.unpack(i, n.get());
         n[res] = 0;
         return n;
     }

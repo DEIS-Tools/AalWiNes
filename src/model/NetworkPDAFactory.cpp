@@ -100,7 +100,7 @@ namespace aalwines
         ns._rid = fid;
         ns._eid = eid;
         ns._initial = initial && _only_mpls_swap; // only need for this when restricting labels
-        auto res = _states.insert((unsigned char*) &ns, sizeof (ns));
+        auto res = _states.insert(ns);
         if (res.first) {
             if(res.second != 0)
             {
@@ -350,7 +350,7 @@ namespace aalwines
             throw base_error("Exact and Dual analysis method not yet supported");
         }
         nstate_t s;
-        _states.unpack(id, (unsigned char*) &s);
+        _states.unpack(id, &s);
         std::vector<NetworkPDAFactory::PDAFactory::rule_t> result;
         if (s._opid < 0) {
             if (s._inf == nullptr) 
@@ -515,7 +515,7 @@ namespace aalwines
             {
                 // handle, lookup right states
                 nstate_t s;
-                _states.unpack(step._pdastate, (unsigned char*) &s);
+                _states.unpack(step._pdastate, &s);
                 if(s._opid >= 0)
                 {
                     // Skip, we are just doing a bunch of ops here, printed elsewhere.
@@ -526,7 +526,7 @@ namespace aalwines
                     {
                         // peek at next element, we want to write the ops here
                         nstate_t next;
-                        _states.unpack(trace[sno + 1]._pdastate, (unsigned char*)&next);
+                        _states.unpack(trace[sno + 1]._pdastate, &next);
                         if(next._opid != -1)
                         {
                             // we get the rule we use, print
@@ -655,7 +655,7 @@ namespace aalwines
             if(step._pdastate < _num_pda_states)
             {
                 nstate_t s;
-                _states.unpack(step._pdastate, (unsigned char*) &s);
+                _states.unpack(step._pdastate, &s);
                 if(s._opid >= 0)
                 {
                     // Skip, we are just doing a bunch of ops here, printed elsewhere.
@@ -705,7 +705,7 @@ namespace aalwines
             if(step._pdastate < _num_pda_states)
             {
                 nstate_t s;
-                _states.unpack(step._pdastate, (unsigned char*) &s);
+                _states.unpack(step._pdastate, &s);
                 if(s._opid >= 0)
                 {
                     // Skip, we are just doing a bunch of ops here, printed elsewhere.
