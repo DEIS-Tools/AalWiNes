@@ -225,6 +225,15 @@ namespace aalwines
         for(auto& r : _routers)
         {
             if(r->is_null()) continue;
+            
+            // empty-check
+            bool all_empty = true;
+            for(auto& inf : r->interfaces())
+                all_empty &= inf->table().empty();
+            if(all_empty)
+                continue;
+            
+            
             s << "    <routing for=\"" << r->name() << "\">\n";
             s << "      <destinations>\n";
             
