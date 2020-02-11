@@ -20,7 +20,7 @@ add_executable(aalwines ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.c
     pdaaal/model/PDA.cpp pdaaal/engine/Moped.cpp pdaaal/engine/PostStar.cpp
     utils/parsing.cpp utils/system.cpp)
 add_dependencies(aalwines ptrie-ext rapidxml-ext)
-target_link_libraries(aalwines PRIVATE ${Boost_LIBRARIES} ptrie)
+target_link_libraries(aalwines PRIVATE ${Boost_LIBRARIES})
 
 install(TARGETS aalwines
 	RUNTIME DESTINATION bin
