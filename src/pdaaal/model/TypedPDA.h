@@ -43,6 +43,8 @@
 namespace pdaaal {
     template<typename T>
     class PDAFactory;
+    template<typename T>
+    class PAutomaton;
 
     template<typename T>
     class TypedPDA : public PDA {
@@ -56,7 +58,7 @@ namespace pdaaal {
             return _label_map.size();
         }
         
-        T get_symbol(size_t i) {
+        T get_symbol(size_t i) const {
             T res;
             _label_map.unpack(i, &res);
             return res;
@@ -65,6 +67,7 @@ namespace pdaaal {
 
     protected:
         friend class PDAFactory<T>;
+        friend class PAutomaton<T>;
 
         TypedPDA(std::unordered_set<T>& all_labels) {
             std::set<T> sorted(all_labels.begin(), all_labels.end());
@@ -112,7 +115,7 @@ namespace pdaaal {
             _add_rule(from, to, op, lid, negated, tpre);
         }
         
-        uint32_t find_labelid(op_t op, T label)
+        uint32_t find_labelid(op_t op, T label) const
         {
             if(op != POP && op != NOOP)
             {
@@ -129,7 +132,7 @@ namespace pdaaal {
             return std::numeric_limits<uint32_t>::max();
         }
 
-        std::vector<uint32_t> encode_pre(const std::vector<T>& pre)
+        std::vector<uint32_t> encode_pre(const std::vector<T>& pre) const
         {
             std::vector<uint32_t> tpre(pre.size());
             for(size_t i = 0; i < pre.size(); ++i)

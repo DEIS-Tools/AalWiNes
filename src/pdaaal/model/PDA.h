@@ -137,7 +137,7 @@ namespace pdaaal {
 
     protected:
         std::vector<state_t> _states;
-        const std::vector<uint32_t> _initial_stack{std::numeric_limits<uint32_t>::max()};
+        const std::vector<uint32_t> _initial_stack{std::numeric_limits<uint32_t>::max() - 2}; // std::numeric_limits<uint32_t>::max() is reserved for epsilon transitions (and max-1 for a flag in trace_t).
         state_t _initial;
         size_t _initial_id = 0;
     };

@@ -18,34 +18,34 @@
  */
 
 /*
- * File:   PostStar.h
+ * File:   PreStar.h
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 27-01-2020.
  */
 
-#ifndef POSTSTAR_H
-#define POSTSTAR_H
+#ifndef PRESTAR_H
+#define PRESTAR_H
 
 #include "PAutomaton.h"
 #include "model/Query.h"
 
 namespace pdaaal {
 
-    class PostStar {
+    class PreStar {
     public:
-        PostStar() = default;
+        PreStar() = default;
 
-        virtual ~PostStar() = default;
+        virtual ~PreStar() = default;
 
         bool verify(const TypedPDA<aalwines::Query::label_t>& pda, bool build_trace) {
-            _current_pautomaton = std::make_unique<PAutomaton<aalwines::Query::label_t>>(pda, pda.initial(), pda.initial_stack());
-            _current_pautomaton->_post_star(); // _current_pautomaton->_post_star(build_trace); // TODO: implement no-trace version.
-            return _current_pautomaton->_accepts(pda.terminal(), pda.initial_stack());
+            _current_pautomaton = std::make_unique<PAutomaton<aalwines::Query::label_t>>(pda, pda.terminal(), pda.initial_stack());
+            _current_pautomaton->_pre_star(); // _current_pautomaton->_pre_star(build_trace); // TODO: implement no-trace version.
+            return _current_pautomaton->_accepts(pda.initial(), pda.initial_stack());
         }
 
         [[nodiscard]] std::vector<TypedPDA<aalwines::Query::label_t>::tracestate_t> get_trace(const PDA& pda) const {
-            auto trace = _current_pautomaton->_get_trace(pda.terminal(), pda.initial_stack());
+            auto trace = _current_pautomaton->_get_trace(pda.initial(), pda.initial_stack());
             // Remove terminal state from trace.
             trace.pop_back();
             return trace;
@@ -54,8 +54,7 @@ namespace pdaaal {
     private:
         std::unique_ptr<PAutomaton<aalwines::Query::label_t>> _current_pautomaton = nullptr; // TODO: Maybe change usage interface, so this is not necessary.
     };
-    
+
 }
 
-#endif /* POSTSTAR_H */
-
+#endif //PRESTAR_H

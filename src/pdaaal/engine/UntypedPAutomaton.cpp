@@ -1,0 +1,541 @@
+/*
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *  Copyright Morten K. Schou
+ */
+
+/*
+ * File:   UntypedPAutomaton.cpp
+ * Author: Morten K. Schou <morten@h-schou.dk>
+ *
+ * Created on 21-01-2020.
+ */
+
+
+#include "UntypedPAutomaton.h"
+#include <stack>
+#include <boost/functional/hash.hpp>
+
+namespace pdaaal {
+
+    /*
+     * PreStar, PostStar *
+     */
+    void UntypedPAutomaton::_pre_star() {
+        // This is an implementation of Algorithm 1 (figure 3.3) in:
+        // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
+        // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 42)
+
+        std::vector<std::unique_ptr<temp_edge_t>> edges;
+        std::stack<temp_edge_t *> trans;
+        std::vector<temp_edge_t *> rel;
+        auto dummy = std::make_unique<temp_edge_t>();
+        auto& pda_states = pda().states();
+        const size_t n_pda_states = pda_states.size();
+        auto insert_edge = [&edges, &dummy, &trans, this](size_t from, uint32_t label, size_t to, const trace_t *trace) {
+            (*dummy) = temp_edge_t(from, label, to);
+            auto lb = std::lower_bound(std::begin(edges), std::end(edges), dummy,
+                                       [](auto &a, auto &b) -> bool { return *a < *b; });
+            if (lb == std::end(edges) || *(*lb) != *dummy) { // New edge is not already in edges (rel U trans).
+                lb = edges.insert(lb, std::make_unique<temp_edge_t>(from, label, to));
+                trans.push(lb->get());
+                if (trace != nullptr) { // Don't add existing edges
+                    this->add_edge(from, to, label, trace);
+                }
+            }
+        };
+        const size_t n_pda_labels = this->number_of_labels();
+        auto insert_edge_bulk = [&insert_edge, n_pda_labels](size_t from, const PDA::pre_t &precondition, size_t to, const trace_t *trace) {
+            if (precondition.wildcard()) { // TODO: Symbolic representation of wildcard in edges might be more efficient.
+                for (uint32_t i = 0; i < n_pda_labels; i++) {
+                    insert_edge(from, i, to, trace);
+                }
+            } else {
+                for (auto &label : precondition.labels()) {
+                    insert_edge(from, label, to, trace);
+                }
+            }
+        };
+
+        // trans := ->_0  (line 1)
+        for (auto &from : this->states()) {
+            for (auto &edge : from->_edges) {
+                for (auto &label : edge._labels) {
+                    insert_edge(from->_id, label._label, edge._to->_id, nullptr);
+                }
+            }
+        }
+
+        // for all <p, y> --> <p', epsilon> : trans U= (p, y, p') (line 2)
+        for (size_t state = 0; state < n_pda_states; ++state) {
+            const auto &rules = pda_states[state]._rules;
+            for (size_t rule_id = 0; rule_id < rules.size(); ++rule_id) {
+                auto &rule = rules[rule_id];
+                if (rule._operation == PDA::POP) {
+                    insert_edge_bulk(state, rule._precondition, rule._to, this->new_pre_trace(rule_id));
+                }
+            }
+        }
+
+        // delta_prime[q] = p,pre    where pre.contains(y)    for multi p,pre
+        // corresponds to <p, y> --> <q, y>   (the y is the same, since we only have PUSH and not arbitrary <p, y> --> <q, y1 y2>, i.e. y==y2)
+        std::unordered_multimap<size_t, std::pair<size_t, size_t>> delta_prime{};
+
+        while (!trans.empty()) { // (line 3)
+            // pop t = (q, y, q') from trans (line 4)
+            auto t = trans.top();
+            trans.pop();
+            // rel = rel U {t} (line 6)   (membership test on line 5 is done in insert_edge).
+            rel.push_back(t);
+
+            // (line 7-8 for \Delta')
+            auto range = delta_prime.equal_range(t->_from);
+            for (auto it = range.first; it != range.second; ++it) { // Loop over delta_prime (that match with t->from)
+                auto state = it->second.first;
+                auto rule_id = it->second.second;
+                if (pda_states[state]._rules[rule_id]._precondition.contains(t->_label)) {
+                    insert_edge(it->second.first, t->_label, t->_to, this->new_pre_trace(rule_id, t->_from));
+                }
+            }
+            // Loop over \Delta (filter rules going into q) (line 7 and 9)
+            if (t->_from >= n_pda_states) { continue; }
+            for (auto pre_state : pda_states[t->_from]._pre) {
+                const auto &rules = pda_states[pre_state]._rules;
+                for (size_t rule_id = 0; rule_id < rules.size(); ++rule_id) {
+                    auto &rule = rules[rule_id];
+                //for (auto &rule : pda_states[pre_state]._rules) {
+                    if (rule._to == t->_from) { // TODO: In state._pre: also store which rule in pre_state leads to the state.
+                        switch (rule._operation) {
+                            case PDA::POP:
+                                break;
+                            case PDA::SWAP: // (line 7-8 for \Delta)
+                                if (rule._op_label == t->_label) {
+                                    insert_edge_bulk(pre_state, rule._precondition, t->_to, this->new_pre_trace(rule_id));
+                                }
+                                break;
+                            case PDA::NOOP: // (line 7-8 for \Delta)
+                                if (rule._precondition.contains(t->_label)) {
+                                    insert_edge(pre_state, t->_label, t->_to, this->new_pre_trace(rule_id));
+                                }
+                                break;
+                            case PDA::PUSH: // (line 9)
+                                if (rule._op_label == t->_label) {
+                                    // (line 10)
+                                    delta_prime.emplace(t->_to, std::make_pair(pre_state, rule_id));
+                                    for (auto rel_rule : rel) { // (line 11-12) // TODO: Change rel to a hash map to allow faster lookup here.
+                                        if (rel_rule->_from == t->_to &&
+                                            rule._precondition.contains(rel_rule->_label)) {
+                                            insert_edge(pre_state, rel_rule->_label, rel_rule->_to, this->new_pre_trace(rule_id, t->_to));
+                                        }
+                                    }
+                                }
+                                break;
+                            default:
+                                assert(false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void UntypedPAutomaton::_post_star() {
+        // This is an implementation of Algorithm 2 (figure 3.4) in:
+        // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
+        // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 48)
+
+        std::vector<std::unique_ptr<temp_edge_t>> edges;
+        std::stack<temp_edge_t *> trans;
+        std::vector<temp_edge_t *> rel;
+        auto dummy = std::make_unique<temp_edge_t>();
+        auto & pda_states = pda().states();
+        auto n_pda_states = pda_states.size();
+        auto insert_edge = [&edges, &dummy, &trans, &rel, this](size_t from, uint32_t label, size_t to,
+                                                                const trace_t *trace,
+                                                                bool direct_to_rel = false) {
+            (*dummy) = temp_edge_t(from, label, to);
+            auto lb = std::lower_bound(std::begin(edges), std::end(edges), dummy,
+                                       [](auto &a, auto &b) -> bool { return *a < *b; });
+            if (lb == std::end(edges) || *(*lb) != *dummy) { // New edge is not already in edges (rel U trans).
+                lb = edges.insert(lb, std::make_unique<temp_edge_t>(from, label, to));
+                if (direct_to_rel) {
+                    rel.push_back(lb->get());
+                } else {
+                    trans.push(lb->get());
+                }
+                if (trace != nullptr) { // Don't add existing edges
+                    if (label == std::numeric_limits<uint32_t>::max()) {
+                        this->add_epsilon_edge(from, to, trace);
+                    } else {
+                        this->add_edge(from, to, label, trace);
+                    }
+                }
+            }
+        };
+
+        // trans := ->_0 intersect (P x Gamma x Q)  (line 1)
+        // rel := ->_0 \ trans (line 2)
+        for (auto &from : this->states()) {
+            for (auto &edge : from->_edges) {
+                assert(!edge.has_epsilon()); // PostStar algorithm assumes no epsilon transitions in the NFA.
+                for (auto &label : edge._labels) {
+                    insert_edge(from->_id, label._label, edge._to->_id, nullptr, from->_id >= n_pda_states);
+                }
+            }
+        }
+
+        // for <p, y> -> <p', y1 y2> do  (line 3)
+        //   Q' U= {q_p'y1}              (line 4)
+        std::unordered_map<std::pair<size_t, uint32_t>, size_t, boost::hash<std::pair<size_t, uint32_t>>> q_prime{};
+        for (auto &state : pda_states) {
+            for (auto &rule : state._rules) {
+                if (rule._operation == PDA::PUSH) {
+                    auto pair = std::make_pair(rule._to, rule._op_label);
+                    if (q_prime.find(pair) == q_prime.end()) {
+                        auto new_state = this->add_state(false, false);
+                        q_prime.emplace(pair, new_state);
+                    }
+                }
+            }
+        }
+
+
+        while (!trans.empty()) { // (line 5)
+            // pop t = (q, y, q') from trans (line 6)
+            auto t = trans.top();
+            trans.pop();
+            // rel = rel U {t} (line 8)   (membership test on line 7 is done in insert_edge).
+            rel.push_back(t);
+
+            // if y != epsilon (line 9)
+            if (t->_label != std::numeric_limits<uint32_t>::max()) {
+                const auto &rules = pda_states[t->_from]._rules;
+                for (size_t rule_id = 0; rule_id < rules.size(); ++rule_id) {
+                    auto &rule = rules[rule_id];
+                    if (!rule._precondition.contains(t->_label)) { continue; }
+                    auto trace = this->new_post_trace(t->_from, rule_id, t->_label);
+                    switch (rule._operation) {
+                        case PDA::POP: // (line 10-11)
+                            insert_edge(rule._to, std::numeric_limits<uint32_t>::max(), t->_to, trace);
+                            break;
+                        case PDA::SWAP: // (line 12-13)
+                            insert_edge(rule._to, rule._op_label, t->_to, trace);
+                            break;
+                        case PDA::NOOP:
+                            insert_edge(rule._to, t->_label, t->_to, trace);
+                            break;
+                        case PDA::PUSH: // (line 14)
+                            size_t q_new = q_prime[std::make_pair(rule._to, rule._op_label)];
+                            insert_edge(rule._to, rule._op_label, q_new, trace); // (line 15)
+                            insert_edge(q_new, t->_label, t->_to, trace, true); // (line 16)
+                            for (auto e : rel) { // (line 17)  // TODO: Faster access to rel?
+                                if (e->_to == q_new && e->_label == std::numeric_limits<uint32_t>::max()) {
+                                    insert_edge(e->_from, t->_label, t->_to, this->new_post_trace(q_new)); // (line 18)
+                                }
+                            }
+                            break;
+                    }
+                }
+            } else {
+                for (auto e : rel) { // (line 20)
+                    if (e->_from == t->_to) { // TODO: Faster access to rel?
+                        insert_edge(t->_from, e->_label, e->_to, this->new_post_trace(t->_to)); // (line 21)
+                    }
+                }
+            }
+        }
+    }
+
+    /*
+     * Queries *
+     */
+    bool UntypedPAutomaton::_accepts(size_t state, const std::vector<uint32_t> &stack) const {
+        //Equivalent to (but hopefully faster than): return !_accept_path(state, stack).empty();
+
+        if (stack.empty()) {
+            return _states[state]->_accepting;
+        }
+        // DFS search.
+        std::stack<std::pair<size_t, size_t>> search_stack;
+        search_stack.emplace(state, 0);
+        while (!search_stack.empty()) {
+            auto current = search_stack.top();
+            search_stack.pop();
+            auto current_state = current.first;
+            auto stack_index = current.second;
+            for (auto &edge : _states[current_state]->_edges) {
+                if (edge.contains(stack[stack_index])) {
+                    auto to = edge._to->_id;
+                    if (stack_index + 1 < stack.size()) {
+                        search_stack.emplace(to, stack_index + 1);
+                    } else if (edge._to->_accepting) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    std::vector<size_t> UntypedPAutomaton::_accept_path(size_t state, const std::vector<uint32_t> &stack) const {
+        if (stack.empty()) {
+            if (_states[state]->_accepting) {
+                return std::vector<size_t>{state};
+            } else {
+                return std::vector<size_t>();
+            }
+        }
+        // DFS search.
+        std::vector<size_t> path(stack.size() + 1);
+        std::stack<std::pair<size_t, size_t>> search_stack;
+        search_stack.emplace(state, 0);
+        while (!search_stack.empty()) {
+            auto current = search_stack.top();
+            search_stack.pop();
+            auto current_state = current.first;
+            auto stack_index = current.second;
+            path[stack_index] = current_state;
+            for (auto &edge : _states[current_state]->_edges) {
+                if (edge.contains(stack[stack_index])) {
+                    auto to = edge._to->_id;
+                    if (stack_index + 1 < stack.size()) {
+                        search_stack.emplace(to, stack_index + 1);
+                    } else if (edge._to->_accepting) {
+                        path[stack_index + 1] = to;
+                        return path;
+                    }
+                }
+            }
+        }
+        return std::vector<size_t>();
+    }
+
+    /* Keep this in case we need it anyway.
+    std::pair<std::vector<size_t>, std::vector<uint32_t>> UntypedPAutomaton::_accept_path_with_any_stack(const std::unordered_set<size_t>& states) const {
+        // Find path and stack such that a state in states is accepted (is possible).
+        std::vector<size_t> path;
+        std::vector<uint32_t> stack;
+
+        // BFS search.
+        std::queue<size_t> queue;
+        std::unordered_set<size_t> seen;
+        for (auto state : states) {
+            if (_states[state]->_accepting) {
+                path.emplace_back(state);
+                return std::make_pair(path, stack);
+            }
+            queue.push(state);
+            seen.emplace(queue.back());
+        }
+        std::unordered_map<size_t, std::pair<size_t, uint32_t>> back_labels;
+        while(!queue.empty()) {
+            auto current_state = queue.front();
+            queue.pop();
+            for (auto& edge : _states[current_state]->_edges) {
+                auto to = edge._to->_id;
+                if (edge.has_non_epsilon() && seen.count(to) == 0) {
+                    auto label = edge._labels[0]._label;
+                    if (edge._to->_accepting) {
+                        // Use back_labels to reconstruct path and stack.
+                        path.push_back(current_state);
+                        while (states.count(path.back()) == 0) {
+                            auto back_label = back_labels[path.back()];
+                            path.emplace_back(back_label.first);
+                            stack.emplace_back(back_label.second);
+                        }
+                        std::reverse(path.begin(), path.end());
+                        std::reverse(stack.begin(), stack.end());
+                        path.push_back(to);
+                        stack.push_back(label);
+                        return std::make_pair(path, stack);
+                    }
+                    queue.push(to);
+                    seen.emplace(queue.back());
+                    back_labels.emplace(to, std::make_pair(current_state, label));
+                }
+            }
+        }
+        return std::make_pair(path, stack);
+    }
+
+    std::pair<std::vector<size_t>, std::vector<uint32_t>> UntypedPAutomaton::_accept_path_singleton_stack(size_t state) const {
+        // Find path and stack with one element such that state is accepted (is possible).
+        std::vector<size_t> path;
+        std::vector<uint32_t> stack;
+
+        for (auto& edge : _states[state]->_edges) {
+            if (edge.has_non_epsilon() && edge._to->_accepting) {
+                auto label = edge._labels[0]._label;
+                auto to = edge._to->_id;
+                path.push_back(state);
+                path.push_back(to);
+                stack.push_back(label);
+                return std::make_pair(path, stack);
+            }
+        }
+        return std::make_pair(path, stack);
+    }
+    */
+
+
+    /*
+     * Modification *
+     */
+    void UntypedPAutomaton::edge_t::add_label(uint32_t label, const trace_t *trace) {
+        label_with_trace_t label_trace{label, trace};
+        auto lb = std::lower_bound(_labels.begin(), _labels.end(), label_trace);
+        if (lb == std::end(_labels) || *lb != label_trace) {
+            _labels.insert(lb, label_trace);
+        }
+    }
+
+    bool UntypedPAutomaton::edge_t::contains(uint32_t label) {
+        label_with_trace_t label_trace{label};
+        auto lb = std::lower_bound(_labels.begin(), _labels.end(), label_trace);
+        return lb != std::end(_labels) && *lb == label_trace;
+    }
+
+    size_t UntypedPAutomaton::add_state(bool initial, bool accepting) {
+        auto id = _states.size();
+        _states.emplace_back(std::make_unique<state_t>(accepting, id));
+        if (accepting) {
+            _accepting.push_back(_states.back().get());
+        }
+        if (initial) {
+            _initial.push_back(_states.back().get());
+        }
+        return id;
+    }
+
+    void UntypedPAutomaton::add_epsilon_edge(size_t from, size_t to, const trace_t *trace) {
+        auto &edges = _states[from]->_edges;
+        for (auto &e : edges) {
+            if (e._to->_id == to) {
+                if (!e._labels.back().is_epsilon()) {
+                    e._labels.emplace_back(trace);
+                }
+                return;
+            }
+        }
+        edges.emplace_back(_states[to].get(), trace);
+    }
+
+    void UntypedPAutomaton::add_edge(size_t from, size_t to, uint32_t label, const trace_t *trace) {
+        assert(label < std::numeric_limits<uint32_t>::max() - 1);
+        auto &edges = _states[from]->_edges;
+        for (auto &e : edges) {
+            if (e._to->_id == to) {
+                e.add_label(label, trace);
+                return;
+            }
+        }
+        edges.emplace_back(_states[to].get(), label, trace);
+    }
+
+    void UntypedPAutomaton::add_wildcard(size_t from, size_t to) {
+        auto &edges = _states[from]->_edges;
+        for (auto &e : edges) {
+            if (e._to->_id == to) {
+                e._labels.clear();
+                for (uint32_t i = 0; i < number_of_labels(); i++) {
+                    e._labels.emplace_back(i);
+                }
+                return;
+            }
+        }
+        edges.emplace_back(_states[to].get(), number_of_labels());
+    }
+
+    /*
+     * Traces *
+     */
+    const trace_t *UntypedPAutomaton::get_trace_label(const std::tuple<size_t, uint32_t, size_t> &edge) const {
+        return get_trace_label(std::get<0>(edge), std::get<1>(edge), std::get<2>(edge));
+    }
+    const trace_t *UntypedPAutomaton::get_trace_label(size_t from, uint32_t label, size_t to) const {
+        for (auto &e : _states[from]->_edges) {
+            if (e._to->_id == to) {
+                label_with_trace_t label_trace{label};
+                auto lb = std::lower_bound(e._labels.begin(), e._labels.end(), label_trace);
+                assert(lb != std::end(e._labels)); // We assume the edge exists.
+                return lb->_trace;
+            }
+        }
+        assert(false); // We assume the edge exists.
+        return nullptr;
+    }
+
+    const trace_t *UntypedPAutomaton::new_pre_trace(size_t rule_id) {
+        _trace_info.emplace_back(std::make_unique<trace_t>(rule_id, std::numeric_limits<size_t>::max()));
+        return _trace_info.back().get();
+    }
+    const trace_t *UntypedPAutomaton::new_pre_trace(size_t rule_id, size_t temp_state) {
+        _trace_info.emplace_back(std::make_unique<trace_t>(rule_id, temp_state));
+        return _trace_info.back().get();
+    }
+    const trace_t *UntypedPAutomaton::new_post_trace(size_t from, size_t rule_id, uint32_t label) {
+        _trace_info.emplace_back(std::make_unique<trace_t>(from, rule_id, label));
+        return _trace_info.back().get();
+    }
+    const trace_t *UntypedPAutomaton::new_post_trace(size_t epsilon_state) {
+        _trace_info.emplace_back(std::make_unique<trace_t>(epsilon_state));
+        return _trace_info.back().get();
+    }
+
+    /*
+     * Printing *
+     */
+    void UntypedPAutomaton::to_dot(std::ostream &out,
+                                   const std::function<void(std::ostream &, const label_with_trace_t &)> &printer) const {
+        out << "digraph NFA {\n";
+        for (auto &s : _states) {
+            out << "\"" << s->_id << "\" [shape=";
+            if (s->_accepting)
+                out << "double";
+            out << "circle];\n";
+            for (const edge_t &e : s->_edges) {
+                out << "\"" << s->_id << "\" -> \"" << e._to->_id << "\" [ label=\"";
+                if (e.has_non_epsilon()) {
+                    out << "\\[";
+                    bool first = true;
+                    for (auto &l : e._labels) {
+                        if (l.is_epsilon()) { continue; }
+                        if (!first)
+                            out << ", ";
+                        first = false;
+                        printer(out, l);
+                    }
+                    out << "\\]";
+                }
+                if (e._labels.size() == number_of_labels())
+                    out << "*";
+                if (e.has_epsilon()) {
+                    if (!e._labels.empty()) out << " ";
+                    out << u8"𝜀";
+                }
+
+                out << "\"];\n";
+            }
+        }
+        for (auto &i : _initial) {
+            out << "\"I" << i->_id << "\" -> \"" << i->_id << "\";\n";
+            out << "\"I" << i->_id << "\" [style=invisible];\n";
+        }
+
+        out << "}\n";
+    }
+
+}

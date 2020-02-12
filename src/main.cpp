@@ -35,6 +35,7 @@
 #include "pdaaal/model/PDAFactory.h"
 #include "pdaaal/engine/Moped.h"
 #include "pdaaal/engine/PostStar.h"
+#include "pdaaal/engine/PreStar.h"
 
 #include "utils/stopwatch.h"
 #include "utils/outcome.h"
@@ -137,7 +138,7 @@ int main(int argc, const char** argv)
         exit(-1);
     }
     
-    if(engine > 2)
+    if(engine > 3)
     {
         std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
@@ -246,6 +247,7 @@ int main(int argc, const char** argv)
         }
         Moped moped;
         PostStar post_star;
+        PreStar pre_star;
         
         for(auto& q : builder._result)
         {
@@ -307,7 +309,15 @@ int main(int argc, const char** argv)
                         }
                         break;
                     case 3:
-                        // break;
+                        engine_outcome = pre_star.verify(pda, need_trace);
+                        verification_time.stop();
+                        if(need_trace && engine_outcome)
+                        {
+                            trace = pre_star.get_trace(pda);
+                            if(factory->write_json_trace(proof, trace))
+                                result = utils::YES;
+                        }
+                        break;
                     default:
                         throw base_error("Unsupported --engine value given");
                     }
