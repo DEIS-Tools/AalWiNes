@@ -358,6 +358,7 @@ namespace aalwines
         for(auto& r : _routers)
         {
             if(r->is_null()) continue;
+            if(r->interfaces().empty()) continue;
             s << "    <router name=\"" << r->name() << "\">\n";
             s << "      <interfaces>\n";
             for(auto& inf : r->interfaces())
