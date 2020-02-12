@@ -101,18 +101,6 @@ namespace pdaaal {
             return _label == std::numeric_limits<uint32_t>::max();
         }
     };
-}
-/* In case we need to have an unordered_set/map of label_with_trace_t.
-namespace std {
-    template<>
-    struct hash<pdaaal::label_with_trace_t> {
-        std::size_t operator()(pdaaal::label_with_trace_t const &s) const noexcept {
-            return std::hash<uint32_t>{}(s._label);
-        }
-    };
-}*/
-
-namespace pdaaal {
 
     class PAutomaton {
     private:
@@ -202,8 +190,6 @@ namespace pdaaal {
 
         PAutomaton(PAutomaton &&) noexcept = default;
 
-        // PAutomaton &operator=(PAutomaton &&) noexcept = default;
-
         PAutomaton(const PAutomaton &other) : _pda(other._pda) {
             std::unordered_map<state_t *, state_t *> indir;
             for (auto &s : other._states) {
@@ -223,28 +209,6 @@ namespace pdaaal {
                 _initial.push_back(indir[s]);
             }
         }
-
-        /*
-        PAutomaton &operator=(const PAutomaton &other) { // TODO: Handle self-assignment properly
-            std::unordered_map<state_t *, state_t *> indir;
-            for (auto &s : other._states) {
-                _states.emplace_back(std::make_unique<state_t>(*s));
-                indir[s.get()] = _states.back().get();
-            }
-            // fix links
-            for (auto &s : _states) {
-                for (auto &e : s->_edges) {
-                    e._to = indir[e._to];
-                }
-            }
-            for (auto &s : other._accepting) {
-                _accepting.push_back(indir[s]);
-            }
-            for (auto &s : other._initial) {
-                _initial.push_back(indir[s]);
-            }
-            return *this;
-        }*/
 
         void pre_star();
 
