@@ -52,7 +52,7 @@ namespace aalwines {
             uint8_t _mask = 0;
             uint64_t _value = 0;               
         public:
-            friend class ptrie::byte_iterator<label_t>;
+            friend struct ptrie::byte_iterator<label_t>;
             label_t()
             {
                 _type = NONE;
