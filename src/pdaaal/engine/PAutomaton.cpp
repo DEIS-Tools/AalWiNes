@@ -18,15 +18,16 @@
  */
 
 /*
- * File:   UntypedPAutomaton.cpp
+ * File:   PAutomaton.cpp
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 21-01-2020.
  */
 
 
-#include "UntypedPAutomaton.h"
+#include "PAutomaton.h"
 #include <stack>
+#include <cassert>
 #include <boost/functional/hash.hpp>
 
 namespace pdaaal {
@@ -34,7 +35,7 @@ namespace pdaaal {
     /*
      * PreStar, PostStar *
      */
-    void UntypedPAutomaton::_pre_star() {
+    void PAutomaton::pre_star() {
         // This is an implementation of Algorithm 1 (figure 3.3) in:
         // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 42)
@@ -152,7 +153,7 @@ namespace pdaaal {
         }
     }
 
-    void UntypedPAutomaton::_post_star() {
+    void PAutomaton::post_star() {
         // This is an implementation of Algorithm 2 (figure 3.4) in:
         // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 48)
@@ -262,7 +263,7 @@ namespace pdaaal {
     /*
      * Queries *
      */
-    bool UntypedPAutomaton::_accepts(size_t state, const std::vector<uint32_t> &stack) const {
+    bool PAutomaton::accepts(size_t state, const std::vector<uint32_t> &stack) const {
         //Equivalent to (but hopefully faster than): return !_accept_path(state, stack).empty();
 
         if (stack.empty()) {
@@ -290,7 +291,7 @@ namespace pdaaal {
         return false;
     }
 
-    std::vector<size_t> UntypedPAutomaton::_accept_path(size_t state, const std::vector<uint32_t> &stack) const {
+    std::vector<size_t> PAutomaton::accept_path(size_t state, const std::vector<uint32_t> &stack) const {
         if (stack.empty()) {
             if (_states[state]->_accepting) {
                 return std::vector<size_t>{state};
@@ -323,78 +324,11 @@ namespace pdaaal {
         return std::vector<size_t>();
     }
 
-    /* Keep this in case we need it anyway.
-    std::pair<std::vector<size_t>, std::vector<uint32_t>> UntypedPAutomaton::_accept_path_with_any_stack(const std::unordered_set<size_t>& states) const {
-        // Find path and stack such that a state in states is accepted (is possible).
-        std::vector<size_t> path;
-        std::vector<uint32_t> stack;
-
-        // BFS search.
-        std::queue<size_t> queue;
-        std::unordered_set<size_t> seen;
-        for (auto state : states) {
-            if (_states[state]->_accepting) {
-                path.emplace_back(state);
-                return std::make_pair(path, stack);
-            }
-            queue.push(state);
-            seen.emplace(queue.back());
-        }
-        std::unordered_map<size_t, std::pair<size_t, uint32_t>> back_labels;
-        while(!queue.empty()) {
-            auto current_state = queue.front();
-            queue.pop();
-            for (auto& edge : _states[current_state]->_edges) {
-                auto to = edge._to->_id;
-                if (edge.has_non_epsilon() && seen.count(to) == 0) {
-                    auto label = edge._labels[0]._label;
-                    if (edge._to->_accepting) {
-                        // Use back_labels to reconstruct path and stack.
-                        path.push_back(current_state);
-                        while (states.count(path.back()) == 0) {
-                            auto back_label = back_labels[path.back()];
-                            path.emplace_back(back_label.first);
-                            stack.emplace_back(back_label.second);
-                        }
-                        std::reverse(path.begin(), path.end());
-                        std::reverse(stack.begin(), stack.end());
-                        path.push_back(to);
-                        stack.push_back(label);
-                        return std::make_pair(path, stack);
-                    }
-                    queue.push(to);
-                    seen.emplace(queue.back());
-                    back_labels.emplace(to, std::make_pair(current_state, label));
-                }
-            }
-        }
-        return std::make_pair(path, stack);
-    }
-
-    std::pair<std::vector<size_t>, std::vector<uint32_t>> UntypedPAutomaton::_accept_path_singleton_stack(size_t state) const {
-        // Find path and stack with one element such that state is accepted (is possible).
-        std::vector<size_t> path;
-        std::vector<uint32_t> stack;
-
-        for (auto& edge : _states[state]->_edges) {
-            if (edge.has_non_epsilon() && edge._to->_accepting) {
-                auto label = edge._labels[0]._label;
-                auto to = edge._to->_id;
-                path.push_back(state);
-                path.push_back(to);
-                stack.push_back(label);
-                return std::make_pair(path, stack);
-            }
-        }
-        return std::make_pair(path, stack);
-    }
-    */
-
 
     /*
      * Modification *
      */
-    void UntypedPAutomaton::edge_t::add_label(uint32_t label, const trace_t *trace) {
+    void PAutomaton::edge_t::add_label(uint32_t label, const trace_t *trace) {
         label_with_trace_t label_trace{label, trace};
         auto lb = std::lower_bound(_labels.begin(), _labels.end(), label_trace);
         if (lb == std::end(_labels) || *lb != label_trace) {
@@ -402,13 +336,13 @@ namespace pdaaal {
         }
     }
 
-    bool UntypedPAutomaton::edge_t::contains(uint32_t label) {
+    bool PAutomaton::edge_t::contains(uint32_t label) {
         label_with_trace_t label_trace{label};
         auto lb = std::lower_bound(_labels.begin(), _labels.end(), label_trace);
         return lb != std::end(_labels) && *lb == label_trace;
     }
 
-    size_t UntypedPAutomaton::add_state(bool initial, bool accepting) {
+    size_t PAutomaton::add_state(bool initial, bool accepting) {
         auto id = _states.size();
         _states.emplace_back(std::make_unique<state_t>(accepting, id));
         if (accepting) {
@@ -420,7 +354,7 @@ namespace pdaaal {
         return id;
     }
 
-    void UntypedPAutomaton::add_epsilon_edge(size_t from, size_t to, const trace_t *trace) {
+    void PAutomaton::add_epsilon_edge(size_t from, size_t to, const trace_t *trace) {
         auto &edges = _states[from]->_edges;
         for (auto &e : edges) {
             if (e._to->_id == to) {
@@ -433,7 +367,7 @@ namespace pdaaal {
         edges.emplace_back(_states[to].get(), trace);
     }
 
-    void UntypedPAutomaton::add_edge(size_t from, size_t to, uint32_t label, const trace_t *trace) {
+    void PAutomaton::add_edge(size_t from, size_t to, uint32_t label, const trace_t *trace) {
         assert(label < std::numeric_limits<uint32_t>::max() - 1);
         auto &edges = _states[from]->_edges;
         for (auto &e : edges) {
@@ -445,7 +379,7 @@ namespace pdaaal {
         edges.emplace_back(_states[to].get(), label, trace);
     }
 
-    void UntypedPAutomaton::add_wildcard(size_t from, size_t to) {
+    void PAutomaton::add_wildcard(size_t from, size_t to) {
         auto &edges = _states[from]->_edges;
         for (auto &e : edges) {
             if (e._to->_id == to) {
@@ -462,10 +396,10 @@ namespace pdaaal {
     /*
      * Traces *
      */
-    const trace_t *UntypedPAutomaton::get_trace_label(const std::tuple<size_t, uint32_t, size_t> &edge) const {
+    const trace_t *PAutomaton::get_trace_label(const std::tuple<size_t, uint32_t, size_t> &edge) const {
         return get_trace_label(std::get<0>(edge), std::get<1>(edge), std::get<2>(edge));
     }
-    const trace_t *UntypedPAutomaton::get_trace_label(size_t from, uint32_t label, size_t to) const {
+    const trace_t *PAutomaton::get_trace_label(size_t from, uint32_t label, size_t to) const {
         for (auto &e : _states[from]->_edges) {
             if (e._to->_id == to) {
                 label_with_trace_t label_trace{label};
@@ -478,19 +412,19 @@ namespace pdaaal {
         return nullptr;
     }
 
-    const trace_t *UntypedPAutomaton::new_pre_trace(size_t rule_id) {
+    const trace_t *PAutomaton::new_pre_trace(size_t rule_id) {
         _trace_info.emplace_back(std::make_unique<trace_t>(rule_id, std::numeric_limits<size_t>::max()));
         return _trace_info.back().get();
     }
-    const trace_t *UntypedPAutomaton::new_pre_trace(size_t rule_id, size_t temp_state) {
+    const trace_t *PAutomaton::new_pre_trace(size_t rule_id, size_t temp_state) {
         _trace_info.emplace_back(std::make_unique<trace_t>(rule_id, temp_state));
         return _trace_info.back().get();
     }
-    const trace_t *UntypedPAutomaton::new_post_trace(size_t from, size_t rule_id, uint32_t label) {
+    const trace_t *PAutomaton::new_post_trace(size_t from, size_t rule_id, uint32_t label) {
         _trace_info.emplace_back(std::make_unique<trace_t>(from, rule_id, label));
         return _trace_info.back().get();
     }
-    const trace_t *UntypedPAutomaton::new_post_trace(size_t epsilon_state) {
+    const trace_t *PAutomaton::new_post_trace(size_t epsilon_state) {
         _trace_info.emplace_back(std::make_unique<trace_t>(epsilon_state));
         return _trace_info.back().get();
     }
@@ -498,7 +432,7 @@ namespace pdaaal {
     /*
      * Printing *
      */
-    void UntypedPAutomaton::to_dot(std::ostream &out,
+    void PAutomaton::to_dot(std::ostream &out,
                                    const std::function<void(std::ostream &, const label_with_trace_t &)> &printer) const {
         out << "digraph NFA {\n";
         for (auto &s : _states) {

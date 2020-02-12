@@ -1,37 +1,192 @@
-//
-// Created by Morten on 22-01-2020.
-//
+/*
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *  Copyright Morten K. Schou
+ */
+
+/*
+ * File:   PAutomaton.h
+ * Author: Morten K. Schou <morten@h-schou.dk>
+ *
+ * Created on 08-01-2020.
+ */
 
 #ifndef PDAAAL_PAUTOMATON_H
 #define PDAAAL_PAUTOMATON_H
 
-#include "UntypedPAutomaton.h"
+#include "pdaaal/model/PDA.h"
+
+#include <memory>
+#include <functional>
+#include <vector>
+#include <iostream>
+/*
+#include <queue>
+#include <unordered_set>
+#include <unordered_map>
+#include <set>
+
+*/
 
 namespace pdaaal {
 
-    template<typename T>
-    class PAutomaton : public UntypedPAutomaton {
-    public:
-        using tracestate_t = typename TypedPDA<T>::tracestate_t;
+    struct trace_t {
+        size_t _state = std::numeric_limits<size_t>::max(); // _state = p
+        size_t _rule_id = std::numeric_limits<size_t>::max(); // size_t _to = pda.states()[_from]._rules[_rule_id]._to; // _to = q
+        uint32_t _label = std::numeric_limits<uint32_t>::max(); // _label = \gamma
+        // if is_pre_trace() {
+        // then {use _rule_id (and potentially _state)}
+        // else if is_post_epsilon_trace()
+        // then {_state = q'; _rule_id invalid }
+        // else {_state = p; _label = \gamma}
 
-        // Accept one control state with given stack.
-        PAutomaton(const TypedPDA<T> &pda, size_t initial_state, const std::vector<T> &initial_stack) : _typed_pda(pda) {
-            const size_t size = pda.states().size();
-            const size_t accepting = initial_stack.empty() ? initial_state : size;
-            for (size_t i = 0; i < size; ++i) {
-                add_state(true, i == accepting);
+        trace_t() = default;
+
+        trace_t(size_t rule_id, size_t temp_state)
+                : _state(temp_state), _rule_id(rule_id), _label(std::numeric_limits<uint32_t>::max() - 1) {};
+
+        trace_t(size_t from, size_t rule_id, uint32_t label)
+                : _state(from), _rule_id(rule_id), _label(label) {};
+
+        explicit trace_t(size_t epsilon_state)
+                : _state(epsilon_state) {};
+
+        [[nodiscard]] bool is_pre_trace() const {
+            return _label == std::numeric_limits<uint32_t>::max() - 1;
+        }
+        [[nodiscard]] bool is_post_epsilon_trace() const {
+            return _label == std::numeric_limits<uint32_t>::max();
+        }
+    };
+
+    struct label_with_trace_t {
+        uint32_t _label = std::numeric_limits<uint32_t>::max();
+        const trace_t *_trace = nullptr;
+
+        explicit label_with_trace_t(uint32_t label)
+                : _label(label) {};
+
+        explicit label_with_trace_t(const trace_t *trace) // epsilon edge
+                : _trace(trace) {};
+
+        label_with_trace_t(uint32_t label, const trace_t *trace)
+                : _label(label), _trace(trace) {};
+
+        bool operator<(const label_with_trace_t &other) const {
+            return _label < other._label;
+        }
+
+        bool operator==(const label_with_trace_t &other) const {
+            return _label == other._label;
+        }
+
+        bool operator!=(const label_with_trace_t &other) const {
+            return !(*this == other);
+        }
+
+        [[nodiscard]] bool is_epsilon() const {
+            return _label == std::numeric_limits<uint32_t>::max();
+        }
+    };
+}
+/* In case we need to have an unordered_set/map of label_with_trace_t.
+namespace std {
+    template<>
+    struct hash<pdaaal::label_with_trace_t> {
+        std::size_t operator()(pdaaal::label_with_trace_t const &s) const noexcept {
+            return std::hash<uint32_t>{}(s._label);
+        }
+    };
+}*/
+
+namespace pdaaal {
+
+    class PAutomaton {
+    private:
+        struct temp_edge_t {
+            size_t _from = std::numeric_limits<size_t>::max();
+            size_t _to = std::numeric_limits<size_t>::max();
+            uint32_t _label = std::numeric_limits<uint32_t>::max();
+
+            temp_edge_t() = default;
+
+            temp_edge_t(size_t from, uint32_t label, size_t to)
+                    : _from(from), _to(to), _label(label) {};
+
+            bool operator<(const temp_edge_t &other) const {
+                if (_from != other._from) return _from < other._from;
+                if (_label != other._label) return _label < other._label;
+                return _to < other._to;
             }
-            auto labels = pda.encode_pre(initial_stack);
-            auto last_state = initial_state;
-            for (size_t i = 0; i < labels.size(); ++i) {
-                auto state = add_state(false, i == labels.size() - 1);
-                add_edge(last_state, state, labels[i]);
-                last_state = state;
+
+            bool operator==(const temp_edge_t &other) const {
+                return _from == other._from && _to == other._to && _label == other._label;
+            }
+
+            bool operator!=(const temp_edge_t &other) const {
+                return !(*this == other);
             }
         };
 
+    public:
+        struct state_t;
+
+        struct edge_t {
+            state_t *_to;
+            std::vector<label_with_trace_t> _labels;
+
+            // edge with a label and optional trace
+            edge_t(state_t *to, uint32_t label, const trace_t *trace = nullptr)
+                    : _to(to), _labels() {
+                _labels.emplace_back(label, trace);
+            };
+
+            // epsilon edge with trace
+            edge_t(state_t *to, const trace_t *trace) : _to(to), _labels() {
+                _labels.emplace_back(trace);
+            };
+
+            // wildcard (all labels), no trace
+            edge_t(state_t *to, size_t all_labels) : _to(to), _labels() {
+                for (uint32_t label = 0; label < all_labels; label++) {
+                    _labels.emplace_back(label);
+                }
+            };
+
+            void add_label(uint32_t label, const trace_t *trace);
+
+            bool contains(uint32_t label);
+
+            [[nodiscard]] bool has_epsilon() const { return !_labels.empty() && _labels.back().is_epsilon(); }
+            [[nodiscard]] bool has_non_epsilon() const { return !_labels.empty() && !_labels[0].is_epsilon(); }
+        };
+
+        struct state_t {
+            bool _accepting = false;
+            size_t _id;
+            std::vector<edge_t> _edges;
+
+            state_t(bool accepting, size_t id) : _accepting(accepting), _id(id) {};
+
+            state_t(const state_t &other) = default;
+        };
+
+    public:
         // Accept one control state with given stack.
-        PAutomaton(const TypedPDA<T> &pda, size_t initial_state, const std::vector<uint32_t> &initial_stack) : _typed_pda(pda) {
+        PAutomaton(const PDA &pda, size_t initial_state, const std::vector<uint32_t> &initial_stack) : _pda(pda) {
             const size_t size = pda.states().size();
             const size_t accepting = initial_stack.empty() ? initial_state : size;
             for (size_t i = 0; i < size; ++i) {
@@ -45,192 +200,101 @@ namespace pdaaal {
             }
         };
 
-        /* Not used. Keep it in case we need it anyway
-        // Accept one control state with any one-element stack.
-        PAutomaton(const TypedPDA<T> &pda, size_t state) : _typed_pda(pda) {
-            const size_t size = pda.states().size();
-            for (size_t i = 0; i < size; ++i) {
-                add_state(true, false);
-            }
-            auto new_state = add_state(false, true);
-            add_wildcard(state, new_state);
-        };
+        PAutomaton(PAutomaton &&) noexcept = default;
 
-        static PAutomaton<T> any_stack(const TypedPDA<T> &pda, size_t state) {
-            PAutomaton<T> result(pda);
-            const size_t size = pda.states().size();
-            for (size_t i = 0; i < size; ++i) {
-                result.add_state(true, i == state);
+        // PAutomaton &operator=(PAutomaton &&) noexcept = default;
+
+        PAutomaton(const PAutomaton &other) : _pda(other._pda) {
+            std::unordered_map<state_t *, state_t *> indir;
+            for (auto &s : other._states) {
+                _states.emplace_back(std::make_unique<state_t>(*s));
+                indir[s.get()] = _states.back().get();
             }
-            // Accept any stack, but avoid transitions into states in pda.
-            auto new_state = result.add_state(false, true);
-            result.add_wildcard(state, new_state);
-            result.add_wildcard(new_state, new_state);
-            return result;
+            // fix links
+            for (auto &s : _states) {
+                for (auto &e : s->_edges) {
+                    e._to = indir[e._to];
+                }
+            }
+            for (auto &s : other._accepting) {
+                _accepting.push_back(indir[s]);
+            }
+            for (auto &s : other._initial) {
+                _initial.push_back(indir[s]);
+            }
         }
-        */
 
-        PAutomaton(PAutomaton<T> &&) noexcept = default;
-        PAutomaton<T> &operator=(PAutomaton<T> &&) noexcept = default;
-        PAutomaton(const PAutomaton<T> &other) : UntypedPAutomaton(other), _typed_pda(other._typed_pda) {};
-        PAutomaton<T> &operator=(const PAutomaton<T> &other) {
-            UntypedPAutomaton::operator=(other);
-            _typed_pda = other._typed_pda;
+        /*
+        PAutomaton &operator=(const PAutomaton &other) { // TODO: Handle self-assignment properly
+            std::unordered_map<state_t *, state_t *> indir;
+            for (auto &s : other._states) {
+                _states.emplace_back(std::make_unique<state_t>(*s));
+                indir[s.get()] = _states.back().get();
+            }
+            // fix links
+            for (auto &s : _states) {
+                for (auto &e : s->_edges) {
+                    e._to = indir[e._to];
+                }
+            }
+            for (auto &s : other._accepting) {
+                _accepting.push_back(indir[s]);
+            }
+            for (auto &s : other._initial) {
+                _initial.push_back(indir[s]);
+            }
             return *this;
-        };
+        }*/
 
-        virtual ~PAutomaton() = default;
+        void pre_star();
 
-        // const version of _pre_star()
-        PAutomaton<T> pre_star() const {
-            PAutomaton<T> result(*this);
-            result._pre_star();
-            return result;
-        }
+        void post_star();
 
-        // const version of _post_star()
-        PAutomaton<T> post_star() const {
-            PAutomaton<T> result(*this);
-            result._post_star();
-            return result;
-        }
+        [[nodiscard]] const std::vector<std::unique_ptr<state_t>> &states() const { return _states; }
+        
+        [[nodiscard]] const PDA &pda() const { return _pda; }
 
-        std::vector<tracestate_t> get_trace(size_t state, const std::vector<T>& labels) const {
-            assert(state < pda().states().size());
-            auto stack = encode(labels);
-            auto path = _accept_path(state, stack);
-            return get_trace(path, stack);
-        }
-        std::vector<tracestate_t> _get_trace(size_t state, const std::vector<uint32_t>& stack) const {
-            assert(state < pda().states().size());
-            auto path = _accept_path(state, stack);
-            return get_trace(path, stack);
-        }
+        void to_dot(std::ostream &out,
+                    const std::function<void(std::ostream &, const label_with_trace_t &)> &printer = [](auto &s,
+                                                                                                        auto &e) {
+                        s << e._label;
+                    }) const;
 
-        void to_dot_with_symbols(std::ostream &out) const {
-            to_dot(out, [this](auto &s, auto &e) { s << get_symbol(e._label); });
-        }
+        [[nodiscard]] bool accepts(size_t state, const std::vector<uint32_t> &stack) const;
+        [[nodiscard]] std::vector<size_t> accept_path(size_t state, const std::vector<uint32_t> &stack) const;
 
-        bool accepts(size_t state, const std::vector<T>& stack) {
-            auto labels = encode(stack);
-            return _accepts(state, labels);
-        }
+        [[nodiscard]] const trace_t *get_trace_label(const std::tuple<size_t, uint32_t, size_t> &edge) const;
+        [[nodiscard]] const trace_t *get_trace_label(size_t from, uint32_t label, size_t to) const;
 
-        std::vector<size_t> accept_path(size_t state, const std::vector<T> &labels) {
-            auto stack = encode(labels);
-            return _accept_path(state, stack);
-        }
-
-        const TypedPDA<T> &typed_pda() const { return _typed_pda; }
+        // TODO: Implement early termination versions.
+        // bool _pre_star_accepts(size_t state, const std::vector<uint32_t> &stack);
+        // bool _post_star_accepts(size_t state, const std::vector<uint32_t> &stack);
 
     protected:
-        explicit PAutomaton(const TypedPDA<T> &pda) : _typed_pda(pda) {};
+        [[nodiscard]] size_t number_of_labels() const { return _pda.number_of_labels(); }
 
-        [[nodiscard]] const PDA &pda() const override { return _typed_pda; }
+        size_t add_state(bool initial, bool accepting);
 
-        [[nodiscard]] size_t number_of_labels() const override { return _typed_pda.number_of_labels(); };
+        void add_epsilon_edge(size_t from, size_t to, const trace_t *trace);
 
-        T get_symbol(uint32_t i) const {
-            return _typed_pda.get_symbol(i);
-        };
+        void add_edge(size_t from, size_t to, uint32_t label, const trace_t *trace = nullptr);
 
-        std::vector<uint32_t> encode(const std::vector<T>& labels) const {
-            return _typed_pda.encode_pre(labels);
-        }
-        std::vector<tracestate_t> get_trace(const std::vector<size_t>& path, const std::vector<uint32_t>& stack) const;
-
+        void add_wildcard(size_t from, size_t to);
 
     private:
-        const TypedPDA<T> &_typed_pda;
+        const trace_t *new_pre_trace(size_t rule_id);
+        const trace_t *new_pre_trace(size_t rule_id, size_t temp_state);
+        const trace_t *new_post_trace(size_t from, size_t rule_id, uint32_t label);
+        const trace_t *new_post_trace(size_t epsilon_state);
+
+        std::vector<std::unique_ptr<state_t>> _states;
+        std::vector<state_t *> _initial;
+        std::vector<state_t *> _accepting;
+
+        std::vector<std::unique_ptr<trace_t>> _trace_info;
+
+        const PDA &_pda;
     };
-
-    template <typename T>
-    std::vector<typename PAutomaton<T>::tracestate_t> PAutomaton<T>::get_trace(const std::vector<size_t>& path, const std::vector<uint32_t>& stack) const {
-        if (path.empty()) {
-            return std::vector<tracestate_t>();
-        }
-        std::deque<std::tuple<size_t, uint32_t, size_t>> edges;
-        for (size_t i = stack.size(); i > 0; --i) {
-            edges.emplace_back(path[i - 1], stack[i - 1], path[i]);
-        }
-
-        auto decode_edges = [this](const std::deque<std::tuple<size_t, uint32_t, size_t>> &edges) -> tracestate_t {
-            tracestate_t result{std::get<0>(edges.back()), std::vector<T>()};
-            auto num_labels = number_of_labels();
-            for (auto it = edges.crbegin(); it != edges.crend(); ++it) {
-                auto label = std::get<1>(*it);
-                if (label < num_labels){
-                    result._stack.emplace_back(get_symbol(label));
-                }
-            }
-            return result;
-        };
-
-        bool post = false;
-
-        std::vector<tracestate_t> trace;
-        trace.push_back(decode_edges(edges));
-        while (true) {
-            auto &edge = edges.back();
-            edges.pop_back();
-            const trace_t *trace_label = get_trace_label(edge);
-            if (trace_label == nullptr) break;
-
-            auto from = std::get<0>(edge);
-            auto label = std::get<1>(edge);
-            auto to = std::get<2>(edge);
-
-            if (trace_label->is_pre_trace()) {
-                // pre* trace
-                auto &rule = _typed_pda.states()[from]._rules[trace_label->_rule_id];
-                switch (rule._operation) {
-                    case PDA::POP:
-                        break;
-                    case PDA::SWAP:
-                        edges.emplace_back(rule._to, rule._op_label, to);
-                        break;
-                    case PDA::NOOP:
-                        edges.emplace_back(rule._to, label, to);
-                        break;
-                    case PDA::PUSH:
-                        edges.emplace_back(trace_label->_state, label, to);
-                        edges.emplace_back(rule._to, rule._op_label, trace_label->_state);
-                        break;
-                }
-                trace.push_back(decode_edges(edges));
-
-            } else if (trace_label->is_post_epsilon_trace()) {
-                // Intermediate post* trace
-                // Current edge is the result of merging with an epsilon edge.
-                // Reconstruct epsilon edge and the other edge.
-                edges.emplace_back(trace_label->_state, label, to);
-                edges.emplace_back(from, std::numeric_limits<uint32_t>::max(), trace_label->_state);
-
-            } else {
-                // post* trace
-                auto &rule = _typed_pda.states()[trace_label->_state]._rules[trace_label->_rule_id];
-                switch (rule._operation) {
-                    case PDA::POP:
-                    case PDA::SWAP:
-                    case PDA::NOOP:
-                        edges.emplace_back(trace_label->_state, trace_label->_label, to);
-                        break;
-                    case PDA::PUSH:
-                        auto &edge2 = edges.back();
-                        edges.pop_back();
-                        auto trace_label2 = get_trace_label(edge2);
-                        edges.emplace_back(trace_label2->_state, trace_label2->_label, std::get<2>(edge2));
-                        break;
-                }
-                trace.push_back(decode_edges(edges));
-                post = true;
-            }
-        }
-        if (post) {
-            std::reverse(trace.begin(), trace.end());
-        }
-        return trace;
-    }
 
 
 }

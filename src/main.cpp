@@ -284,7 +284,7 @@ int main(int argc, const char** argv)
                     verification_time.start();
                     bool engine_outcome;
                     bool need_trace = was_dual || get_trace;
-                    Solver::res_type<aalwines::Query::label_t> solver_result;
+                    Solver::res_type solver_result;
                     switch(engine)
                     {
                     case 1:
@@ -303,7 +303,7 @@ int main(int argc, const char** argv)
                         verification_time.stop();
                         if(need_trace && engine_outcome)
                         {
-                            trace = solver.get_trace(std::move(solver_result.second));
+                            trace = solver.get_trace(pda, std::move(solver_result.second));
                             if(factory->write_json_trace(proof, trace))
                                 result = utils::YES;
                         }
@@ -314,7 +314,7 @@ int main(int argc, const char** argv)
                         verification_time.stop();
                         if(need_trace && engine_outcome)
                         {
-                            trace = solver.get_trace(std::move(solver_result.second));
+                            trace = solver.get_trace(pda, std::move(solver_result.second));
                             if(factory->write_json_trace(proof, trace))
                                 result = utils::YES;
                         }
