@@ -156,7 +156,6 @@ namespace pdaaal {
 
         std::unordered_set<temp_edge_t, temp_edge_hasher> edges;
         std::stack<temp_edge_t> trans;
-        std::vector<temp_edge_t> rel;
 
         // for <p, y> -> <p', y1 y2> do  (line 3)
         //   Q' U= {q_p'y1}              (line 4)
@@ -173,15 +172,18 @@ namespace pdaaal {
         }
 
         std::vector<std::vector<std::pair<size_t,uint32_t>>> rel1(_states.size()); // faster access for lookup _from -> (_to, _label)
+        std::vector<std::vector<size_t>> rel2(_states.size()); // faster access for lookup _to -> _from  (when _label is uint32_t::max)
 
-        auto insert_edge = [&edges, &trans, &rel, &rel1, this](size_t from, uint32_t label, size_t to,
+        auto insert_edge = [&edges, &trans, &rel1, &rel2, this](size_t from, uint32_t label, size_t to,
                                                                 const trace_t *trace,
                                                                 bool direct_to_rel = false) {
             auto res = edges.emplace(from, label, to);
             if (res.second) { // New edge is not already in edges (rel U trans).
                 if (direct_to_rel) {
-                    rel.emplace_back(from, label, to);
                     rel1[from].emplace_back(to, label);
+                    if (label == std::numeric_limits<uint32_t>::max()) {
+                        rel2[to].push_back(from);
+                    }
                 } else {
                     trans.emplace(from, label, to);
                 }
@@ -211,8 +213,10 @@ namespace pdaaal {
             auto t = trans.top();
             trans.pop();
             // rel = rel U {t} (line 8)   (membership test on line 7 is done in insert_edge).
-            rel.push_back(t);
             rel1[t._from].emplace_back(t._to, t._label);
+            if (t._label == std::numeric_limits<uint32_t>::max()) {
+                rel2[t._to].push_back(t._from);
+            }
 
             // if y != epsilon (line 9)
             if (t._label != std::numeric_limits<uint32_t>::max()) {
@@ -235,10 +239,8 @@ namespace pdaaal {
                             size_t q_new = q_prime[std::make_pair(rule._to, rule._op_label)];
                             insert_edge(rule._to, rule._op_label, q_new, trace); // (line 15)
                             insert_edge(q_new, t._label, t._to, trace, true); // (line 16)
-                            for (auto e : rel) { // (line 17)  // TODO: Faster access to rel?
-                                if (e._to == q_new && e._label == std::numeric_limits<uint32_t>::max()) {
-                                    insert_edge(e._from, t._label, t._to, this->new_post_trace(q_new)); // (line 18)
-                                }
+                            for (auto f : rel2[q_new]) { // (line 17)
+                                insert_edge(f, t._label, t._to, this->new_post_trace(q_new)); // (line 18)
                             }
                             break;
                     }
