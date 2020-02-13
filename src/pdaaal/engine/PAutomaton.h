@@ -33,13 +33,8 @@
 #include <functional>
 #include <vector>
 #include <iostream>
-/*
-#include <queue>
-#include <unordered_set>
-#include <unordered_map>
-#include <set>
+#include <boost/functional/hash.hpp>
 
-*/
 
 namespace pdaaal {
 
@@ -126,6 +121,16 @@ namespace pdaaal {
 
             bool operator!=(const temp_edge_t &other) const {
                 return !(*this == other);
+            }
+        };
+        struct temp_edge_hasher {
+            std::size_t operator()(const temp_edge_t& e) const
+            {
+                std::size_t seed = 0;
+                boost::hash_combine(seed, e._from);
+                boost::hash_combine(seed, e._to);
+                boost::hash_combine(seed, e._label);
+                return seed;
             }
         };
 

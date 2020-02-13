@@ -27,8 +27,8 @@
 
 #include "PAutomaton.h"
 #include <stack>
+#include <unordered_set>
 #include <cassert>
-#include <boost/functional/hash.hpp>
 
 namespace pdaaal {
 
@@ -40,19 +40,15 @@ namespace pdaaal {
         // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 42)
 
-        std::vector<std::unique_ptr<temp_edge_t>> edges;
-        std::stack<temp_edge_t *> trans;
-        std::vector<temp_edge_t *> rel;
-        auto dummy = std::make_unique<temp_edge_t>();
+        std::unordered_set<temp_edge_t, temp_edge_hasher> edges;
+        std::stack<temp_edge_t> trans;
+        std::vector<temp_edge_t> rel;
         auto& pda_states = pda().states();
         const size_t n_pda_states = pda_states.size();
-        auto insert_edge = [&edges, &dummy, &trans, this](size_t from, uint32_t label, size_t to, const trace_t *trace) {
-            (*dummy) = temp_edge_t(from, label, to);
-            auto lb = std::lower_bound(std::begin(edges), std::end(edges), dummy,
-                                       [](auto &a, auto &b) -> bool { return *a < *b; });
-            if (lb == std::end(edges) || *(*lb) != *dummy) { // New edge is not already in edges (rel U trans).
-                lb = edges.insert(lb, std::make_unique<temp_edge_t>(from, label, to));
-                trans.push(lb->get());
+        auto insert_edge = [&edges, &trans, this](size_t from, uint32_t label, size_t to, const trace_t *trace) {
+            auto res = edges.emplace(from, label, to);
+            if (res.second) { // New edge is not already in edges (rel U trans).
+                trans.emplace(from, label, to);
                 if (trace != nullptr) { // Don't add existing edges
                     this->add_edge(from, to, label, trace);
                 }
@@ -103,42 +99,41 @@ namespace pdaaal {
             rel.push_back(t);
 
             // (line 7-8 for \Delta')
-            for (auto pair : delta_prime[t->_from]) { // Loop over delta_prime (that match with t->from)
+            for (auto pair : delta_prime[t._from]) { // Loop over delta_prime (that match with t->from)
                 auto state = pair.first;
                 auto rule_id = pair.second;
-                if (pda_states[state]._rules[rule_id]._precondition.contains(t->_label)) {
-                    insert_edge(state, t->_label, t->_to, this->new_pre_trace(rule_id, t->_from));
+                if (pda_states[state]._rules[rule_id]._precondition.contains(t._label)) {
+                    insert_edge(state, t._label, t._to, this->new_pre_trace(rule_id, t._from));
                 }
             }
             // Loop over \Delta (filter rules going into q) (line 7 and 9)
-            if (t->_from >= n_pda_states) { continue; }
-            for (auto pre_state : pda_states[t->_from]._pre) {
+            if (t._from >= n_pda_states) { continue; }
+            for (auto pre_state : pda_states[t._from]._pre) {
                 const auto &rules = pda_states[pre_state]._rules;
                 for (size_t rule_id = 0; rule_id < rules.size(); ++rule_id) {
                     auto &rule = rules[rule_id];
-                //for (auto &rule : pda_states[pre_state]._rules) {
-                    if (rule._to == t->_from) { // TODO: In state._pre: also store which rule in pre_state leads to the state.
+                    if (rule._to == t._from) { // TODO: In state._pre: also store which rule in pre_state leads to the state.
                         switch (rule._operation) {
                             case PDA::POP:
                                 break;
                             case PDA::SWAP: // (line 7-8 for \Delta)
-                                if (rule._op_label == t->_label) {
-                                    insert_edge_bulk(pre_state, rule._precondition, t->_to, this->new_pre_trace(rule_id));
+                                if (rule._op_label == t._label) {
+                                    insert_edge_bulk(pre_state, rule._precondition, t._to, this->new_pre_trace(rule_id));
                                 }
                                 break;
                             case PDA::NOOP: // (line 7-8 for \Delta)
-                                if (rule._precondition.contains(t->_label)) {
-                                    insert_edge(pre_state, t->_label, t->_to, this->new_pre_trace(rule_id));
+                                if (rule._precondition.contains(t._label)) {
+                                    insert_edge(pre_state, t._label, t._to, this->new_pre_trace(rule_id));
                                 }
                                 break;
                             case PDA::PUSH: // (line 9)
-                                if (rule._op_label == t->_label) {
+                                if (rule._op_label == t._label) {
                                     // (line 10)
-                                    delta_prime[t->_to].emplace_back(pre_state, rule_id);
+                                    delta_prime[t._to].emplace_back(pre_state, rule_id);
                                     for (auto rel_rule : rel) { // (line 11-12) // TODO: Change rel to a hash map to allow faster lookup here.
-                                        if (rel_rule->_from == t->_to &&
-                                            rule._precondition.contains(rel_rule->_label)) {
-                                            insert_edge(pre_state, rel_rule->_label, rel_rule->_to, this->new_pre_trace(rule_id, t->_to));
+                                        if (rel_rule._from == t._to &&
+                                            rule._precondition.contains(rel_rule._label)) {
+                                            insert_edge(pre_state, rel_rule._label, rel_rule._to, this->new_pre_trace(rule_id, t._to));
                                         }
                                     }
                                 }
@@ -157,24 +152,20 @@ namespace pdaaal {
         // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 48)
 
-        std::vector<std::unique_ptr<temp_edge_t>> edges;
-        std::stack<temp_edge_t *> trans;
-        std::vector<temp_edge_t *> rel;
-        auto dummy = std::make_unique<temp_edge_t>();
+        std::unordered_set<temp_edge_t, temp_edge_hasher> edges;
+        std::stack<temp_edge_t> trans;
+        std::vector<temp_edge_t> rel;
         auto & pda_states = pda().states();
         auto n_pda_states = pda_states.size();
-        auto insert_edge = [&edges, &dummy, &trans, &rel, this](size_t from, uint32_t label, size_t to,
+        auto insert_edge = [&edges, &trans, &rel, this](size_t from, uint32_t label, size_t to,
                                                                 const trace_t *trace,
                                                                 bool direct_to_rel = false) {
-            (*dummy) = temp_edge_t(from, label, to);
-            auto lb = std::lower_bound(std::begin(edges), std::end(edges), dummy,
-                                       [](auto &a, auto &b) -> bool { return *a < *b; });
-            if (lb == std::end(edges) || *(*lb) != *dummy) { // New edge is not already in edges (rel U trans).
-                lb = edges.insert(lb, std::make_unique<temp_edge_t>(from, label, to));
+            auto res = edges.emplace(from, label, to);
+            if (res.second) { // New edge is not already in edges (rel U trans).
                 if (direct_to_rel) {
-                    rel.push_back(lb->get());
+                    rel.emplace_back(from, label, to);
                 } else {
-                    trans.push(lb->get());
+                    trans.emplace(from, label, to);
                 }
                 if (trace != nullptr) { // Don't add existing edges
                     if (label == std::numeric_limits<uint32_t>::max()) {
@@ -221,29 +212,29 @@ namespace pdaaal {
             rel.push_back(t);
 
             // if y != epsilon (line 9)
-            if (t->_label != std::numeric_limits<uint32_t>::max()) {
-                const auto &rules = pda_states[t->_from]._rules;
+            if (t._label != std::numeric_limits<uint32_t>::max()) {
+                const auto &rules = pda_states[t._from]._rules;
                 for (size_t rule_id = 0; rule_id < rules.size(); ++rule_id) {
                     auto &rule = rules[rule_id];
-                    if (!rule._precondition.contains(t->_label)) { continue; }
-                    auto trace = this->new_post_trace(t->_from, rule_id, t->_label);
+                    if (!rule._precondition.contains(t._label)) { continue; }
+                    auto trace = this->new_post_trace(t._from, rule_id, t._label);
                     switch (rule._operation) {
                         case PDA::POP: // (line 10-11)
-                            insert_edge(rule._to, std::numeric_limits<uint32_t>::max(), t->_to, trace);
+                            insert_edge(rule._to, std::numeric_limits<uint32_t>::max(), t._to, trace);
                             break;
                         case PDA::SWAP: // (line 12-13)
-                            insert_edge(rule._to, rule._op_label, t->_to, trace);
+                            insert_edge(rule._to, rule._op_label, t._to, trace);
                             break;
                         case PDA::NOOP:
-                            insert_edge(rule._to, t->_label, t->_to, trace);
+                            insert_edge(rule._to, t._label, t._to, trace);
                             break;
                         case PDA::PUSH: // (line 14)
                             size_t q_new = q_prime[std::make_pair(rule._to, rule._op_label)];
                             insert_edge(rule._to, rule._op_label, q_new, trace); // (line 15)
-                            insert_edge(q_new, t->_label, t->_to, trace, true); // (line 16)
+                            insert_edge(q_new, t._label, t._to, trace, true); // (line 16)
                             for (auto e : rel) { // (line 17)  // TODO: Faster access to rel?
-                                if (e->_to == q_new && e->_label == std::numeric_limits<uint32_t>::max()) {
-                                    insert_edge(e->_from, t->_label, t->_to, this->new_post_trace(q_new)); // (line 18)
+                                if (e._to == q_new && e._label == std::numeric_limits<uint32_t>::max()) {
+                                    insert_edge(e._from, t._label, t._to, this->new_post_trace(q_new)); // (line 18)
                                 }
                             }
                             break;
@@ -251,8 +242,8 @@ namespace pdaaal {
                 }
             } else {
                 for (auto e : rel) { // (line 20)
-                    if (e->_from == t->_to) { // TODO: Faster access to rel?
-                        insert_edge(t->_from, e->_label, e->_to, this->new_post_trace(t->_to)); // (line 21)
+                    if (e._from == t._to) { // TODO: Faster access to rel?
+                        insert_edge(t._from, e._label, e._to, this->new_post_trace(t._to)); // (line 21)
                     }
                 }
             }
