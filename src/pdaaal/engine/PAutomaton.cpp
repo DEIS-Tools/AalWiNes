@@ -39,12 +39,13 @@ namespace pdaaal {
         // This is an implementation of Algorithm 1 (figure 3.3) in:
         // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 42)
+        auto& pda_states = pda().states();
+        const size_t n_pda_states = pda_states.size();
 
         std::unordered_set<temp_edge_t, temp_edge_hasher> edges;
         std::stack<temp_edge_t> trans;
-        std::vector<temp_edge_t> rel;
-        auto& pda_states = pda().states();
-        const size_t n_pda_states = pda_states.size();
+        std::vector<std::vector<std::pair<size_t,uint32_t>>> rel(n_pda_states);
+
         auto insert_edge = [&edges, &trans, this](size_t from, uint32_t label, size_t to, const trace_t *trace) {
             auto res = edges.emplace(from, label, to);
             if (res.second) { // New edge is not already in edges (rel U trans).
@@ -89,14 +90,14 @@ namespace pdaaal {
 
         // delta_prime[q] = [p,rule_id]    where states[p]._rules[rule_id]._precondition.contains(y)    for each p, rule_id
         // corresponds to <p, y> --> <q, y>   (the y is the same, since we only have PUSH and not arbitrary <p, y> --> <q, y1 y2>, i.e. y==y2)
-        std::vector<std::vector<std::pair<size_t, size_t>>> delta_prime(pda().states().size());
+        std::vector<std::vector<std::pair<size_t, size_t>>> delta_prime(n_pda_states);
 
         while (!trans.empty()) { // (line 3)
             // pop t = (q, y, q') from trans (line 4)
             auto t = trans.top();
             trans.pop();
             // rel = rel U {t} (line 6)   (membership test on line 5 is done in insert_edge).
-            rel.push_back(t);
+            rel[t._from].emplace_back(t._to, t._label);
 
             // (line 7-8 for \Delta')
             for (auto pair : delta_prime[t._from]) { // Loop over delta_prime (that match with t->from)
@@ -130,10 +131,9 @@ namespace pdaaal {
                                 if (rule._op_label == t._label) {
                                     // (line 10)
                                     delta_prime[t._to].emplace_back(pre_state, rule_id);
-                                    for (auto rel_rule : rel) { // (line 11-12) // TODO: Change rel to a hash map to allow faster lookup here.
-                                        if (rel_rule._from == t._to &&
-                                            rule._precondition.contains(rel_rule._label)) {
-                                            insert_edge(pre_state, rel_rule._label, rel_rule._to, this->new_pre_trace(rule_id, t._to));
+                                    for (auto rel_rule : rel[t._to]) { // (line 11-12)
+                                        if (rule._precondition.contains(rel_rule.second)) {
+                                            insert_edge(pre_state, rel_rule.second, rel_rule.first, this->new_pre_trace(rule_id, t._to));
                                         }
                                     }
                                 }
