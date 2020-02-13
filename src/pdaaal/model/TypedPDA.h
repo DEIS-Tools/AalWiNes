@@ -43,7 +43,6 @@
 namespace pdaaal {
     template<typename T>
     class PDAFactory;
-    template<typename T>
     class PAutomaton;
 
     template<typename T>
@@ -67,7 +66,7 @@ namespace pdaaal {
 
     protected:
         friend class PDAFactory<T>;
-        friend class PAutomaton<T>;
+        friend class PAutomaton;
 
         TypedPDA(std::unordered_set<T>& all_labels) {
             std::set<T> sorted(all_labels.begin(), all_labels.end());
