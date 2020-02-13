@@ -144,7 +144,6 @@ namespace pdaaal
     {
         std::queue<size_t> waiting;
         std::vector<bool> in_waiting(_states.size());
-        in_waiting[_initial_id] = true; // we don't ever prune initial.
         for (size_t t = 0; t < _states.size(); ++t) {
             in_waiting[t] = true;
             waiting.push(t);
@@ -153,7 +152,7 @@ namespace pdaaal
         while (!waiting.empty()) {
             auto s = waiting.front();
             waiting.pop();
-            if (s == _initial_id) continue;
+            if (s == 0) continue; // We don't prune terminal.
             in_waiting[s] = false;
             std::set<uint32_t> usefull_tos;
             bool cont = false;
