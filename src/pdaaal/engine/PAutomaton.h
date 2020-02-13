@@ -243,6 +243,7 @@ namespace pdaaal {
         [[nodiscard]] size_t number_of_labels() const { return _pda.number_of_labels(); }
 
         size_t add_state(bool initial, bool accepting);
+        size_t next_state_id() const;
 
         void add_epsilon_edge(size_t from, size_t to, const trace_t *trace);
 

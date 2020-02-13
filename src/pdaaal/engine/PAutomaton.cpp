@@ -194,10 +194,9 @@ namespace pdaaal {
         for (auto &state : pda_states) {
             for (auto &rule : state._rules) {
                 if (rule._operation == PDA::PUSH) {
-                    auto pair = std::make_pair(rule._to, rule._op_label);
-                    if (q_prime.find(pair) == q_prime.end()) {
-                        auto new_state = this->add_state(false, false);
-                        q_prime.emplace(pair, new_state);
+                    auto res = q_prime.emplace(std::make_pair(rule._to, rule._op_label), this->next_state_id());
+                    if (res.second) {
+                        this->add_state(false, false);
                     }
                 }
             }
@@ -333,7 +332,7 @@ namespace pdaaal {
     }
 
     size_t PAutomaton::add_state(bool initial, bool accepting) {
-        auto id = _states.size();
+        auto id = next_state_id();
         _states.emplace_back(std::make_unique<state_t>(accepting, id));
         if (accepting) {
             _accepting.push_back(_states.back().get());
@@ -342,6 +341,9 @@ namespace pdaaal {
             _initial.push_back(_states.back().get());
         }
         return id;
+    }
+    size_t PAutomaton::next_state_id() const {
+        return _states.size();
     }
 
     void PAutomaton::add_epsilon_edge(size_t from, size_t to, const trace_t *trace) {
