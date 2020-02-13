@@ -44,7 +44,7 @@ namespace pdaaal {
 
         std::unordered_set<temp_edge_t, temp_edge_hasher> edges;
         std::stack<temp_edge_t> trans;
-        std::vector<std::vector<std::pair<size_t,uint32_t>>> rel(n_pda_states);
+        std::vector<std::vector<std::pair<size_t,uint32_t>>> rel(_states.size());
 
         auto insert_edge = [&edges, &trans, this](size_t from, uint32_t label, size_t to, const trace_t *trace) {
             auto res = edges.emplace(from, label, to);
@@ -151,19 +151,37 @@ namespace pdaaal {
         // This is an implementation of Algorithm 2 (figure 3.4) in:
         // Schwoon, Stefan. Model-checking pushdown systems. 2002. PhD Thesis. Technische Universität München.
         // http://www.lsv.fr/Publis/PAPERS/PDF/schwoon-phd02.pdf (page 48)
+        auto & pda_states = pda().states();
+        auto n_pda_states = pda_states.size();
 
         std::unordered_set<temp_edge_t, temp_edge_hasher> edges;
         std::stack<temp_edge_t> trans;
         std::vector<temp_edge_t> rel;
-        auto & pda_states = pda().states();
-        auto n_pda_states = pda_states.size();
-        auto insert_edge = [&edges, &trans, &rel, this](size_t from, uint32_t label, size_t to,
+
+        // for <p, y> -> <p', y1 y2> do  (line 3)
+        //   Q' U= {q_p'y1}              (line 4)
+        std::unordered_map<std::pair<size_t, uint32_t>, size_t, boost::hash<std::pair<size_t, uint32_t>>> q_prime{};
+        for (auto &state : pda_states) {
+            for (auto &rule : state._rules) {
+                if (rule._operation == PDA::PUSH) {
+                    auto res = q_prime.emplace(std::make_pair(rule._to, rule._op_label), this->next_state_id());
+                    if (res.second) {
+                        this->add_state(false, false);
+                    }
+                }
+            }
+        }
+
+        std::vector<std::vector<std::pair<size_t,uint32_t>>> rel1(_states.size()); // faster access for lookup _from -> (_to, _label)
+
+        auto insert_edge = [&edges, &trans, &rel, &rel1, this](size_t from, uint32_t label, size_t to,
                                                                 const trace_t *trace,
                                                                 bool direct_to_rel = false) {
             auto res = edges.emplace(from, label, to);
             if (res.second) { // New edge is not already in edges (rel U trans).
                 if (direct_to_rel) {
                     rel.emplace_back(from, label, to);
+                    rel1[from].emplace_back(to, label);
                 } else {
                     trans.emplace(from, label, to);
                 }
@@ -188,27 +206,13 @@ namespace pdaaal {
             }
         }
 
-        // for <p, y> -> <p', y1 y2> do  (line 3)
-        //   Q' U= {q_p'y1}              (line 4)
-        std::unordered_map<std::pair<size_t, uint32_t>, size_t, boost::hash<std::pair<size_t, uint32_t>>> q_prime{};
-        for (auto &state : pda_states) {
-            for (auto &rule : state._rules) {
-                if (rule._operation == PDA::PUSH) {
-                    auto res = q_prime.emplace(std::make_pair(rule._to, rule._op_label), this->next_state_id());
-                    if (res.second) {
-                        this->add_state(false, false);
-                    }
-                }
-            }
-        }
-
-
         while (!trans.empty()) { // (line 5)
             // pop t = (q, y, q') from trans (line 6)
             auto t = trans.top();
             trans.pop();
             // rel = rel U {t} (line 8)   (membership test on line 7 is done in insert_edge).
             rel.push_back(t);
+            rel1[t._from].emplace_back(t._to, t._label);
 
             // if y != epsilon (line 9)
             if (t._label != std::numeric_limits<uint32_t>::max()) {
@@ -240,10 +244,8 @@ namespace pdaaal {
                     }
                 }
             } else {
-                for (auto e : rel) { // (line 20)
-                    if (e._from == t._to) { // TODO: Faster access to rel?
-                        insert_edge(t._from, e._label, e._to, this->new_post_trace(t._to)); // (line 21)
-                    }
+                for (auto e : rel1[t._to]) { // (line 20)
+                    insert_edge(t._from, e.second, e.first, this->new_post_trace(t._to)); // (line 21)
                 }
             }
         }
