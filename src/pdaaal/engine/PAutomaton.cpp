@@ -91,9 +91,9 @@ namespace pdaaal {
             }
         }
 
-        // delta_prime[q] = p,pre    where pre.contains(y)    for multi p,pre
+        // delta_prime[q] = [p,rule_id]    where states[p]._rules[rule_id]._precondition.contains(y)    for each p, rule_id
         // corresponds to <p, y> --> <q, y>   (the y is the same, since we only have PUSH and not arbitrary <p, y> --> <q, y1 y2>, i.e. y==y2)
-        std::unordered_multimap<size_t, std::pair<size_t, size_t>> delta_prime{};
+        std::vector<std::vector<std::pair<size_t, size_t>>> delta_prime(pda().states().size());
 
         while (!trans.empty()) { // (line 3)
             // pop t = (q, y, q') from trans (line 4)
@@ -103,12 +103,11 @@ namespace pdaaal {
             rel.push_back(t);
 
             // (line 7-8 for \Delta')
-            auto range = delta_prime.equal_range(t->_from);
-            for (auto it = range.first; it != range.second; ++it) { // Loop over delta_prime (that match with t->from)
-                auto state = it->second.first;
-                auto rule_id = it->second.second;
+            for (auto pair : delta_prime[t->_from]) { // Loop over delta_prime (that match with t->from)
+                auto state = pair.first;
+                auto rule_id = pair.second;
                 if (pda_states[state]._rules[rule_id]._precondition.contains(t->_label)) {
-                    insert_edge(it->second.first, t->_label, t->_to, this->new_pre_trace(rule_id, t->_from));
+                    insert_edge(state, t->_label, t->_to, this->new_pre_trace(rule_id, t->_from));
                 }
             }
             // Loop over \Delta (filter rules going into q) (line 7 and 9)
@@ -135,7 +134,7 @@ namespace pdaaal {
                             case PDA::PUSH: // (line 9)
                                 if (rule._op_label == t->_label) {
                                     // (line 10)
-                                    delta_prime.emplace(t->_to, std::make_pair(pre_state, rule_id));
+                                    delta_prime[t->_to].emplace_back(pre_state, rule_id);
                                     for (auto rel_rule : rel) { // (line 11-12) // TODO: Change rel to a hash map to allow faster lookup here.
                                         if (rel_rule->_from == t->_to &&
                                             rule._precondition.contains(rel_rule->_label)) {
