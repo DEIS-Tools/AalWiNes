@@ -34,7 +34,7 @@
 #include "query/parsererrors.h"
 #include "pdaaal/model/PDAFactory.h"
 #include "pdaaal/engine/Moped.h"
-#include "pdaaal/engine/PostStar.h"
+#include "pdaaal/engine/Solver.h"
 
 #include "utils/stopwatch.h"
 #include "utils/outcome.h"
@@ -137,7 +137,7 @@ int main(int argc, const char** argv)
         exit(-1);
     }
     
-    if(engine > 2)
+    if(engine > 3)
     {
         std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
@@ -245,7 +245,7 @@ int main(int argc, const char** argv)
             std::cout << "\t\"answers\":{\n";
         }
         Moped moped;
-        PostStar post_star;
+        Solver solver;
         
         for(auto& q : builder._result)
         {
@@ -284,6 +284,7 @@ int main(int argc, const char** argv)
                     verification_time.start();
                     bool engine_outcome;
                     bool need_trace = was_dual || get_trace;
+                    Solver::res_type solver_result;
                     switch(engine)
                     {
                     case 1:
@@ -297,17 +298,27 @@ int main(int argc, const char** argv)
                         }
                         break;
                     case 2:
-                        engine_outcome = post_star.verify(pda, need_trace);
+                        solver_result = solver.post_star(pda, need_trace);
+                        engine_outcome = solver_result.first;
                         verification_time.stop();
                         if(need_trace && engine_outcome)
                         {
-                            trace = post_star.get_trace(pda);
+                            trace = solver.get_trace(pda, std::move(solver_result.second));
                             if(factory->write_json_trace(proof, trace))
                                 result = utils::YES;
                         }
                         break;
                     case 3:
-                        // break;
+                        solver_result = solver.pre_star(pda, need_trace);
+                        engine_outcome = solver_result.first;
+                        verification_time.stop();
+                        if(need_trace && engine_outcome)
+                        {
+                            trace = solver.get_trace(pda, std::move(solver_result.second));
+                            if(factory->write_json_trace(proof, trace))
+                                result = utils::YES;
+                        }
+                        break;
                     default:
                         throw base_error("Unsupported --engine value given");
                     }
