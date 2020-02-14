@@ -504,10 +504,10 @@ namespace pdaaal
 
     bool PDA::rule_t::operator<(const rule_t& other) const
     {
-        if (_op_label != other._op_label)
-            return _op_label < other._op_label;
         if (_to != other._to)
             return _to < other._to;
+        if (_op_label != other._op_label)
+            return _op_label < other._op_label;
         return _operation < other._operation;
     }
 

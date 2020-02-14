@@ -111,36 +111,38 @@ namespace pdaaal {
             if (t._from >= n_pda_states) { continue; }
             for (auto pre_state : pda_states[t._from]._pre) {
                 const auto &rules = pda_states[pre_state]._rules;
-                for (size_t rule_id = 0; rule_id < rules.size(); ++rule_id) {
-                    auto &rule = rules[rule_id];
-                    if (rule._to == t._from) { // TODO: In state._pre: also store which rule in pre_state leads to the state.
-                        switch (rule._operation) {
-                            case PDA::POP:
-                                break;
-                            case PDA::SWAP: // (line 7-8 for \Delta)
-                                if (rule._op_label == t._label) {
-                                    insert_edge_bulk(pre_state, rule._precondition, t._to, this->new_pre_trace(rule_id));
-                                }
-                                break;
-                            case PDA::NOOP: // (line 7-8 for \Delta)
-                                if (rule._precondition.contains(t._label)) {
-                                    insert_edge(pre_state, t._label, t._to, this->new_pre_trace(rule_id));
-                                }
-                                break;
-                            case PDA::PUSH: // (line 9)
-                                if (rule._op_label == t._label) {
-                                    // (line 10)
-                                    delta_prime[t._to].emplace_back(pre_state, rule_id);
-                                    for (auto rel_rule : rel[t._to]) { // (line 11-12)
-                                        if (rule._precondition.contains(rel_rule.second)) {
-                                            insert_edge(pre_state, rel_rule.second, rel_rule.first, this->new_pre_trace(rule_id, t._to));
-                                        }
+                PDA::rule_t dummy_rule{t._from, PDA::PUSH, 0}; // PUSH and 0 are the smallest w.r.t. PDA::rule_t::operator<
+                auto lb = std::lower_bound(rules.begin(), rules.end(), dummy_rule);
+                while (lb != rules.end() && lb->_to == t._from) {
+                    auto &rule = *lb;
+                    size_t rule_id = lb - rules.begin();
+                    ++lb;
+                    switch (rule._operation) {
+                        case PDA::POP:
+                            break;
+                        case PDA::SWAP: // (line 7-8 for \Delta)
+                            if (rule._op_label == t._label) {
+                                insert_edge_bulk(pre_state, rule._precondition, t._to, this->new_pre_trace(rule_id));
+                            }
+                            break;
+                        case PDA::NOOP: // (line 7-8 for \Delta)
+                            if (rule._precondition.contains(t._label)) {
+                                insert_edge(pre_state, t._label, t._to, this->new_pre_trace(rule_id));
+                            }
+                            break;
+                        case PDA::PUSH: // (line 9)
+                            if (rule._op_label == t._label) {
+                                // (line 10)
+                                delta_prime[t._to].emplace_back(pre_state, rule_id);
+                                for (auto rel_rule : rel[t._to]) { // (line 11-12)
+                                    if (rule._precondition.contains(rel_rule.second)) {
+                                        insert_edge(pre_state, rel_rule.second, rel_rule.first, this->new_pre_trace(rule_id, t._to));
                                     }
                                 }
-                                break;
-                            default:
-                                assert(false);
-                        }
+                            }
+                            break;
+                        default:
+                            assert(false);
                     }
                 }
             }
