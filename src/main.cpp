@@ -32,9 +32,9 @@
 #include "model/NetworkPDAFactory.h"
 
 #include "query/parsererrors.h"
-#include "pdaaal/model/PDAFactory.h"
+#include <pdaaal/PDAFactory.h>
 #include "pdaaal/engine/Moped.h"
-#include "pdaaal/engine/Solver.h"
+#include <pdaaal/Solver.h>
 
 #include "utils/stopwatch.h"
 #include "utils/outcome.h"

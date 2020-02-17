@@ -26,7 +26,8 @@
 
 #ifndef QUERY_H
 #define QUERY_H
-#include "pdaaal/model/NFA.h"
+#include <pdaaal/NFA.h>
+#include "utils/errors.h"
 #include "utils/parsing.h"
 
 #include <functional>

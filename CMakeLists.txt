@@ -45,6 +45,12 @@ if (AALWINES_GetDependencies)
         INSTALL_COMMAND cd ../rapidxml-ext && ${CMAKE_COMMAND} -E copy rapidxml.hpp rapidxml_iterators.hpp rapidxml_print.hpp rapidxml_utils.hpp ${EXTERNAL_INSTALL_LOCATION}/include 
     )
 
+    ExternalProject_add(pdaaal-ext
+        GIT_REPOSITORY git@github.com:DEIS-Tools/PDAAAL.git
+        GIT_TAG af00e80a1a28c20923d6915d38af9469ead54be5
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPTRIE_BuildTest=OFF -DCMAKE_BUILD_TYPE=Release
+        )
+
     # we can now include external libraries
     include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
     link_directories(${EXTERNAL_INSTALL_LOCATION}/lib)

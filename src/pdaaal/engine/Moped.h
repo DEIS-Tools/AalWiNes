@@ -27,7 +27,8 @@
 #ifndef MOPED_H
 #define MOPED_H
 
-#include "pdaaal/model/TypedPDA.h"
+#include <pdaaal/TypedPDA.h>
+#include "utils/errors.h"
 
 #include <cassert>
 #include <sstream>
