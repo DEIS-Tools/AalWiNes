@@ -90,7 +90,7 @@ namespace pdaaal {
 
         // delta_prime[q] = [p,rule_id]    where states[p]._rules[rule_id]._precondition.contains(y)    for each p, rule_id
         // corresponds to <p, y> --> <q, y>   (the y is the same, since we only have PUSH and not arbitrary <p, y> --> <q, y1 y2>, i.e. y==y2)
-        std::vector<std::vector<std::pair<size_t, size_t>>> delta_prime(n_pda_states);
+        std::vector<std::vector<std::pair<size_t, size_t>>> delta_prime(_states.size());
 
         while (!trans.empty()) { // (line 3)
             // pop t = (q, y, q') from trans (line 4)
@@ -238,6 +238,7 @@ namespace pdaaal {
                             insert_edge(rule._to, t._label, t._to, trace);
                             break;
                         case PDA::PUSH: // (line 14)
+                            assert(q_prime.find(std::make_pair(rule._to, rule._op_label)) != std::end(q_prime));
                             size_t q_new = q_prime[std::make_pair(rule._to, rule._op_label)];
                             insert_edge(rule._to, rule._op_label, q_new, trace); // (line 15)
                             insert_edge(q_new, t._label, t._to, trace, true); // (line 16)
