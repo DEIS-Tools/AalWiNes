@@ -1,4 +1,5 @@
 # AalWiNes (Aalborg Wien Network Suite)
+[![DOI](https://zenodo.org/badge/241874332.svg)](https://zenodo.org/badge/latestdoi/241874332)
 ## Compilation
 Requirements for compilation:
 
