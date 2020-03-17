@@ -35,6 +35,7 @@ namespace aalwines
         NFA::state_t* ns = nullptr;
         Interface* nr = nullptr;
         add_state(ns, nr);
+        add_state(ns, nr, -1); // Add a second (different) NULL state.
         _path.compile();
         construct_initial();
     }
@@ -100,7 +101,7 @@ namespace aalwines
         ns._initial = initial && _only_mpls_swap; // only need for this when restricting labels
         auto res = _states.insert(ns);
         if (res.first) {
-            if(res.second != 0)
+            if(res.second > 1)
             {
                 // don't check null-state
                 auto& d = _states.get_data(res.second);
