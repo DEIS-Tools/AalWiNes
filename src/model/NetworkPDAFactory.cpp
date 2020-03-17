@@ -28,9 +28,8 @@
 
 namespace aalwines
 {
-
-    NetworkPDAFactory::NetworkPDAFactory(Query& query, Network& network, bool only_mpls_swap)
-    : PDAFactory(query.construction(), query.destruction(), network.all_labels()), _network(network), _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap)
+    NetworkPDAFactory::NetworkPDAFactory(Query& query, Network& network, bool only_mpls_swap, weight_function& weight_f)
+    : PDAFactory(query.construction(), query.destruction(), network.all_labels()), _network(network), _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap), _weight_f(weight_f)
     {
         // add special NULL state initially
         NFA::state_t* ns = nullptr;
@@ -166,6 +165,7 @@ namespace aalwines
         }
     }
 
+
     void NetworkPDAFactory::expand_back(std::vector<rule_t>& rules, const Query::label_t& pre)
     {
         rule_t cpy;
@@ -230,9 +230,9 @@ namespace aalwines
         }
     }
 
-    bool NetworkPDAFactory::start_rule(size_t id, nstate_t& s, const RoutingTable::forward_t& forward, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result)
-    {
-        rule_t nr;                            
+
+    bool NetworkPDAFactory::start_rule(size_t id, nstate_t& s, const RoutingTable::forward_t& forward, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::rule_t>& result) {
+        rule_t nr;
         auto appmode = s._appmode;
         if (!forward._via->is_virtual()) {
             appmode = set_approximation(s, forward);
@@ -249,12 +249,12 @@ namespace aalwines
             auto lb = std::lower_bound(_initial.begin(), _initial.end(), id);
             if(lb == std::end(_initial) || *lb != id) // allow for IP-routing on initial
             {
-                return false;            
+                return false;
             }
         }
         if (forward._ops.size() > 0) {
             // check if no-ip-swap is set
-            
+
             if(_only_mpls_swap && !is_virtual && (
                forward._ops[0]._op_label.type() == Query::ANYIP ||
                forward._ops[0]._op_label.type() == Query::IP4 ||
@@ -265,18 +265,18 @@ namespace aalwines
 
             switch (forward._ops[0]._op) {
             case RoutingTable::POP:
-                nr._op = PDA::POP;
-                assert(entry._top_label.type() == Query::MPLS || 
+                nr._op = pdaaal::POP;
+                assert(entry._top_label.type() == Query::MPLS ||
                        entry._top_label.type() == Query::STICKY_MPLS);
                 break;
             case RoutingTable::PUSH:
-                nr._op = PDA::PUSH;
-                assert(forward._ops[0]._op_label.type() == Query::MPLS || 
+                nr._op = pdaaal::PUSH;
+                assert(forward._ops[0]._op_label.type() == Query::MPLS ||
                        forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
                 nr._op_label = forward._ops[0]._op_label;
                 break;
             case RoutingTable::SWAP:
-                nr._op = PDA::SWAP;
+                nr._op = pdaaal::SWAP;
                 nr._op_label = forward._ops[0]._op_label;
                 break;
             }
@@ -294,7 +294,7 @@ namespace aalwines
                entry._top_label.type() != Query::ANYMPLS &&
                entry._top_label.type() != Query::ANYSTICKY)
             {
-                nr._op = PDA::SWAP;
+                nr._op = pdaaal::SWAP;
                 nr._op_label = entry._top_label;
                 assert(entry._top_label.mask() == 0);
                 assert(entry._top_label.type() == Query::MPLS ||
@@ -302,41 +302,37 @@ namespace aalwines
             }
             else
             {
-                nr._op = PDA::NOOP;
+                nr._op = pdaaal::NOOP;
             }
         }
-        
-        
-        if (forward._ops.size() <= 1) {
-            std::vector<NFA::state_t*> next{destination};
-            if (forward._via->is_virtual())
-                next = {s._nfastate};
-            else
-                NFA::follow_epsilon(next);
-            for (auto& n : next) {
-                result.emplace_back(nr);
-                auto& ar = result.back();
-                auto res = add_state(n, forward._via->match(), appmode);
-                ar._dest = res.second;
-                expand_back(result, entry._top_label);
+
+        std::vector<NFA::state_t*> next{destination};
+        if (forward._via->is_virtual())
+            next = {s._nfastate};
+        else
+            NFA::follow_epsilon(next);
+        for (auto& n : next) {
+            result.emplace_back(nr);
+            auto& ar = result.back();
+            std::pair<bool,size_t> res;
+            if (forward._ops.size() <= 1) {
+                res = add_state(n, forward._via->match(), appmode);
+                if constexpr (is_weighted){
+                    ar._weight = _weight_f(forward, true);
+                }
             }
-        }
-        else {
-            std::vector<NFA::state_t*> next{destination};
-            if (forward._via->is_virtual())
-                next = {s._nfastate};
-            else
-                NFA::follow_epsilon(next);
-            for (auto& n : next) {
-                result.emplace_back(nr);
-                auto& ar = result.back();
+            else{
                 auto eid = ((&entry) - s._inf->table().entries().data());
                 auto rid = ((&forward) - entry._rules.data());
-                auto res = add_state(n, s._inf, appmode, eid, rid, 0);
-                ar._dest = res.second;
-                expand_back(result, entry._top_label);
+                res = add_state(n, s._inf, appmode, eid, rid, 0);
+                if constexpr (is_weighted) {
+                    ar._weight = _weight_f(forward, false);
+                }
             }
-        }        
+            ar._dest = res.second;
+
+            expand_back(result, entry._top_label);
+        }
         return true;
     }
     
@@ -405,32 +401,39 @@ namespace aalwines
                 default:
                     throw base_error("Unexpected pop!");
                     assert(false);
-
                 }
             }
             switch (act._op) {
             case RoutingTable::POP:
-                nr._op = PDA::POP;
+                nr._op = pdaaal::POP;
                 throw base_error("Unexpected pop!");
                 assert(false);
                 break;
             case RoutingTable::PUSH:
-                nr._op = PDA::PUSH;
+                nr._op = pdaaal::PUSH;
                 nr._op_label = act._op_label;
                 break;
             case RoutingTable::SWAP:
-                nr._op = PDA::SWAP;
+                nr._op = pdaaal::SWAP;
                 nr._op_label = act._op_label;
                 break;
             }
+            //Also handle nr  (Routerhop(Latensy), Network Stack Size, traffic engineergroup failiures) (does the implementaion approache work?) (Define MPLS in report)
             if (s._opid + 2 == (int) r._ops.size()) {
                 auto res = add_state(s._nfastate, r._via->match());
                 nr._dest = res.second;
+                if constexpr (is_weighted) {
+                    nr._weight = _weight_f(r, true);
+                }
             }
             else {
                 auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
                 nr._dest = res.second;
+                if constexpr (is_weighted) {
+                    nr._weight = _weight_f(r, false);
+                }
             }
+            //or/andHere
         }
         return result;
     }
@@ -501,7 +504,7 @@ namespace aalwines
         }
     }
 
-    bool NetworkPDAFactory::concreterize_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace, 
+    bool NetworkPDAFactory::concreterize_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace,
                                                std::vector<const RoutingTable::entry_t*>& entries, 
                                                std::vector<const RoutingTable::forward_t*>& rules)
     {
@@ -642,7 +645,7 @@ namespace aalwines
         return true;
     }
     
-    void NetworkPDAFactory::write_concrete_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace, 
+    void NetworkPDAFactory::write_concrete_trace(std::ostream& stream, const std::vector<PDA::tracestate_t>& trace,
                                                     std::vector<const RoutingTable::entry_t*>& entries, 
                                                     std::vector<const RoutingTable::forward_t*>& rules)
     {
@@ -693,7 +696,7 @@ namespace aalwines
         }        
     }
     
-    void NetworkPDAFactory::substitute_wildcards(std::vector<PDA::tracestate_t>& trace, 
+    void NetworkPDAFactory::substitute_wildcards(std::vector<PDA::tracestate_t>& trace,
                                                     std::vector<const RoutingTable::entry_t*>& entries, 
                                                     std::vector<const RoutingTable::forward_t*>& rules) 
     {

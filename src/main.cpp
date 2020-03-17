@@ -33,9 +33,8 @@
 
 #include "query/parsererrors.h"
 #include <pdaaal/PDAFactory.h>
-#include "pdaaal/engine/Moped.h"
-#include <pdaaal/Solver.h>
-
+#include <pdaaal/Solver_Adapter.h>
+#include <pdaaal/Reducer.h>
 #include "utils/stopwatch.h"
 #include "utils/outcome.h"
 
@@ -73,7 +72,6 @@ int main(int argc, const char** argv)
     bool print_dot = false;
     bool no_parser_warnings = false;
     bool silent = false;
-    bool dump_to_moped = false;
     bool no_timing = false;
     std::string topology_destination;
     std::string routing_destination;
@@ -83,7 +81,7 @@ int main(int argc, const char** argv)
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
-            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
+            //("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
             ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
             ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
     ;
@@ -115,7 +113,7 @@ int main(int argc, const char** argv)
             ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
+            ("engine,e", po::value<size_t>(&engine), "0=no verification,2=post*,3=pre*")
             ;    
     
     opts.add(input);
@@ -141,12 +139,6 @@ int main(int argc, const char** argv)
     {
         std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
-    }
-    
-    if(engine != 0 && dump_to_moped)
-    {
-        std::cerr << "Cannot both verify (--engine > 0) and dump model (--dump-for-moped) to stdout" << std::endl;
-        exit(-1);
     }
     
     if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty()))
@@ -234,144 +226,122 @@ int main(int argc, const char** argv)
         queryparsingwatch.stop();
         
         size_t query_no = 0;
-        if(!dump_to_moped)
+        std::cout << "{\n";
+        if(!no_timing)
         {
-            std::cout << "{\n";
-            if(!no_timing)
-            {
-                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration()) 
-                          << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
-            }
-            std::cout << "\t\"answers\":{\n";
+            std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration())
+                      << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
         }
-        Moped moped;
-        Solver solver;
+        std::cout << "\t\"answers\":{\n";
+
+        Solver_Adapter solver;
         
         for(auto& q : builder._result)
         {
             ++query_no;
             stopwatch compilation_time(false);
-            if(dump_to_moped)
+
+            std::vector<Query::mode_t> modes{q.approximation()};
+            bool was_dual = q.approximation() == Query::DUAL;
+            if(was_dual)
+                modes = std::vector<Query::mode_t>{Query::OVER, Query::UNDER};
+            std::pair<size_t,size_t> reduction;
+            utils::outcome_t result = utils::MAYBE;
+            stopwatch reduction_time(false);
+            stopwatch verification_time(false);
+            std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
+            std::unique_ptr<NetworkPDAFactory> factory;
+            std::stringstream proof;
+            for(auto m : modes)
             {
                 compilation_time.start();
-                NetworkPDAFactory factory(q, network, no_ip_swap);
-                auto pda = factory.compile();
-                Moped::dump_pda(pda, std::cout);
-            }
-            else
-            {
-                std::vector<Query::mode_t> modes{q.approximation()};
-                bool was_dual = q.approximation() == Query::DUAL;
-                if(was_dual)
-                    modes = std::vector<Query::mode_t>{Query::OVER, Query::UNDER};
-                std::pair<size_t,size_t> reduction;
-                utils::outcome_t result = utils::MAYBE;
-                stopwatch reduction_time(false);
-                stopwatch verification_time(false);
-                std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
-                std::unique_ptr<NetworkPDAFactory> factory;
-                std::stringstream proof;
-                for(auto m : modes)
+                q.set_approximation(m);
+                factory = std::make_unique<NetworkPDAFactory>(q, network, no_ip_swap);
+                auto pda = factory->compile();
+                compilation_time.stop();
+                reduction_time.start();
+                reduction = Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
+                reduction_time.stop();
+                verification_time.start();
+                bool engine_outcome;
+                bool need_trace = was_dual || get_trace;
+
+                switch(engine)
                 {
-                    compilation_time.start();
-                    q.set_approximation(m);
-                    factory = std::make_unique<NetworkPDAFactory>(q, network, no_ip_swap);
-                    auto pda = factory->compile();
-                    compilation_time.stop();
-                    reduction_time.start();
-                    reduction = pda.reduce(tos);
-                    reduction_time.stop();
-                    verification_time.start();
-                    bool engine_outcome;
-                    bool need_trace = was_dual || get_trace;
-                    Solver::res_type solver_result;
-                    switch(engine)
-                    {
-                    case 1:
-                        engine_outcome = moped.verify(pda, need_trace);
-                        verification_time.stop();
-                        if(need_trace && engine_outcome)
-                        {
-                            trace = moped.get_trace(pda);
-                            if(factory->write_json_trace(proof, trace))
-                                result = utils::YES;
-                        }
-                        break;
-                    case 2:
-                        solver_result = solver.post_star(pda, need_trace);
-                        engine_outcome = solver_result.first;
-                        verification_time.stop();
-                        if(need_trace && engine_outcome)
-                        {
-                            trace = solver.get_trace(pda, std::move(solver_result.second));
-                            if(factory->write_json_trace(proof, trace))
-                                result = utils::YES;
-                        }
-                        break;
-                    case 3:
-                        solver_result = solver.pre_star(pda, need_trace);
-                        engine_outcome = solver_result.first;
-                        verification_time.stop();
-                        if(need_trace && engine_outcome)
-                        {
-                            trace = solver.get_trace(pda, std::move(solver_result.second));
-                            if(factory->write_json_trace(proof, trace))
-                                result = utils::YES;
-                        }
-                        break;
-                    default:
-                        throw base_error("Unsupported --engine value given");
+                case 1:
+                    throw base_error("Moped is not supported --engine mode given");
+                    break;
+                case 2: {
+                    auto solver_result1 = solver.post_star(pda);
+                    engine_outcome = solver_result1.first;
+                    verification_time.stop();
+                    if (need_trace && engine_outcome) {
+                        trace = solver.get_trace(pda, std::move(solver_result1.second));
+                        if (factory->write_json_trace(proof, trace))
+                            result = utils::YES;
                     }
-                    
-                    if(q.number_of_failures() == 0)
-                        result = engine_outcome ? utils::YES : utils::NO;
-                    
-                    if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
-                        result = utils::NO;
-                    if(result != utils::MAYBE)
-                        break;
-                    /*else
-                        trace.clear();*/
+                    break;
+                }
+                case 3: {
+                    auto solver_result2 = solver.pre_star(pda, need_trace);
+                    engine_outcome = solver_result2.first;
+                    verification_time.stop();
+                    if (need_trace && engine_outcome) {
+                        trace = solver.get_trace(pda, std::move(solver_result2.second));
+                        if (factory->write_json_trace(proof, trace))
+                            result = utils::YES;
+                    }
+                    break;
+                }
+                default:
+                    throw base_error("Unsupported --engine value given");
                 }
 
-                // move this into function that generalizes
-                // and extracts trace at the same time.
+                if(q.number_of_failures() == 0)
+                    result = engine_outcome ? utils::YES : utils::NO;
 
-                std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":";
-                switch(result)
-                {
-                case utils::MAYBE:
-                    std::cout << "null";
+                if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
+                    result = utils::NO;
+                if(result != utils::MAYBE)
                     break;
-                case utils::NO:
-                    std::cout << "false";
-                    break;
-                case utils::YES:
-                    std::cout << "true";
-                    break;
-                }
-                std::cout << ",\n";
-                std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
-                if(get_trace && result == utils::YES)
-                {
-                    std::cout << ",\n\t\t\"trace\":[\n";
-                    std::cout << proof.str();
-                    std::cout << "\n\t\t]";
-                }
-                if(!no_timing)
-                {
-                    std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
-                              << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
-                             << ",\n\t\t\"verification-time\":" << (verification_time.duration());
-                }
-                std::cout << "\n\t}";
-                if(query_no != builder._result.size())
-                    std::cout << ",";
-                std::cout << "\n";
+                /*else
+                    trace.clear();*/
             }
-        }
-        if(!dump_to_moped)
-        {
+
+            // move this into function that generalizes
+            // and extracts trace at the same time.
+
+            std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":";
+            switch(result)
+            {
+            case utils::MAYBE:
+                std::cout << "null";
+                break;
+            case utils::NO:
+                std::cout << "false";
+                break;
+            case utils::YES:
+                std::cout << "true";
+                break;
+            }
+            std::cout << ",\n";
+            std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
+            if(get_trace && result == utils::YES)
+            {
+                std::cout << ",\n\t\t\"trace\":[\n";
+                std::cout << proof.str();
+                std::cout << "\n\t\t]";
+            }
+            if(!no_timing)
+            {
+                std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
+                          << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
+                         << ",\n\t\t\"verification-time\":" << (verification_time.duration());
+            }
+            std::cout << "\n\t}";
+            if(query_no != builder._result.size())
+                std::cout << ",";
+            std::cout << "\n";
             std::cout << "\n}}" << std::endl;
         }
     }

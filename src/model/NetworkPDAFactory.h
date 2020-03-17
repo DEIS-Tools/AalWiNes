@@ -30,15 +30,20 @@
 #include "Query.h"
 #include "Network.h"
 #include <pdaaal/PDAFactory.h>
+#include "NetworkWeight.h"
 
 
 namespace aalwines
 {
-    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t> {
+
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, weight_function::result_type> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
-        using PDAFactory = pdaaal::PDAFactory<label_t>;
+        using weight_type = weight_function::result_type;
+        static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
+        using PDAFactory = pdaaal::PDAFactory<label_t, weight_function::result_type>;
         using PDA = pdaaal::TypedPDA<label_t>;
+        using rule_t = typename pdaaal::PDAFactory<label_t, weight_function::result_type>::rule_t;
     private:        
         struct nstate_t {
             bool _initial = false;
@@ -50,7 +55,7 @@ namespace aalwines
             const Interface* _inf = nullptr;
         } __attribute__((packed)); // packed is needed to make this work fast with ptries
     public:
-        NetworkPDAFactory(Query& q, Network& network, bool only_mpls_swap);
+        NetworkPDAFactory(Query& q, Network& network, bool only_mpls_swap, weight_function& weight_f = default_weight_function);
         
         std::function<void(std::ostream&, const Query::label_t&) > label_writer() const;
         
@@ -63,7 +68,7 @@ namespace aalwines
         bool accepting(size_t) override;
         std::vector<rule_t> rules(size_t ) override;
         void expand_back(std::vector<rule_t>& rules, const Query::label_t& pre);
-        bool start_rule(size_t id, nstate_t& s, const RoutingTable::forward_t& fwd, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result);
+        bool start_rule(size_t id, nstate_t& s, const RoutingTable::forward_t& forward, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<rule_t>& result);
     private:
         bool add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const;
         void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;
@@ -88,6 +93,7 @@ namespace aalwines
         std::vector<size_t> _initial;
         ptrie::map<nstate_t,bool> _states;
         bool _only_mpls_swap = false;
+        weight_function& _weight_f;
     };
 }
 
