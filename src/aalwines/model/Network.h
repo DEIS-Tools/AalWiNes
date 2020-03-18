@@ -26,8 +26,8 @@
 
 #ifndef NETWORK_H
 #define NETWORK_H
-#include "model/Router.h"
-#include "model/RoutingTable.h"
+#include "Router.h"
+#include "RoutingTable.h"
 #include "Query.h"
 #include "filter.h"
 

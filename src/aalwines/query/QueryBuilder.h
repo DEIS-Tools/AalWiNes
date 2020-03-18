@@ -25,9 +25,9 @@
 
 #include "location.hh"
 #include <pdaaal/NFA.h>
-#include "model/Query.h"
-#include "model/Network.h"
-#include "model/filter.h"
+#include "aalwines/model/Query.h"
+#include "aalwines/model/Network.h"
+#include "aalwines/model/filter.h"
 
 #include <string>
 #include <sstream>
