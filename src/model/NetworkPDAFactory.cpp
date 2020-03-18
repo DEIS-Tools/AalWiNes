@@ -514,7 +514,7 @@ namespace aalwines
         for(size_t sno = 0; sno < trace.size(); ++sno)
         {
             auto& step = trace[sno];
-            if(step._pdastate < _num_pda_states)
+            if(step._pdastate > 1 && step._pdastate < _num_pda_states)
             {
                 // handle, lookup right states
                 nstate_t s;
@@ -525,7 +525,7 @@ namespace aalwines
                 }
                 else
                 {
-                    if(sno != trace.size() - 1 && trace[sno + 1]._pdastate < _num_pda_states && !step._stack.empty())
+                    if(sno != trace.size() - 1 && trace[sno + 1]._pdastate > 1 && trace[sno + 1]._pdastate < _num_pda_states && !step._stack.empty())
                     {
                         // peek at next element, we want to write the ops here
                         nstate_t next;
@@ -655,7 +655,7 @@ namespace aalwines
         for(size_t sno = 0; sno < trace.size(); ++sno)
         {
             auto& step = trace[sno];
-            if(step._pdastate < _num_pda_states)
+            if(step._pdastate > 1 && step._pdastate < _num_pda_states)
             {
                 nstate_t s;
                 _states.unpack(step._pdastate, &s);
@@ -705,7 +705,7 @@ namespace aalwines
         for(size_t sno = 0; sno < trace.size(); ++sno)
         {
             auto& step = trace[sno];
-            if(step._pdastate < _num_pda_states)
+            if(step._pdastate > 1 && step._pdastate < _num_pda_states)
             {
                 nstate_t s;
                 _states.unpack(step._pdastate, &s);
