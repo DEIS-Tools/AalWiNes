@@ -15,7 +15,7 @@ find_package(Boost 1.66 COMPONENTS program_options regex filesystem REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 add_executable(aalwines ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.cpp model/builders/PRexBuilder.cpp
-    model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp model/NetworkPDAFactory.cpp
+    model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp
     utils/parsing.cpp utils/system.cpp)
 add_dependencies(aalwines ptrie-ext rapidxml-ext pdaaal-ext)

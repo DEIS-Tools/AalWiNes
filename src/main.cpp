@@ -250,14 +250,13 @@ int main(int argc, const char** argv)
             stopwatch reduction_time(false);
             stopwatch verification_time(false);
             std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
-            std::unique_ptr<NetworkPDAFactory> factory;
             std::stringstream proof;
             for(auto m : modes)
             {
                 compilation_time.start();
                 q.set_approximation(m);
-                factory = std::make_unique<NetworkPDAFactory>(q, network, no_ip_swap);
-                auto pda = factory->compile();
+                NetworkPDAFactory factory(q, network, no_ip_swap);
+                auto pda = factory.compile();
                 compilation_time.stop();
                 reduction_time.start();
                 reduction = Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
@@ -277,7 +276,7 @@ int main(int argc, const char** argv)
                     verification_time.stop();
                     if (need_trace && engine_outcome) {
                         trace = solver.get_trace(pda, std::move(solver_result1.second));
-                        if (factory->write_json_trace(proof, trace))
+                        if (factory.write_json_trace(proof, trace))
                             result = utils::YES;
                     }
                     break;
@@ -288,7 +287,7 @@ int main(int argc, const char** argv)
                     verification_time.stop();
                     if (need_trace && engine_outcome) {
                         trace = solver.get_trace(pda, std::move(solver_result2.second));
-                        if (factory->write_json_trace(proof, trace))
+                        if (factory.write_json_trace(proof, trace))
                             result = utils::YES;
                     }
                     break;
