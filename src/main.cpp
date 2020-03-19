@@ -50,9 +50,12 @@
 #include <memory.h>
 #include <boost/filesystem/path.hpp>
 
+
 namespace po = boost::program_options;
 using namespace aalwines;
 using namespace pdaaal;
+
+void write_json_help(const po::options_description &opts, std::ostream &ostream);
 
 /*
  TODO:
@@ -65,7 +68,7 @@ int main(int argc, const char** argv)
     po::options_description opts;
     opts.add_options()
             ("help,h", "produce help message");
-    
+
     po::options_description output("Output Options");
     po::options_description input("Input Options");
     po::options_description verification("Verification Options");    
@@ -75,48 +78,46 @@ int main(int argc, const char** argv)
     bool silent = false;
     bool dump_to_moped = false;
     bool no_timing = false;
+    bool json_help = false;
     std::string topology_destination;
     std::string routing_destination;
 
     output.add_options()
-            ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
+            ("dot", po::bool_switch(&print_dot), "A dot output will be printed to standard out when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
             ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
             ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
             ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
+            ("json-help", po::bool_switch(&json_help), "Write a JSON-version of --help to standard output and exit.")
     ;
-
 
     std::string junos_config, prex_topo, prex_routing;
     bool skip_pfe = false;
     input.add_options()
             ("juniper", po::value<std::string>(&junos_config),
-            "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
+            "A file containing a network-description; each line is a router in the format 'name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml'. ")
             ("topology", po::value<std::string>(&prex_topo), 
             "An xml-file defining the topology in the P-Rex format")
             ("routing", po::value<std::string>(&prex_routing), 
             "An xml-file defining the routing in the P-Rex format")
             ("skip-pfe", po::bool_switch(&skip_pfe),
-            "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
-            ;    
+            "Skip 'indirect' cases of juniper-routing as package-drops (compatibility with P-Rex semantics).")
+            ;
 
     std::string query_file;
-    unsigned int link_failures = 0;
     size_t tos = 0;
     size_t engine = 0;
     bool get_trace = false;
     bool no_ip_swap = false;
     verification.add_options()
-            ("query,q", po::value<std::string>(&query_file),
-            "A file containing valid queries over the input network.")
+            ("query,q", po::value<std::string>(&query_file),"A file containing valid queries over the input network.")
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
             ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
-            ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
-            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
-            ;    
+            ("tos-reduction,r", po::value<size_t>(&tos)->default_value(tos), "Reduction method: 0=none,1=simple,2=dual-stack,3=dual-stack+backup")
+            ("engine,e", po::value<size_t>(&engine)->default_value(engine), "Engine type: 0=no verification,1=moped,2=post*,3=pre*")
+            ;
     
     opts.add(input);
     opts.add(output);
@@ -128,6 +129,12 @@ int main(int argc, const char** argv)
 
     if (vm.count("help")) {
         std::cout << opts << "\n";
+        return 1;
+    }
+
+    if (json_help)
+    {
+        write_json_help(opts, std::cout);
         return 1;
     }
     
@@ -376,4 +383,60 @@ int main(int argc, const char** argv)
         }
     }
     return 0;
+}
+
+void write_json_help(const po::options_description &opts, std::ostream &ostream) {
+    ostream << "{";
+    bool first = true;
+    for(auto& o : opts.options()) {
+        if(!first) ostream << ",";
+        ostream << "\n";
+        first = false;
+        ostream << "\"" << o->long_name() << "\":{\n";
+        ostream << "\t" << "\"type\":\"";
+        auto description = o->description();
+        if(dynamic_cast<const po::typed_value<std::string>*>(o->semantic().get()))
+        {
+            ostream << "string\",\n";
+        }
+        else if(dynamic_cast<const po::typed_value<size_t>*>(o->semantic().get()))
+        {
+            ostream << "select\",\n";
+            ostream << "\t\"choices\":{";
+            // extract values
+            auto it = std::find(description.begin(), description.end(), ':');
+            if(it == description.end())
+                throw base_error("No ':' found in description of multiple-choice option "  + o->long_name());
+            auto torm = it;
+            ++it;
+            while(*it == ' ') ++it;
+            if(it == description.end())
+                throw base_error("Only whitespace after ':' in description of multiple-choice option " + o->long_name());
+
+            auto bg = it;
+            ostream << "\"";
+            for(; it != std::end(description); ++it)
+            {
+                if(*it == '=') {
+                    ostream << std::string(bg, it) << "\":\"";
+                    bg = it+1;
+                }
+                else if(*it == ',') {
+                    ostream << std::string(bg, it) << "\",\"";
+                    bg = it+1;
+                }
+            }
+            ostream << std::string(bg, it) << "\"},\n";
+
+            description.erase(torm, description.end());
+
+        }
+        else
+        {
+            ostream << "switch\",\n";
+        }
+        ostream << "\t" << "\"description\":\"" << description << "\"";
+        ostream << "}";
+    }
+    ostream << "}" << std::endl;
 }
