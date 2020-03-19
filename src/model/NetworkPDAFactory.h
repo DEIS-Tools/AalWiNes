@@ -66,7 +66,7 @@ namespace aalwines
         bool start_rule(size_t id, nstate_t& s, const RoutingTable::forward_t& fwd, const RoutingTable::entry_t& entry, NFA::state_t* destination, std::vector<NetworkPDAFactory::PDAFactory::rule_t>& result);
     private:
         bool add_interfaces(std::unordered_set<const Interface*>& disabled, std::unordered_set<const Interface*>& active, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& fwd) const;
-        void print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;
+        void print_trace_rule(std::ostream& stream, const Interface* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const;
 
         void construct_initial();
         std::pair<bool,size_t> add_state(NFA::state_t* state, const Interface* router, int32_t mode = 0, int32_t eid = 0, int32_t fid = 0, int32_t op = -1, bool initial = false);

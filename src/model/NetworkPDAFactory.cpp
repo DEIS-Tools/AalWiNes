@@ -436,8 +436,12 @@ namespace aalwines
         return result;
     }
 
-    void NetworkPDAFactory::print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
-        stream << "{\"pre\":";
+    void NetworkPDAFactory::print_trace_rule(std::ostream& stream, const Interface* inf, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
+        stream << "{";
+
+        auto name = inf->source()->interface_name(inf->id());
+        stream << "\"ingoing\":\"" << name.get() << "\"";
+        stream << ",\"pre\":";
         if(entry._top_label.type() == Query::INTERFACE)
         {
             assert(false);
@@ -685,7 +689,7 @@ namespace aalwines
                     if(cnt < entries.size())
                     {
                         stream << ",\n\t\t\t";
-                        print_trace_rule(stream, s._inf->source(), *entries[cnt], *rules[cnt]);                        
+                        print_trace_rule(stream, s._inf, *entries[cnt], *rules[cnt]);
                         ++cnt;
                     }
                     first = false;
