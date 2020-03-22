@@ -205,9 +205,9 @@ namespace aalwines
     void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex, const Network* network) const
     {
         s << "{";
-        s << "\"weight\":" << _weight;
+        s << "\"weight\": " << _weight;
         if (_via) {
-            s << ", \"via\":";
+            s << ", \"via\": ";
             if (use_hex) {
                 s << _via->id();
             }
@@ -217,9 +217,9 @@ namespace aalwines
             }
         }
         else
-            s << ",  \"drop\":true";
+            s << ", \"drop\": true";
         if (_ops.size() > 0) {
-            s << ", \"ops\":[";
+            s << ", \"ops\": [";
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)
                     s << ", ";

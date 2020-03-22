@@ -252,10 +252,10 @@ int main(int argc, const char** argv)
         {
             if(!no_timing)
             {
-                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration()) 
-                          << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
+                std::cout << "\t\"network-parsing-time\": " << (parsingwatch.duration()) 
+                          << ",\n\t\"query-parsing-time\": " << (queryparsingwatch.duration()) << ",\n";
             }
-            std::cout << "\t\"answers\":{\n";
+            std::cout << "\t\"answers\": {\n";
         }
         Moped moped;
         Solver solver;
@@ -350,7 +350,7 @@ int main(int argc, const char** argv)
                 // move this into function that generalizes
                 // and extracts trace at the same time.
 
-                std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":";
+                std::cout << "\t\t\"Q" << query_no << "\": {\n\t\t\t\"result\": ";
                 switch(result)
                 {
                 case utils::MAYBE:
@@ -364,20 +364,20 @@ int main(int argc, const char** argv)
                     break;
                 }
                 std::cout << ",\n";
-                std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
+                std::cout << "\t\t\t\"reduction\": [" << reduction.first << ", " << reduction.second << "]";
                 if(get_trace && result == utils::YES)
                 {
-                    std::cout << ",\n\t\t\"trace\":[\n";
+                    std::cout << ",\n\t\t\t\"trace\": [\n";
                     std::cout << proof.str();
-                    std::cout << "\n\t\t]";
+                    std::cout << "\n\t\t\t]";
                 }
                 if(!no_timing)
                 {
-                    std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
-                              << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
-                             << ",\n\t\t\"verification-time\":" << (verification_time.duration());
+                    std::cout << ",\n\t\t\t\"compilation-time\": " << (compilation_time.duration())
+                              << ",\n\t\t\t\"reduction-time\": " << (reduction_time.duration())
+                             << ",\n\t\t\t\"verification-time\": " << (verification_time.duration());
                 }
-                std::cout << "\n\t}";
+                std::cout << "\n\t\t}";
                 if(query_no != builder._result.size())
                     std::cout << ",";
                 std::cout << "\n";
@@ -385,7 +385,7 @@ int main(int argc, const char** argv)
         }
         if(!dump_to_moped)
         {
-            std::cout << "\n}";
+            std::cout << "\t}";
         }
     }
     if (!dump_to_moped && (print_net || !query_file.empty()))

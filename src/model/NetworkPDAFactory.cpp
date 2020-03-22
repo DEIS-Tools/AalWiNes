@@ -437,7 +437,7 @@ namespace aalwines
     }
 
     void NetworkPDAFactory::print_trace_rule(std::ostream& stream, const Router* router, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
-        stream << "{\"pre\":";
+        stream << "{\"pre\": ";
         if(entry._top_label.type() == Query::INTERFACE)
         {
             assert(false);
@@ -449,7 +449,7 @@ namespace aalwines
                 stream << "^";
             stream << "\"";
         }
-        stream << ",\"rule\":";
+        stream << " ,\"rule\": ";
         rule.print_json(stream, false);
         stream << "}";
     }
@@ -664,17 +664,17 @@ namespace aalwines
                 {
                     if(!first)
                         stream << ",\n";
-                    stream << "\t\t\t{\"router\":";
+                    stream << "\t\t\t\t{\"router\": ";
                     if(s._inf)
                         stream << "\"" << s._inf->source()->name() << "\"";
                     else
                         stream << "null";
-                    stream << ",\"stack\":[";
+                    stream << ", \"stack\": [";
                     bool first_symbol = true;
                     for(auto& symbol : step._stack)
                     {
                         if(!first_symbol)
-                            stream << ",";
+                            stream << ", ";
                         stream << "\"" << symbol;
                         if(_network.is_service_label(symbol))
                             stream << "^";
@@ -684,7 +684,7 @@ namespace aalwines
                     stream << "]}";
                     if(cnt < entries.size())
                     {
-                        stream << ",\n\t\t\t";
+                        stream << ",\n\t\t\t\t";
                         print_trace_rule(stream, s._inf->source(), *entries[cnt], *rules[cnt]);                        
                         ++cnt;
                     }
