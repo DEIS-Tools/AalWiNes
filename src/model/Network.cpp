@@ -214,6 +214,26 @@ namespace aalwines
             r->print_simple(s);
         }
     }
+    void Network::print_json(std::ostream& s)
+    {
+        s << "\t\"routers\": {\n";
+        bool first = true;
+        for(auto& r : _routers)
+        {
+            if (r->is_null()) {
+                continue;
+            }
+            if (first) {
+                first = false;
+            } else {
+                s << ",\n";
+            }            
+            s << "\t\t\"" << r->name() << "\": {\n";
+            r->print_json(s);
+            s << "\t\t}";
+        }
+        s << "\n\t}";
+    }
 
     bool Network::is_service_label(const Query::label_t& l) const
     {

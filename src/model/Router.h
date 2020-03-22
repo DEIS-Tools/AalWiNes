@@ -109,6 +109,7 @@ public:
     void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
     static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<char, Router*>& mapping);
     void print_simple(std::ostream& s);
+    void print_json(std::ostream& s);
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;

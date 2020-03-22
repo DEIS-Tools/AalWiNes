@@ -54,6 +54,7 @@ public:
     const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);
     void print_simple(std::ostream& s);
+    void print_json(std::ostream& s);
     bool is_service_label(const Query::label_t&) const;
     void write_prex_topology(std::ostream& s);
     void write_prex_routing(std::ostream& s);
