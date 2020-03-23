@@ -44,10 +44,14 @@ if (AALWINES_GetDependencies)
         CONFIGURE_COMMAND ""
         INSTALL_COMMAND cd ../rapidxml-ext && ${CMAKE_COMMAND} -E copy rapidxml.hpp rapidxml_iterators.hpp rapidxml_print.hpp rapidxml_utils.hpp ${EXTERNAL_INSTALL_LOCATION}/include 
     )
-
+    file(DOWNLOAD
+            https://github.com/nlohmann/json/releases/download/v3.7.3/json.hpp
+            ${EXTERNAL_INSTALL_LOCATION}/include/json.hpp
+            EXPECTED_HASH SHA256=3b5d2b8f8282b80557091514d8ab97e27f9574336c804ee666fda673a9b59926
+    )
     ExternalProject_add(pdaaal-ext
         GIT_REPOSITORY git@github.com:DEIS-Tools/PDAAAL.git
-        GIT_TAG ca2423f95af7cfcd2030eba47dbf3c2a03729993
+        GIT_TAG 0a55572529dbc9e64a232e2ba22ede1b10fbd8eb
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release
         )
 

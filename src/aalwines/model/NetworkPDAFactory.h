@@ -30,7 +30,6 @@
 #include "Query.h"
 #include "Network.h"
 #include <pdaaal/PDAFactory.h>
-#include "NetworkWeight.h"
 
 
 namespace aalwines {

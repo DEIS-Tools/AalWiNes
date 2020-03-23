@@ -28,10 +28,11 @@
 #include <aalwines/model/builders/PRexBuilder.h>
 
 #include <aalwines/model/NetworkPDAFactory.h>
+#include <aalwines/model/NetworkWeight.h>
 
 #include <aalwines/query/parsererrors.h>
 #include <pdaaal/PDAFactory.h>
-#include <pdaaal/Solver_Adapter.h>
+#include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
@@ -95,6 +96,7 @@ int main(int argc, const char** argv)
             ;    
 
     std::string query_file;
+    std::string weight_file;
     unsigned int link_failures = 0;
     size_t tos = 0;
     size_t engine = 0;
@@ -108,6 +110,7 @@ int main(int argc, const char** argv)
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,2=post*,3=pre*")
+            ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression")
             ;    
     
     opts.add(input);
@@ -218,7 +221,31 @@ int main(int argc, const char** argv)
             }
         }
         queryparsingwatch.stop();
-        
+
+        std::optional<NetworkWeight::weight_function> weight_fn;
+        if (!weight_file.empty()) {
+            //stopwatch weightparsingwatch;
+            NetworkWeight network_weight;
+            {
+                std::ifstream wstream(weight_file);
+                if (!wstream.is_open()) {
+                    std::cerr << "Could not open Weight-file\"" << weight_file << "\"" << std::endl;
+                    exit(-1);
+                }
+                try {
+                    weight_fn.emplace(network_weight.parse(wstream));
+                    wstream.close();
+                } catch (base_error& error) {
+                    std::cerr << "Error while parsing weight function:" << error << std::endl;
+                    exit(-1);
+                } catch (nlohmann::detail::parse_error& error) {
+                    std::cerr << "Error while parsing weight function:" << error.what() << std::endl;
+                    exit(-1);
+                }
+            }
+            // weightparsingwatch.stop();
+        }
+
         size_t query_no = 0;
         std::cout << "{\n";
         if(!no_timing)
@@ -228,7 +255,7 @@ int main(int argc, const char** argv)
         }
         std::cout << "\t\"answers\":{\n";
 
-        Solver_Adapter solver;
+        SolverAdapter solver;
         
         for(auto& q : builder._result)
         {
@@ -249,7 +276,7 @@ int main(int argc, const char** argv)
             {
                 compilation_time.start();
                 q.set_approximation(m);
-                NetworkPDAFactory factory(q, network, no_ip_swap);
+                NetworkPDAFactory factory(q, network, no_ip_swap, weight_fn.value());
                 auto pda = factory.compile();
                 compilation_time.stop();
                 reduction_time.start();
