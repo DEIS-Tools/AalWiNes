@@ -45,13 +45,17 @@ public:
     Network(Network&&) = default;
     Network& operator=(const Network&) = default;
     Network& operator=(Network&&) = default;
-    
-    const Router* get_router(size_t id) const;
+
+    Router *get_router(size_t id);
+    std::vector<std::unique_ptr<Router>> get_all_routers() { return std::move(_routers); }
+
     size_t size() const { return _routers.size(); }
+    const routermap_t& get_mapping() const { return _mapping; }
+
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact = false);
     std::unordered_set<Query::label_t> all_labels();
-    const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
+    std::vector<const Interface*>& all_interfaces() { return _all_interfaces; }
     void print_dot(std::ostream& s);
     void print_simple(std::ostream& s);
     bool is_service_label(const Query::label_t&) const;
@@ -65,8 +69,6 @@ private:
     std::vector<const Interface*> _all_interfaces;
     std::unordered_set<Query::label_t> _label_cache;
     std::unordered_set<Query::label_t> _non_service_label;
-    
-
 };
 }
 

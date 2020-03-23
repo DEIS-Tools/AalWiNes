@@ -98,6 +98,13 @@ namespace aalwines
     {
     }
 
+    void Interface::remove_pairing(Interface* interface){
+        _matching = interface;
+        interface->_matching = this;
+        interface->_target = nullptr;
+        _target = interface->_parent;
+    }
+
     void Interface::make_pairing(Interface* interface)
     {
         _matching = interface;

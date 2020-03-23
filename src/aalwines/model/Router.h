@@ -68,6 +68,7 @@ public:
         return _global_id;
     }
     
+    void remove_pairing(Interface* interface);
     void make_pairing(Interface* interface);
     void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
     Interface* match() const { return _matching; }

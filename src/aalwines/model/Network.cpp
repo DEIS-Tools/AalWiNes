@@ -46,7 +46,7 @@ namespace aalwines
         }
     }
 
-    const Router* Network::get_router(size_t id) const
+    Router* Network::get_router(size_t id)
     {
         if (id < _routers.size()) {
             return _routers[id].get();
