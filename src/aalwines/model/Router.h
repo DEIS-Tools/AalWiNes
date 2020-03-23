@@ -101,6 +101,7 @@ public:
 
     void print_dot(std::ostream& out);
     const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
+    void remove_interface(Interface* interface);
     Interface* find_interface(std::string iface);
     Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr);
     Interface* interface_no(size_t i) const {

@@ -9,25 +9,29 @@
 
 using namespace aalwines;
 
-Network manipulate_network(Network& synthetic_network, Network& nested_synthetic_network){
+Network manipulate_network(Network synthetic_network, int start_router_index, int end_router_index, Network nested_synthetic_network){
     if(!synthetic_network.size() || !nested_synthetic_network.size()) throw base_error("Networks must be defined");
 
     //Modify start and end routers
-    Router* router_start = synthetic_network.get_router(0);
-    Router* router_end = synthetic_network.get_router(2);
-    Router* nested_router_start = synthetic_network.get_router(0);
-    Router* nested_router_end = synthetic_network.get_router(nested_synthetic_network.size() - 3);
+    Router* router_start = synthetic_network.get_router(start_router_index);
+    Router* router_end = synthetic_network.get_router(end_router_index);
+    Router* nested_router_start = nested_synthetic_network.get_start_router();
+    Router* nested_router_end = nested_synthetic_network.get_end_router();
     //Remove pairing link
     Interface* interface1 = router_start->find_interface(router_end->name());
     Interface* interface2 = router_end->find_interface(router_start->name());
-    interface1->remove_pairing(interface2);
-    interface2->remove_pairing(interface1);
+    router_start->remove_interface(interface1);
+    router_end->remove_interface(interface2);
 
-    router_start->get_interface(synthetic_network.all_interfaces(), nested_router_start->name());
-    nested_router_start->get_interface(nested_synthetic_network.all_interfaces(), router_start->name());
+    interface1 = router_start->get_interface(synthetic_network.all_interfaces(), nested_router_start->name());
+    interface2 = nested_router_start->get_interface(synthetic_network.all_interfaces(), router_start->name());
+    interface1->make_pairing(interface2);
+    interface2->make_pairing(interface1);
 
-    router_end->get_interface(synthetic_network.all_interfaces(), nested_router_end->name());
-    nested_router_end->get_interface(nested_synthetic_network.all_interfaces(), router_end->name());
+    interface1 = router_end->get_interface(synthetic_network.all_interfaces(), nested_router_end->name());
+    interface2 = nested_router_end->get_interface(synthetic_network.all_interfaces(), router_end->name());
+    interface1->make_pairing(interface2);
+    interface2->make_pairing(interface1);
 
     //Construct new network
     std::vector<std::unique_ptr<Router>> routers = synthetic_network.get_all_routers();
@@ -35,9 +39,7 @@ Network manipulate_network(Network& synthetic_network, Network& nested_synthetic
     std::vector<const Interface*> interfaces = synthetic_network.all_interfaces();
 
     //Map all routers into one network
-    //routers.reserve(routers.size() + nested_routers.size());
-    routers.insert((std::end(routers) - 3), std::make_move_iterator(std::begin(nested_routers)), std::make_move_iterator(std::end(nested_routers)));
-
+    routers.insert((std::end(routers) - 1), std::make_move_iterator(std::begin(nested_routers)), std::make_move_iterator(std::end(nested_routers)-1));
 
     interfaces.insert(interfaces.end(), nested_synthetic_network.all_interfaces().begin(),
           nested_synthetic_network.all_interfaces().end());   //Map all interfaces
@@ -47,7 +49,6 @@ Network manipulate_network(Network& synthetic_network, Network& nested_synthetic
 
     return Network(std::move(mapping), std::move(routers), std::move(interfaces));
 }
-
 
 Router* get_router(std::string router_name, Network::routermap_t& _mapping){
     auto res = _mapping.exists(router_name.c_str(), router_name.length());
@@ -176,12 +177,10 @@ Network construct_synthetic_network(){
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
 
-
-
 BOOST_AUTO_TEST_CASE(NetworkConstruction) {
     Network synthetic_network = construct_synthetic_network();
     Network synthetic_network2 = construct_synthetic_network();
-    synthetic_network = manipulate_network(synthetic_network, synthetic_network2);
+    synthetic_network = manipulate_network(std::move(synthetic_network), 0, 2, std::move(synthetic_network2));
     synthetic_network.print_dot(std::cout);
 
     BOOST_CHECK_EQUAL(true, true);

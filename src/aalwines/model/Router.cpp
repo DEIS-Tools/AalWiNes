@@ -98,11 +98,16 @@ namespace aalwines
     {
     }
 
+    void Router::remove_interface(Interface* interface){
+        auto lambda = [interface] (std::unique_ptr<aalwines::Interface>& a) { return a.get() == interface; };
+        auto rem = std::remove_if(_interfaces.begin(), _interfaces.end(), lambda);
+        _interfaces.erase(rem, _interfaces.end());
+    }
+
     void Interface::remove_pairing(Interface* interface){
         _matching = interface;
         interface->_matching = this;
         interface->_target = nullptr;
-        _target = interface->_parent;
     }
 
     void Interface::make_pairing(Interface* interface)
