@@ -33,7 +33,7 @@
     #include <string>
     #include <unordered_set>
     #include <memory>
-    #include "pdaaal/model/NFA.h"
+    #include <pdaaal/NFA.h>
     #include "model/Query.h"
     #include "model/filter.h"
 
@@ -59,7 +59,7 @@
     #include "QueryBuilder.h"
     #include "Scanner.h"
     #include "model/Query.h"
-    #include "pdaaal/model/NFA.h"
+    #include <pdaaal/NFA.h>
     #include "model/filter.h"
 
     using namespace pdaaal;
