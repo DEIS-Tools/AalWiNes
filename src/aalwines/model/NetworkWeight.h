@@ -41,15 +41,19 @@ namespace aalwines {
      * Weight language JSON syntax:
      * [ // Outer array: In order of priority
      *   [ // Inner array: Linear combination of atoms.
-     *       {"factor": NUM,
-     *        "atom": ATOM}, ...
+     *       {"atom": ATOM,
+     *        "factor": NUM // (optional)
+     *       }, ...
      *   ], ...
      * ]
      * where
-     *  - NUM = {0,1,2,...}
      *  - ATOM = {"hops", "failures", "tunnel_depth", "latency"}
+     *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
+    private:
+        using atomic_property_function = std::function<uint32_t(const RoutingTable::forward_t&, bool)>;
+        using linear_weight_function = pdaaal::linear_weight_function<uint32_t, const RoutingTable::forward_t&, bool>;
     public:
         using weight_function = pdaaal::ordered_weight_function<uint32_t, const RoutingTable::forward_t&, bool>;
 
@@ -64,7 +68,7 @@ namespace aalwines {
         NetworkWeight() = default;
         explicit NetworkWeight(std::unordered_map<const Interface*, uint32_t>  latency_map) : _latency_map(std::move(latency_map)) {};
 
-        [[nodiscard]] std::function<uint32_t(const RoutingTable::forward_t&, bool)> get_atom(AtomicProperty atom) const {
+        [[nodiscard]] atomic_property_function get_atom(AtomicProperty atom) const {
             switch (atom) {
                 case AtomicProperty::link_failures:
                     return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
@@ -93,8 +97,7 @@ namespace aalwines {
             }
         }
 
-
-        auto parse(std::istream &stream) {
+        auto parse(std::istream &stream) const {
             json j;
             stream >> j;
 
@@ -103,15 +106,21 @@ namespace aalwines {
             }
             std::vector<linear_weight_function> fns;
             for (auto& elem : j) {
-                fns.emplace_back(parse_lin_exp(elem));
+                if (elem.size() == 1 && (!elem[0].contains("factor") || elem[0]["factor"] == 1)) {
+                    fns.emplace_back(parse_atom(elem[0]));
+                } else {
+                    fns.emplace_back(parse_lin_exp(elem));
+                }
             }
             return pdaaal::ordered_weight_function(fns);
         }
 
     private:
-        using linear_weight_function = pdaaal::linear_weight_function<uint32_t, const RoutingTable::forward_t&, bool>;
-
-        linear_weight_function parse_atom(const json& atom) const {
+        atomic_property_function parse_atom(const json& elem) const {
+            if (!elem.contains("atom")) {
+                throw base_error("Object of inner array has no key \"atom\". ");
+            }
+            auto atom = elem["atom"];
             if (!atom.is_string()) {
                 throw base_error("Atomic property field is not a string. ");
             }
@@ -128,7 +137,7 @@ namespace aalwines {
             } else {
                 throw base_error("Unknown atomic property. ");
             }
-            return pdaaal::linear_weight_function(get_atom(p));
+            return get_atom(p);
         }
         std::vector<std::pair<uint32_t,linear_weight_function>> parse_lin_exp(const json& inner) const {
             if (!inner.is_array()) {
@@ -139,13 +148,8 @@ namespace aalwines {
                 if (!elem.is_object()) {
                     throw base_error("Element of inner array is not an object. ");
                 }
-                if (!elem.contains("factor")) {
-                    throw base_error("Object of inner array has no key \"factor\". ");
-                }
-                if (!elem.contains("atom")) {
-                    throw base_error("Object of inner array has no key \"atom\". ");
-                }
-                result.emplace_back(elem["factor"].get<uint32_t>(), parse_atom(elem["atom"]));
+                auto factor = elem.contains("factor") ? elem["factor"].get<uint32_t>() : 1;
+                result.emplace_back(factor, pdaaal::linear_weight_function(parse_atom(elem)));
             }
             return result;
         }
