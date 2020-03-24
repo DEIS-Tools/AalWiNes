@@ -96,6 +96,7 @@ public:
     }
     
     void add_name(const std::string& name);
+    void change_name(const std::string& name);
     const std::string& name() const;
     const std::vector<std::string>& names() const { return _names; }
 

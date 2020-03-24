@@ -47,8 +47,6 @@ public:
     Network& operator=(Network&&) = default;
 
     Router *get_router(size_t id);
-    Router *get_end_router() { return get_router(this->size()-2); }
-    Router *get_start_router() { return get_router(0); }
     std::vector<std::unique_ptr<Router>> get_all_routers() { return std::move(_routers); }
 
     size_t size() const { return _routers.size(); }
