@@ -29,7 +29,7 @@
 
 #include "Query.h"
 #include "Network.h"
-#include "pdaaal/model/PDAFactory.h"
+#include <pdaaal/PDAFactory.h>
 
 
 namespace aalwines

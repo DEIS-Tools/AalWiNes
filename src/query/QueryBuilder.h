@@ -24,7 +24,7 @@
 #define PROJECT_BUILDER_H
 
 #include "location.hh"
-#include "pdaaal/model/NFA.h"
+#include <pdaaal/NFA.h>
 #include "model/Query.h"
 #include "model/Network.h"
 #include "model/filter.h"
