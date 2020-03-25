@@ -198,6 +198,55 @@ namespace aalwines
         return _label_cache;
     }
 
+    void Network::manipulate_network(int start_router_index, int end_router_index, Network& nested_synthetic_network,
+                               int start_router_index2, int end_router_index2){
+
+        if(!this->size() || !nested_synthetic_network.size()) throw base_error("Networks must be defined");
+
+        //Modify start and end routers
+        Router* router_start = this->get_router(start_router_index);
+        Router* router_end = this->get_router(end_router_index);
+        Router* nested_router_start = nested_synthetic_network.get_router(start_router_index2);
+        Router* nested_router_end = nested_synthetic_network.get_router(end_router_index2);
+        //Remove pairing link
+        Interface* interface1 = router_start->find_interface(router_end->name());
+        Interface* interface2 = router_end->find_interface(router_start->name());
+        router_start->remove_interface(interface1);
+        router_end->remove_interface(interface2);
+
+        interface1 = router_start->get_interface(_all_interfaces, nested_router_start->name());
+        interface2 = nested_router_start->get_interface(nested_synthetic_network.all_interfaces(), router_start->name());
+        interface1->make_pairing(interface2);
+        interface2->make_pairing(interface1);
+
+        interface1 = router_end->get_interface(_all_interfaces, nested_router_end->name());
+        interface2 = nested_router_end->get_interface(nested_synthetic_network.all_interfaces(), router_end->name());
+        interface1->make_pairing(interface2);
+        interface2->make_pairing(interface1);
+
+        //Construct new network
+        std::vector<std::unique_ptr<Router>>& nested_routers = nested_synthetic_network.get_all_routers();
+
+        //Give routers distinct names and extend mapping
+        int name_iterator = 0;
+        std::string name = "Router";
+        for (auto& e : nested_routers){
+            std::string old_name = e.get()->name();
+            if(std::find_if(_routers.begin(), _routers.end(),
+                            [&](auto& rh){ return (rh.get()->name() == e.get()->name() && e.get()->name() != "NULL"); } )->get() != _routers.end()->get()) {
+                e.get()->change_name(name + std::to_string(name_iterator++));
+            }
+            auto res = _mapping.insert(e->name().c_str(), e->name().length());
+            _mapping.get_data(res.second) = e.get();
+        }
+
+        //Map all routers into one network
+        _routers.insert(std::end(_routers)-1, std::make_move_iterator(std::begin(nested_routers)), std::make_move_iterator(std::end(nested_routers)));
+
+        _all_interfaces.insert(_all_interfaces.end(), nested_synthetic_network.all_interfaces().begin(),
+                          nested_synthetic_network.all_interfaces().end());   //Map all interfaces
+    }
+
     void Network::print_dot(std::ostream& s)
     {
         s << "digraph network {\n";

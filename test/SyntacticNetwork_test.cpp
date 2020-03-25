@@ -8,61 +8,7 @@
 #include <aalwines/model/Network.h>
 
 using namespace aalwines;
-
-Network manipulate_network(Network synthetic_network, int start_router_index, int end_router_index, Network nested_synthetic_network,
-        int start_router_index2, int end_router_index2){
-
-    if(!synthetic_network.size() || !nested_synthetic_network.size()) throw base_error("Networks must be defined");
-
-    //Modify start and end routers
-    Router* router_start = synthetic_network.get_router(start_router_index);
-    Router* router_end = synthetic_network.get_router(end_router_index);
-    Router* nested_router_start = nested_synthetic_network.get_router(start_router_index2);
-    Router* nested_router_end = nested_synthetic_network.get_router(end_router_index2);
-    //Remove pairing link
-    Interface* interface1 = router_start->find_interface(router_end->name());
-    Interface* interface2 = router_end->find_interface(router_start->name());
-    router_start->remove_interface(interface1);
-    router_end->remove_interface(interface2);
-
-    interface1 = router_start->get_interface(synthetic_network.all_interfaces(), nested_router_start->name());
-    interface2 = nested_router_start->get_interface(synthetic_network.all_interfaces(), router_start->name());
-    interface1->make_pairing(interface2);
-    interface2->make_pairing(interface1);
-
-    interface1 = router_end->get_interface(synthetic_network.all_interfaces(), nested_router_end->name());
-    interface2 = nested_router_end->get_interface(synthetic_network.all_interfaces(), router_end->name());
-    interface1->make_pairing(interface2);
-    interface2->make_pairing(interface1);
-
-    //Construct new network
-    std::vector<std::unique_ptr<Router>> routers = synthetic_network.get_all_routers();
-    std::vector<std::unique_ptr<Router>> nested_routers = nested_synthetic_network.get_all_routers();
-    std::vector<const Interface*> interfaces = synthetic_network.all_interfaces();
-    routers.pop_back(); //Remove NULL router
-
-    //Give routers distinct names
-    int name_iterator = 0;
-    std::string name = routers.back()->name();
-    for (auto& e : nested_routers){
-        if(std::find_if(routers.begin(), routers.end(),
-                [&](auto& rh){ return rh.get()->name() == e.get()->name(); } )->get() != routers.end()->get()) {
-            std::string old_name = e.get()->name();
-            e.get()->change_name(name + std::to_string(name_iterator++));
-        }
-    }
-
-    //Map all routers into one network
-    routers.insert(std::end(routers), std::make_move_iterator(std::begin(nested_routers)), std::make_move_iterator(std::end(nested_routers)-1));
-
-    interfaces.insert(interfaces.end(), nested_synthetic_network.all_interfaces().begin(),
-          nested_synthetic_network.all_interfaces().end());   //Map all interfaces
-
-    Network::routermap_t mapping;
-    //Network::routermap_t mapping = synthetic_network.get_mapping();
-
-    return Network(std::move(mapping), std::move(routers), std::move(interfaces));
-}
+RoutingTable table;
 
 void add_entry(RoutingTable table, const Interface& interface1, Interface interface2, Query::type_t type, int weight, int interface_label) {
     auto& entry = table.push_entry();
@@ -83,7 +29,6 @@ Network construct_synthetic_network(int nesting = 1){
     int router_size = 5 * nesting;
     std::string router_name = "Router";
     std::vector<std::string> router_names;
-    using routermap_t = ptrie::map<char, Router *>;
     std::vector<std::unique_ptr<Router> > _routers;
     std::vector<const Interface*> _all_interfaces;
     Network::routermap_t _mapping;
@@ -152,7 +97,6 @@ Network construct_synthetic_network(int nesting = 1){
                 throw base_error("Something went wrong in the construction");
         }
     }
-    RoutingTable table;
     int interface_label = 4;
     size_t weight = 0;
     Query::type_t type = Query::MPLS;
@@ -224,10 +168,10 @@ Network construct_synthetic_network(int nesting = 1){
 }
 
 BOOST_AUTO_TEST_CASE(NetworkConstruction) {
-    Network synthetic_network = construct_synthetic_network(3);
+    Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
-    synthetic_network = manipulate_network(std::move(synthetic_network), 0,
-            2, std::move(synthetic_network2), 0, synthetic_network2.size() - 2);
+    synthetic_network.manipulate_network(0,2,synthetic_network2, 0,synthetic_network2.size() - 2);
+
     synthetic_network.print_dot(std::cout);
 
     BOOST_CHECK_EQUAL(true, true);

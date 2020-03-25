@@ -47,9 +47,14 @@ public:
     Network& operator=(Network&&) = default;
 
     Router *get_router(size_t id);
-    std::vector<std::unique_ptr<Router>> get_all_routers() { return std::move(_routers); }
 
+    //Not too good, should be const
+    std::vector<std::unique_ptr<Router>>& get_all_routers() { return _routers; }
+    void manipulate_network(int start_router_index, int end_router_index, Network& nested_synthetic_network,
+                            int start_router_index2, int end_router_index2);
     size_t size() const { return _routers.size(); }
+
+    //Copy Constructor missing
     const routermap_t& get_mapping() const { return _mapping; }
 
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
