@@ -33,7 +33,7 @@
 
 #include "query/parsererrors.h"
 #include <pdaaal/PDAFactory.h>
-#include <pdaaal/Solver_Adapter.h>
+#include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 #include "utils/stopwatch.h"
 #include "utils/outcome.h"
@@ -234,7 +234,7 @@ int main(int argc, const char** argv)
         }
         std::cout << "\t\"answers\":{\n";
 
-        Solver_Adapter solver;
+        SolverAdapter solver;
         
         for(auto& q : builder._result)
         {
