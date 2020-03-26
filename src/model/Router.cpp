@@ -222,6 +222,7 @@ namespace aalwines
     std::unique_ptr<char[] > Router::interface_name(size_t i)
     {
         auto n = std::make_unique<char[]>(_inamelength + 1);
+        assert(i < _interface_map.size());
         auto res = _interface_map.unpack(i, n.get());
         n[res] = 0;
         return n;

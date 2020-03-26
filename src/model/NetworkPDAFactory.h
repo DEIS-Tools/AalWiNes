@@ -94,7 +94,7 @@ namespace aalwines {
         add_interfaces(std::unordered_set<const Interface *> &disabled, std::unordered_set<const Interface *> &active,
                        const RoutingTable::entry_t &entry, const RoutingTable::forward_t &fwd) const;
 
-        void print_trace_rule(std::ostream &stream, const Router *router, const RoutingTable::entry_t &entry,
+        void print_trace_rule(std::ostream &stream, const Interface *router, const RoutingTable::entry_t &entry,
                               const RoutingTable::forward_t &rule) const;
 
         void construct_initial();
@@ -503,10 +503,14 @@ namespace aalwines {
     }
 
     template<typename W_FN, typename W>
-    void NetworkPDAFactory<W_FN, W>::print_trace_rule(std::ostream &stream, const Router *router,
-                                                   const RoutingTable::entry_t &entry,
-                                                   const RoutingTable::forward_t &rule) const {
-        stream << "{\"pre\":";
+    void NetworkPDAFactory<W_FN, W>::print_trace_rule(std::ostream &stream, const Interface* inf, 
+                                                  const RoutingTable::entry_t &entry,
+                                                  const RoutingTable::forward_t &rule) const {
+        stream << "{";
+
+        auto name = inf->source()->interface_name(inf->id());
+        stream << "\"ingoing\":\"" << name.get() << "\"";
+        stream << ",\"pre\":";
         if (entry._top_label.type() == Query::INTERFACE) {
             assert(false);
         } else {
@@ -713,7 +717,7 @@ namespace aalwines {
                     stream << "]}";
                     if (cnt < entries.size()) {
                         stream << ",\n\t\t\t";
-                        print_trace_rule(stream, s._inf->source(), *entries[cnt], *rules[cnt]);
+                        print_trace_rule(stream, s._inf, *entries[cnt], *rules[cnt]);
                         ++cnt;
                     }
                     first = false;
