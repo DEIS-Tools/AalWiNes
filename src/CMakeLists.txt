@@ -17,6 +17,7 @@ include_directories(${Boost_INCLUDE_DIR})
 add_executable(aalwines ${HEADER_FILES} main.cpp model/builders/JuniperBuilder.cpp model/builders/PRexBuilder.cpp
     model/Router.cpp model/RoutingTable.cpp model/Query.cpp model/Network.cpp model/filter.cpp
     ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} query/QueryBuilder.cpp
+	engine/Moped.cpp
     utils/parsing.cpp utils/system.cpp)
 add_dependencies(aalwines ptrie-ext rapidxml-ext pdaaal-ext)
 target_link_libraries(aalwines PRIVATE ${Boost_LIBRARIES} pdaaal)
