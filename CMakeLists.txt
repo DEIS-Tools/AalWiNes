@@ -33,8 +33,8 @@ if (AALWINES_GetDependencies)
     
     ExternalProject_add(ptrie-ext
         GIT_REPOSITORY git@github.com:petergjoel/ptrie.git
-        GIT_TAG f2218918f6b2fba2ff6ecf51a977694c525c8229  # Working TAG
-        #GIT_TAG 9bc665e13a034d88b10de39aed6223075c6f77bd # Exploding TAG
+        #GIT_TAG f2218918f6b2fba2ff6ecf51a977694c525c8229  # Working TAG
+        GIT_TAG 80afa1c7488a5961cd6f6d6a48bda6a212a390ae # Exploding TAG
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     )
     file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/include)

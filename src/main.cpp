@@ -174,14 +174,10 @@ int main(int argc, const char** argv)
     auto network = junos_config.empty() ?
         PRexBuilder::parse(prex_topo, prex_routing, warnings) :
         JuniperBuilder::parse(junos_config, warnings, skip_pfe);
-    auto network2 = junos_config.empty() ?
-                   PRexBuilder::parse(prex_topo, prex_routing, warnings) :
-                   JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
 
     if (modify_network) {
-        network.manipulate_network(start_router, end_router,
-                network2, start_router, end_router);
+        //network.manipulate(some network)
     }
 
     if (print_dot) {

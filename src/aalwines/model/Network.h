@@ -47,14 +47,11 @@ public:
     Network& operator=(Network&&) = default;
 
     Router *get_router(size_t id);
+    const std::vector<std::unique_ptr<Router>>& get_all_routers() const { return _routers; }
 
-    //Not too good, should be const
-    std::vector<std::unique_ptr<Router>>& get_all_routers() { return _routers; }
     void manipulate_network(int start_router_index, int end_router_index, Network& nested_synthetic_network,
                             int start_router_index2, int end_router_index2);
     size_t size() const { return _routers.size(); }
-
-    //Copy Constructor missing
     const routermap_t& get_mapping() const { return _mapping; }
 
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
@@ -69,7 +66,7 @@ public:
 private:
     // NO TOUCHEE AFTER INIT!
     routermap_t _mapping;
-    std::vector<std::unique_ptr<Router>> _routers;    
+    std::vector<std::unique_ptr<Router>> _routers;
     size_t _total_labels = 0;
     std::vector<const Interface*> _all_interfaces;
     std::unordered_set<Query::label_t> _label_cache;

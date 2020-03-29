@@ -224,13 +224,13 @@ namespace aalwines
         interface1->make_pairing(interface2);
         interface2->make_pairing(interface1);
 
-        //Construct new network
-        std::vector<std::unique_ptr<Router>>& nested_routers = nested_synthetic_network.get_all_routers();
+        //Construct new network - Mitigate const_cast
+        auto& nested_routers = const_cast<std::vector<std::unique_ptr<Router>>&>(nested_synthetic_network.get_all_routers());
 
         //Give routers distinct names and extend mapping
         int name_iterator = 0;
-        std::string name = "Router";
-        for (auto& e : nested_routers){
+        std::string name = "Routerer";
+        for (const auto& e : nested_routers){
             std::string old_name = e.get()->name();
             if(std::find_if(_routers.begin(), _routers.end(),
                             [&](auto& rh){ return (rh.get()->name() == e.get()->name() && e.get()->name() != "NULL"); } )->get() != _routers.end()->get()) {
@@ -241,7 +241,7 @@ namespace aalwines
         }
 
         //Map all routers into one network
-        _routers.insert(std::end(_routers)-1, std::make_move_iterator(std::begin(nested_routers)), std::make_move_iterator(std::end(nested_routers)));
+        _routers.insert(std::end(_routers)-1, std::make_move_iterator(nested_routers.begin()), std::make_move_iterator(nested_routers.end()));
 
         _all_interfaces.insert(_all_interfaces.end(), nested_synthetic_network.all_interfaces().begin(),
                           nested_synthetic_network.all_interfaces().end());   //Map all interfaces
