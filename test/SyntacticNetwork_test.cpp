@@ -15,12 +15,12 @@
 
 using namespace aalwines;
 
-void add_entry(Interface& from_interface, Interface& to_interface, Query::type_t type, int weight, int interface_label) {
+void add_entry(Interface& from_interface, Interface& to_interface, RoutingTable::op_t type, int weight, int interface_label_in, int interface_label_out = 0) {
     RoutingTable table;
     auto& entry = table.push_entry();
     entry._ingoing = &from_interface;           //From interface
-    type = Query::MPLS;
-    entry._top_label.set_value(type, interface_label, 0);
+    Query::type_t q_type = Query::MPLS;
+    entry._top_label.set_value(q_type, interface_label_in, 0);
 
     entry._rules.emplace_back();
     entry._rules.back()._via = &to_interface;  //Rule to
@@ -28,20 +28,16 @@ void add_entry(Interface& from_interface, Interface& to_interface, Query::type_t
     entry._rules.back()._weight = weight;
     entry._rules.back()._ops.emplace_back();
     auto& op = entry._rules.back()._ops.back();
-    op._op_label.set_value(type, interface_label, 0);
-    op._op = RoutingTable::SWAP;
+    op._op_label.set_value(q_type, interface_label_out, 0);
+    op._op = type;
 
     std::ostream& warnings = std::cerr;
     table.sort();
     from_interface.table().merge(table, from_interface, warnings);
 }
 
-void add_entries(Interface& passing_interface, Interface& from_interface, Interface& to_interface, Query::type_t type, int weight, int interface_label){
-    add_entry(passing_interface, to_interface, type, weight, interface_label);
-    add_entry(from_interface, to_interface, type, weight, interface_label);
+void re_labelling(){
 
-    add_entry(to_interface, passing_interface, type, weight, interface_label);
-    add_entry(from_interface, passing_interface, type, weight, interface_label);
 }
 
 Network construct_synthetic_network(int nesting = 1){
@@ -68,7 +64,6 @@ Network construct_synthetic_network(int nesting = 1){
         router.add_name(router_name);
         auto res = _mapping.insert(router_name.c_str(), router_name.length());
         _mapping.get_data(res.second) = &router;
-        router.get_interface(_all_interfaces, "i" + router_names[i]);
         switch (network_node) {
             case 1:
                 router.get_interface(_all_interfaces, router_names[i - 1]);
@@ -117,27 +112,14 @@ Network construct_synthetic_network(int nesting = 1){
                 throw base_error("Something went wrong in the construction");
         }
     }
-    int interface_label = 4;
-    size_t weight = 0;
-    Query::type_t type = Query::MPLS;
-
     Interface* passing_interface = nullptr;
     Interface* passing_interface1 = nullptr;
-    Interface* from_interface = nullptr;
     Interface* to_interface = nullptr;
     Interface* interface1 = nullptr;
     Interface* interface2 = nullptr;
-    if(nesting > 1){
-        nested = true;
-    }
 
     for(int i = 0; 0 < nesting; nesting--, i+=5) {
-        if(i == router_size){
-            nested = false;
-        }
-
         //Node0
-        from_interface = _routers[i]->find_interface("i" + router_names[i + 0]);
         interface1 = _routers[i]->find_interface(router_names[i + 1]);
         interface2 = _routers[i + 1]->find_interface(router_names[i]);
         interface1->make_pairing(interface2);
@@ -151,25 +133,22 @@ Network construct_synthetic_network(int nesting = 1){
             assert(passing_interface->match() == interface2);
             assert(interface2->match() == passing_interface);
 
-            //Total entries 0 - 5, 5 - 0, 0 - 6, 6 - 0, 0 - 7, 7 - 0, 0 - 1
+            //Add routing 1 - 5, 5 - 1
+            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::PUSH, 0, 4, 4 );
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::POP, 0, 5);
 
-            //Add routing 0 - 1
-            add_entry(*from_interface, *interface1, type, weight, interface_label);
+            //Add routing 0 - 6, 6 - 0
+            passing_interface = _routers[i + 5]->find_interface(router_names[i + 0]);
+            interface1 = _routers[i + 5]->find_interface(router_names[i + 6]);
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 4, 6 );
+            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::POP, 0, 4);
 
-            //Add routing 0 - 5
-            add_entry(*from_interface, *passing_interface, type, weight, interface_label);
-
-            //Add routing 5 - 0, 5 - 6, 0 - 6, 6 - 0
-            from_interface = _routers[i + 5]->find_interface("i" + router_names[i + 5]);
-            interface1 = _routers[i + 5]->find_interface(router_names[i]);
-            passing_interface = _routers[i + 5]->find_interface(router_names[i + 6]);
-            add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
-
-            if(!nested){
-                //Add routing 5 - 0, 5 - 7, 0 - 7, 7 - 0
-                interface1 = _routers[i + 5]->find_interface(router_names[i]);
-                passing_interface = _routers[i + 5]->find_interface(router_names[i + 7]);
-                add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
+            //if next is not nested
+            if(i + 10 == router_size){
+                //Add routing 0 - 7, 7 - 0
+                interface1 = _routers[i + 5]->find_interface(router_names[i + 7]);
+                add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 4, 6);
+                add_entry(*interface1, *passing_interface, aalwines::RoutingTable::POP, 0, 5);
             }
         } else {
             passing_interface = _routers[i]->find_interface(router_names[i + 2]);
@@ -177,13 +156,13 @@ Network construct_synthetic_network(int nesting = 1){
             passing_interface->make_pairing(interface2);
             assert(passing_interface->match() == interface2);
             assert(interface2->match() == passing_interface);
-            //Add routings 0 - 1, 0 - 2, 2 - 1, 1 - 2 ||
-            //Add routings 5 - 6, 5 - 7, 7 - 6, 6 - 7
-            add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
+            //Add routings 2 - 1, 1 - 2 ||
+            //Add routings 7 - 6, 6 - 7
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 5, 11);
+            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 6);
         }
 
         //Node1
-        from_interface = _routers[i + 1]->find_interface("i" + router_names[i + 1]);
         passing_interface = _routers[i + 1]->find_interface(router_names[i + 0]);
 
         interface1 = _routers[i + 1]->find_interface(router_names[i + 3]);
@@ -191,8 +170,9 @@ Network construct_synthetic_network(int nesting = 1){
         interface1->make_pairing(interface2);
         assert(interface1->match() == interface2);
         assert(interface2->match() == interface1);
-        //Add entries 0 - 3, 1 - 3, 3 - 0, 1 - 0
-        add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
+        //Add entries 0 - 3, 3 - 0
+        add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 6, 7);
+        add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 22, 4);
 
         //Node2
         to_interface = _routers[i + 2]->find_interface(router_names[i + 3]);
@@ -207,16 +187,10 @@ Network construct_synthetic_network(int nesting = 1){
         assert(interface1->match() == interface2);
         assert(interface2->match() == interface1);
 
-        //Total entries 2 - 0, 2 - 3, 2 - 4, 0 - 3, 0 - 4, 3 - 0, 3 - 4, 4 - 0, 4 - 3
-
-        from_interface = _routers[i + 2]->find_interface("i" + router_names[i + 2]);
-
-        //Add entries 2 - 4, 2 - 3, 4 - 3, 3 - 4
-        add_entries(*interface1, *from_interface, *to_interface, type, weight, interface_label);
-
-        //Add entries 2 - 4, 4 - 2
-        //add_entry(*to_interface, *passing_interface1, type, weight, interface_label);
-        //add_entry(*passing_interface1, *to_interface, type, weight, interface_label);
+        //Total entries 0 - 3, 0 - 4, 3 - 0, 3 - 4, 4 - 0, 4 - 3
+        //Add entries 4 - 3, 3 - 4
+        add_entry(*interface1, *to_interface, aalwines::RoutingTable::SWAP, 0, 33, 10);
+        add_entry(*to_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 22);
 
         if(nesting > 1) {
             interface1 = _routers[i + 2]->find_interface(router_names[i + 8]);
@@ -225,64 +199,31 @@ Network construct_synthetic_network(int nesting = 1){
             assert(interface1->match() == interface2);
             assert(interface2->match() == interface1);
 
-            //Total entries 2 - 8, 8 - 2, 7 - 2, 2 - 7, 6 - 2, 2 - 6, 9 - 2, 2 - 9, 3 - 8, 8 - 3, 4 - 8, 8 - 4
-
-        //For node 2
+            //Total entries 3 - 8, 8 - 3, 4 - 8, 8 - 4
             passing_interface = _routers[i + 2]->find_interface(router_names[i + 3]);
             //Add entries 3 - 8, 8 - 3, 2 - 8, 8 - 2
-            add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 7, 10);
+            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 10);
 
             passing_interface = _routers[i + 2]->find_interface(router_names[i + 4]);
             //Add entries 4 - 8, 8 - 4
-            add_entry(*interface1, *passing_interface, type, weight, interface_label);
-            add_entry(*passing_interface, *interface1, type, weight, interface_label);
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 33, 10);
+            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 40);
 
-
-        //For node 3
-            from_interface = _routers[i + 8]->find_interface("i" + router_names[i + 8]);
-            interface1 = _routers[i + 8]->find_interface(router_names[i + 6]);
-            passing_interface = _routers[i + 8]->find_interface(router_names[i + 7]);
-            interface2 = _routers[i + 8]->find_interface(router_names[i + 9]);
-            to_interface = _routers[i + 8]->find_interface(router_names[i + 2]);
-
-            //Add entries 8 - 6, 8 - 7, 6 - 7, 7 - 6
-            add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
-
-            //Add entries 6 - 9, 9 - 6
-            add_entry(*interface2, *interface1, type, weight, interface_label);
-            add_entry(*interface1, *interface2, type, weight, interface_label);
-
-            //Add entries 7 - 9, 9 - 7
-            add_entry(*passing_interface, *interface2, type, weight, interface_label);
-            add_entry(*interface2, *passing_interface, type, weight, interface_label);
-
-            //Add entries 6 - 2, 2 - 6
-            add_entry(*interface1, *to_interface, type, weight, interface_label);
-            add_entry(*to_interface, *interface1, type, weight, interface_label);
-
-            //Add entries 9 - 2, 2 - 9
-            add_entry(*interface2, *to_interface, type, weight, interface_label);
-            add_entry(*to_interface, *interface2, type, weight, interface_label);
-
-            //Add entries 7 - 2, 2 - 7
-            add_entry(*to_interface, *passing_interface, type, weight, interface_label);
-            add_entry(*passing_interface, *to_interface, type, weight, interface_label);
         } else {
-
             passing_interface = _routers[i + 2]->find_interface(router_names[i + 0]);
             passing_interface1 = _routers[i + 2]->find_interface(router_names[i + 4]);
 
             //Add entries 0 - 3, 3 - 0
-            add_entry(*passing_interface, *to_interface, type, weight, interface_label);
-            add_entry(*to_interface, *passing_interface, type, weight, interface_label);
+            add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::SWAP, 0, 6, 7);
+            add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::SWAP, 0, 5, 5);
 
             //Add entries 0 - 4, 4 - 0
-            add_entry(*passing_interface, *passing_interface1, type, weight, interface_label);
-            add_entry(*passing_interface1, *passing_interface, type, weight, interface_label);
+            add_entry(*passing_interface, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 6, 40);
+            add_entry(*passing_interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 33, 5);
         }
 
         //Node3
-        from_interface = _routers[i + 3]->find_interface("i" + router_names[i + 3]);
         passing_interface = _routers[i + 3]->find_interface(router_names[i + 1]);
 
         interface1 = _routers[i + 3]->find_interface(router_names[i + 4]);
@@ -290,27 +231,47 @@ Network construct_synthetic_network(int nesting = 1){
         interface1->make_pairing(interface2);
         assert(interface1->match() == interface2);
         assert(interface2->match() == interface1);
-        //Total entries 3 - 1, 3 - 2, 3 - 4, 1 - 2, 1 - 4, 2 - 4, 2 - 1, 4 - 1, 4 - 2
+        //Total entries 1 - 2, 1 - 4, 2 - 4, 2 - 1, 4 - 1, 4 - 2
 
-        //Add entries 1 - 4, 4 - 1, 3 - 4, 3 - 1
-        add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
+        //Add entries 1 - 4, 4 - 1
+        add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 33, 22);
+        add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 33, 5);
 
         passing_interface1 = _routers[i + 3]->find_interface(router_names[i + 2]);
-        //Add entries 2 - 4, 4 - 2, 3 - 4, 3 - 1
-        add_entries(*passing_interface1, *from_interface, *interface1, type, weight, interface_label);
+        //Add entries 2 - 4, 4 - 2
+        add_entry(*passing_interface1, *interface1, aalwines::RoutingTable::SWAP, 0, 10, 9);
+        add_entry(*interface1, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 33, 7);
 
-        //Add entries 1 - 2, 2 - 1, 3 - 2
-        add_entry(*passing_interface, *interface1, type, weight, interface_label);
-        add_entry(*interface1, *passing_interface, type, weight, interface_label);
-        add_entry(*from_interface, *passing_interface1, type, weight, interface_label);
+        //Add entries 1 - 2, 2 - 1
+        add_entry(*passing_interface, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 7, 7);
+        add_entry(*passing_interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 10, 22);
+
+        if(nesting > 1){
+            interface1 = _routers[i + 8]->find_interface(router_names[i + 6]);
+            passing_interface = _routers[i + 8]->find_interface(router_names[i + 7]);
+            interface2 = _routers[i + 8]->find_interface(router_names[i + 9]);
+            to_interface = _routers[i + 8]->find_interface(router_names[i + 2]);
+
+            //Add entries 6 - 2, 2 - 6
+            add_entry(*interface1, *to_interface, aalwines::RoutingTable::POP, 0, 7);
+            add_entry(*to_interface, *interface1, aalwines::RoutingTable::POP, 0, 10);
+
+            //Add entries 9 - 2, 2 - 9
+            add_entry(*interface2, *to_interface, aalwines::RoutingTable::POP, 0, 33);
+            add_entry(*to_interface, *interface2, aalwines::RoutingTable::POP, 0, 10);
+
+            //Add entries 7 - 2, 2 - 7
+            add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::POP, 0, 33);
+            add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::POP, 0, 10);
+        }
 
         //Node4
-        from_interface = _routers[i + 4]->find_interface("i" + router_names[i + 4]);
         interface1 = _routers[i + 4]->find_interface(router_names[i + 2]);
         interface2 = _routers[i + 4]->find_interface(router_names[i + 3]);
-        passing_interface = interface2;
-        //Add entries 4 - 2, 4 - 3, 2 - 3, 3 - 2
-        add_entries(*passing_interface, *from_interface, *interface1, type, weight, interface_label);
+        //Add entries 2 - 3, 3 - 2
+        add_entry(*interface1, *interface2, aalwines::RoutingTable::SWAP, 0, 22, 12);
+        add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 9, 33);
+
         //No more edges to add
     }
     Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
@@ -319,7 +280,7 @@ Network construct_synthetic_network(int nesting = 1){
 }
 
 BOOST_AUTO_TEST_CASE(NetworkConstruction) {
-    Network synthetic_network = construct_synthetic_network(3);
+    Network synthetic_network = construct_synthetic_network(2);
     //Network synthetic_network2 = construct_synthetic_network();
     //synthetic_network.manipulate_network(0, 2, synthetic_network2, 0, synthetic_network2.size() - 2);
 
@@ -328,10 +289,12 @@ BOOST_AUTO_TEST_CASE(NetworkConstruction) {
     Builder builder(synthetic_network);
     {
         std::string query(
-                        "<.> [.#Router0] .* [.#Router14] <.> 0 OVER \n"
-                            "<.> [.#Router0] .* [.#Router5] <.> 0 OVER \n"
+                "<.> [Router0#.] .* [.#Router9] <.> 0 OVER \n"
+                        "<.> [Router5#.] .* [.#Router9] <.> 0 OVER \n"
+                        "<.> [Router7#.] .* [.#Router9] <.> 0 OVER \n"
+                            "<.> [.#Router0] .* [.#Router7] <.> 0 OVER \n"
                             "<.> [.#Router0] .* [Router5#.] <.> 0 OVER \n"
-                            "<.> [.#Router5] .* [Router7#.] <.> 0 OVER \n"
+                        "<.> [.#Router5] .* [.#Router7] <.> 0 OVER \n"
                             "<.> [.#Router5] .* [Router6#.] <.> 0 OVER \n"
                           "<.> [.#Router0] .* [Router7#.] <.> 0 OVER \n"
                           "<.> [.#Router0] .* [.#Router7] <.> 0 OVER \n"
@@ -386,7 +349,7 @@ BOOST_AUTO_TEST_CASE(NetworkConstruction) {
             reduction = pdaaal::Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
             bool need_trace = was_dual || get_trace;
 
-            auto solver_result1 = solver.post_star(pda);
+            auto solver_result1 = solver.post_star<pdaaal::Trace_Type::Any>(pda);
             bool engine_outcome = solver_result1.first;
             if (need_trace && engine_outcome) {
                 trace = solver.get_trace(pda, std::move(solver_result1.second));
