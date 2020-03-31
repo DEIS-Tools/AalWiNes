@@ -136,30 +136,31 @@ Network construct_synthetic_network(int nesting = 1){
             pair_and_assert(passing_interface, interface2);
 
             //Add routing (1) 0 -> 5, (5) 0 -> 1
-            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::PUSH, 0, 4, 4 );
-
+            //TODO, does not work with push?
+            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 4 );
             add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 5, 22);
 
             //Add routing (0) 5 -> 6, (6) 5 -> 0
             interface1 = _routers[i + 5]->find_interface(router_names[i + 6]);
-            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 4, 22);
-            add_entry(*interface1, *interface2, aalwines::RoutingTable::POP, 0, 4);
+            add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 4, 22);
+            //TODO, does not work with POP?
+            add_entry(*interface1, *interface2, aalwines::RoutingTable::SWAP, 0, 4, 4);
 
             //if next is not nested
             if(i + 10 == router_size){
                 //Add routing (0) 5 -> 7, (7) 5 -> 0
                 interface1 = _routers[i + 5]->find_interface(router_names[i + 7]);
-                //TODO, should work with push??
-                add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 4, 6);
-                add_entry(*interface1, *passing_interface, aalwines::RoutingTable::POP, 0, 5);
+                add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 4, 6);
+                //TODO, does not work with POP?
+                add_entry(*interface1, *interface2, aalwines::RoutingTable::SWAP, 0, 5, 5);
             }
         } else {
             passing_interface = _routers[i]->find_interface(router_names[i + 2]);
             interface2 = _routers[i + 2]->find_interface(router_names[i]);
             pair_and_assert(passing_interface, interface2);
-            //Add routings 2 - 1, 1 - 2 ||
+            //Add routings 2 0 -> 1, 1 0 -> 2 ||
             //Add routings 7 5 -> 6, 6 5 -> 7
-            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 5, 11);
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 5, 22);
             add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 6);
         }
 
@@ -183,7 +184,7 @@ Network construct_synthetic_network(int nesting = 1){
         interface2 = _routers[i + 4]->find_interface(router_names[i + 2]);
         pair_and_assert(interface1, interface2);
 
-        //Add entries 4 - 3, 3 - 4
+        //Add entries 4 2 -> 3, 3 2 -> 4
         add_entry(*interface1, *to_interface, aalwines::RoutingTable::SWAP, 0, 33, 10);
         add_entry(*to_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 22);
 
@@ -192,27 +193,29 @@ Network construct_synthetic_network(int nesting = 1){
             interface2 = _routers[i + 8]->find_interface(router_names[i + 2]);
             pair_and_assert(interface1, interface2);
 
-            //Total entries 3 - 8, 8 - 3, 4 - 8, 8 - 4
             passing_interface = _routers[i + 2]->find_interface(router_names[i + 3]);
-            //Add entries 3 - 8, 8 - 3, 2 - 8, 8 - 2
-            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 7, 10);
+            passing_interface1 = _routers[i + 2]->find_interface(router_names[i + 4]);
+            //Add entries 3 2 -> 8, 8 2 -> 3
+            //TODO; Should work with PUSH
+            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 10);
+
             add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 10);
 
-            passing_interface = _routers[i + 2]->find_interface(router_names[i + 4]);
-            //Add entries 4 - 8, 8 - 4
-            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 33, 10);
-            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 40);
+            //Add entries 4 2 -> 8, 8 2 -> 4
+            //TODO; Should work with PUSH
+            add_entry(*passing_interface1, *interface1, aalwines::RoutingTable::SWAP, 0, 33, 10);
+            add_entry(*interface1, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 4, 22);
         } else {
             passing_interface = _routers[i + 2]->find_interface(router_names[i + 0]);
             passing_interface1 = _routers[i + 2]->find_interface(router_names[i + 4]);
 
-            //Add entries 0 - 3, 3 - 0
+            //Add entries 0 2 -> 3, 3 2 -> 0
             add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::SWAP, 0, 6, 7);
-            add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::SWAP, 0, 6, 10);
+            add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::SWAP, 0, 6, 5);
 
-            //Add entries 0 - 4, 4 - 0
-            add_entry(*passing_interface, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 6, 33);
-            add_entry(*passing_interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 6, 50);
+            //Add entries 0 2 -> 4, 4 2 -> 0
+            add_entry(*passing_interface, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 6, 22);
+            add_entry(*passing_interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 6, 5);
         }
 
         //Node3
@@ -222,12 +225,12 @@ Network construct_synthetic_network(int nesting = 1){
         pair_and_assert(interface1, interface2);
 
         //Add entries 1 - 4, 4 - 1
-        add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 8);
+        add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 9);
         add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 33, 22);
 
         passing_interface1 = _routers[i + 3]->find_interface(router_names[i + 2]);
         //Add entries 2 3 -> 4, 4 - 2
-        add_entry(*passing_interface1, *interface1, aalwines::RoutingTable::SWAP, 0, 6, 9);
+        add_entry(*passing_interface1, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 9);
         add_entry(*interface1, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 33, 7);
 
         //Add entries 1 3 -> 2, 2 3 -> 1
@@ -241,15 +244,18 @@ Network construct_synthetic_network(int nesting = 1){
             to_interface = _routers[i + 8]->find_interface(router_names[i + 2]);
 
             //Add entries 6 8 -> 2, 2 8 -> 6
-            add_entry(*interface1, *to_interface, aalwines::RoutingTable::POP, 0, 7);
+            //TODO; POP?
+            add_entry(*interface1, *to_interface, aalwines::RoutingTable::SWAP, 0, 7, 4);
             add_entry(*to_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 10, 22);
 
             //Add entries 9 8 -> 2, 2 8 -> 9
-            add_entry(*interface2, *to_interface, aalwines::RoutingTable::POP, 0, 33);
-            add_entry(*to_interface, *interface2, aalwines::RoutingTable::SWAP, 0, 10, 9);
+            //TODO; POP?
+            add_entry(*interface2, *to_interface, aalwines::RoutingTable::SWAP, 0, 12, 4);
+            add_entry(*to_interface, *interface2, aalwines::RoutingTable::SWAP, 0, 7, 9);
 
             //Add entries 7 8 -> 2, 2 8 -> 7
-            add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::POP, 0, 33);
+            //TODO; POP?
+            add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::SWAP, 0, 7, 4);
             add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::SWAP, 0, 10, 6);
         }
 
@@ -277,13 +283,17 @@ BOOST_AUTO_TEST_CASE(NetworkConstruction) {
     Builder builder(synthetic_network);
     {
         std::string query(
+                "<[6]> [.#Router1] .* [Router3#.] <.> 0 OVER \n"
                 "<.> [Router0#.] .* [.#Router4] <.> 0 OVER \n"
                 "<.> [Router0#.] .* [Router2#.] <.> 0 OVER \n"
                 "<.> [Router0#.] .* [Router3#.] <.> 0 OVER \n"
-                "<[4]> [.#Router0] .* [.#Router7] <.> 0 OVER \n"
+                "<.> [.#Router0] .* [Router7#.] <.> 0 OVER \n"
+                "<.> [Router1#.] .* [.#Router7] <.> 0 OVER \n"
                 "<.> [Router0#.] .* [.#Router7] <.> 0 OVER \n"
                 "<.> [.#Router0] .* [Router9#.] <.> 0 OVER \n"
                 "<.> [.#Router5] .* [Router7#.] <.> 0 OVER \n"
+                "<[12]> [.#Router8] .* [Router2#.] <.> 0 OVER \n"
+                "<.> [Router4#.] .* [Router2#.] <.> 0 OVER \n"
                        );
         //Adapt to existing query parser
         std::istringstream qstream(query);
