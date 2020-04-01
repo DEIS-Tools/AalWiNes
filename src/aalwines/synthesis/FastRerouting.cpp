@@ -25,11 +25,13 @@
  */
 
 #include <queue>
+#include <cassert>
+#include <iostream>
 #include "FastRerouting.h"
 
 namespace aalwines {
 
-    bool FastRerouting::make_reroute(Network &network, const Interface* inf, label_t fresh){
+    bool FastRerouting::make_reroute(Network &network, const Interface* failed_inf, label_t failover_label){
         struct queue_elem {
             queue_elem(int priority, Interface* interface, const queue_elem* back_pointer = nullptr)
                 : priority(priority), interface(interface), back_pointer(back_pointer) { };
@@ -49,67 +51,30 @@ namespace aalwines {
         std::priority_queue<queue_elem> queue;
         std::unordered_set<Router*> seen;
         std::vector<std::unique_ptr<queue_elem>> pointers;
-        for(const auto & i : inf->source()->interfaces()) {
+        for(const auto & i : failed_inf->source()->interfaces()) {
             auto interface = i.get();
-            if (interface == inf) continue;
+            if (interface == failed_inf) continue;
             queue.emplace(0, interface);
         }
         while (!queue.empty()) {
             auto elem = queue.top();
             queue.pop();
-            if (inf->target() == elem.interface->target()){
+            if (failed_inf->target() == elem.interface->target()){
                 auto p = elem.back_pointer;
                 assert(p != nullptr);
-                { // POP at last hop of re-route
-                    RoutingTable table;
-                    auto entry = table.push_entry();
-                    auto ingoing_interface = p->interface->match();
-                    entry._ingoing = ingoing_interface;
-                    entry._top_label = fresh;
-                    entry._rules.emplace_back();
-                    entry._rules.back()._ops.emplace_back();
-                    entry._rules.back()._via = elem.interface;
-                    ingoing_interface->table().merge(table, *ingoing_interface, std::cerr);
-                }
+                // POP at last hop of re-route
+                p->interface->match()->table().add_rule(failover_label, RoutingTable::action_t(), elem.interface);
                 // SWAP for each intermediate hop during re-route
                 auto via = p->interface;
                 for (p = p->back_pointer; p != nullptr; via = p->interface, p = p->back_pointer) {
-                    RoutingTable table;
-                    auto entry = table.push_entry();
-                    auto ingoing_interface = p->interface->match();
-                    entry._ingoing = ingoing_interface;
-                    entry._top_label = fresh;
-                    entry._rules.emplace_back();
-                    entry._rules.back()._ops.emplace_back();
-                    entry._rules.back()._ops.back()._op = RoutingTable::op_t::SWAP;
-                    entry._rules.back()._ops.back()._op_label = fresh;
-                    entry._rules.back()._via = via;
-                    ingoing_interface->table().merge(table, *ingoing_interface, std::cerr);
+                    p->interface->match()->table().add_rule(failover_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, failover_label), via);
                 }
                 assert(p == nullptr);
                 // PUSH at first hop of re-route
-                // TODO: Make all this a lot easier by implementing advanced modification operations in routing table.
                 for (const auto& i : via->source()->interfaces()) {
                     auto interface = i.get();
-                    if (interface == inf) continue;
-                    RoutingTable table;
-                    for (const auto& e : interface->table().entries()) {
-                        for (const auto& f : e._rules) {
-                            if (f._via == interface) {
-                                auto entry = table.push_entry();
-                                entry._ingoing = interface;
-                                entry._top_label = e._top_label;
-                                entry._rules.emplace_back();
-                                entry._rules.back()._ops.emplace_back();
-                                entry._rules.back()._ops.back()._op = RoutingTable::op_t::PUSH;
-                                entry._rules.back()._ops.back()._op_label = fresh;
-                                entry._rules.back()._via = via;
-                                entry._rules.back()._weight = f._weight + 1;
-                            }
-                        }
-                    }
-                    table.sort();
-                    interface->table().merge(table, *interface, std::cerr);
+                    if (interface == failed_inf) continue;
+                    interface->table().add_failover_entries(failed_inf, via, failover_label);
                 }
                 return true;
             }
@@ -119,7 +84,7 @@ namespace aalwines {
             pointers.push_back(std::move(u_pointer));
             for(const auto & i : elem.interface->target()->interfaces()) {
                 auto interface = i.get();
-                if (interface == inf) continue;
+                if (interface == failed_inf) continue;
                 if (seen.count(interface->target()) != 0) continue;
                 queue.emplace(elem.priority + 1, interface, pointer); // TODO: Implement weight/cost instead of 1.
             }

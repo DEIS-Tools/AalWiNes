@@ -23,17 +23,17 @@
  *
  * Created on July 2, 2019, 3:29 PM
  */
+#ifndef ROUTINGTABLE_H
+#define ROUTINGTABLE_H
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <ptrie/ptrie_map.h>
 
-#include "Router.h"
 #include "Query.h"
 
-#ifndef ROUTINGTABLE_H
-#define ROUTINGTABLE_H
 namespace aalwines {
     class Router;
     class Interface;
@@ -55,6 +55,8 @@ namespace aalwines {
         struct action_t {
             op_t _op = POP;
             label_t _op_label;
+            action_t() = default;
+            action_t(op_t op, label_t op_label) : _op(op), _op_label(op_label) {};
             void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
         };
 
@@ -63,6 +65,9 @@ namespace aalwines {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _weight = 0;
+            forward_t() = default;
+            forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t weight)
+                : _type(type), _ops(std::move(ops)), _via(via), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
         };
@@ -71,35 +76,35 @@ namespace aalwines {
             label_t _top_label;
             const Interface* _ingoing = nullptr; // this needs to be removed, it is only really used during merges of Routingtables for filtering
             std::vector<forward_t> _rules;
-            bool operator==(const entry_t& other) const;
 
+            bool operator==(const entry_t& other) const;
+            bool operator!=(const entry_t& other) const;
             bool operator<(const entry_t& other) const;
             void print_json(std::ostream&) const;
             static void print_label(label_t label, std::ostream& s, bool quote = true);
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
 
         };
+
     public:
-        RoutingTable(const RoutingTable& orig) = default;
-        virtual ~RoutingTable() = default;
-        RoutingTable(RoutingTable&&) = default;
-
-        RoutingTable& operator=(const RoutingTable&) = default;
-        RoutingTable& operator=(RoutingTable&&) = default;
-
-        bool empty() const;
+        [[nodiscard]] bool empty() const;
         bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
         bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
-        const std::vector<entry_t>& entries() const;
+        [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
         bool check_nondet(std::ostream& e);
         entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
         void pop_entry() { _entries.pop_back(); }
 
-        RoutingTable();
+        void add_rules(label_t top_label, const std::vector<forward_t>& rules);
+        void add_rule(label_t top_label, const forward_t& rule);
+        void add_rule(label_t top_label, forward_t&& rule);
+        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0, type_t = MPLS);
+        void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
+        std::vector<entry_t>::iterator insert_entry(label_t top_label);
         
     private:
         std::vector<entry_t> _entries;

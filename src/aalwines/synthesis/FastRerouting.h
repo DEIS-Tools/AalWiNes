@@ -34,7 +34,7 @@ namespace aalwines {
         using label_t = RoutingTable::label_t;
 
     public:
-        static bool make_reroute(Network &network, const Interface* inf, label_t fresh);
+        static bool make_reroute(Network &network, const Interface* failed_inf, label_t failover_label);
 
     };
 }
