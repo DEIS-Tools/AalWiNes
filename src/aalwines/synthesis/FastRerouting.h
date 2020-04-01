@@ -18,7 +18,7 @@
  */
 
 /*
- * File:   FastReRouting.h
+ * File:   FastRerouting.h
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 01-04-2020
@@ -33,7 +33,8 @@ namespace aalwines {
     class FastRerouting {
         using label_t = RoutingTable::label_t;
 
-        static bool make_reroute(Network &network, Interface* inf, label_t fresh);
+    public:
+        static bool make_reroute(Network &network, const Interface* inf, label_t fresh);
 
     };
 }

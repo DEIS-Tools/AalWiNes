@@ -18,7 +18,7 @@
  */
 
 /*
- * File:   FastReRouting.cpp
+ * File:   FastRerouting.cpp
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 01-04-2020
@@ -29,7 +29,7 @@
 
 namespace aalwines {
 
-    bool FastRerouting::make_reroute(Network &network, Interface* inf, label_t fresh){
+    bool FastRerouting::make_reroute(Network &network, const Interface* inf, label_t fresh){
         struct queue_elem {
             queue_elem(int priority, Interface* interface, const queue_elem* back_pointer = nullptr)
                 : priority(priority), interface(interface), back_pointer(back_pointer) { };
