@@ -32,12 +32,45 @@
 #include <algorithm>
 #include <sstream>
 #include <map>
+#include <cassert>
 
 namespace aalwines
 {
 
-    RoutingTable::RoutingTable()
-    {
+    std::vector<RoutingTable::entry_t>::iterator RoutingTable::insert_entry(label_t top_label) {
+        assert(std::is_sorted(_entries.begin(), _entries.end()));
+        entry_t entry;
+        entry._top_label = top_label;
+        auto lb = std::lower_bound(_entries.begin(), _entries.end(), entry);
+        if (lb == std::end(_entries) || (*lb) != entry) {
+            lb = _entries.insert(lb, entry);
+        }
+        return lb;
+    }
+    void RoutingTable::add_rules(label_t top_label, const std::vector<forward_t>& rules) {
+        auto it = insert_entry(top_label);
+        it->_rules.insert(it->_rules.end(), rules.begin(), rules.end());
+    }
+    void RoutingTable::add_rule(label_t top_label, const forward_t& rule) {
+        insert_entry(top_label)->_rules.push_back(rule);
+    }
+    void RoutingTable::add_rule(label_t top_label, forward_t&& rule) {
+        insert_entry(top_label)->_rules.emplace_back(std::move(rule));
+    }
+    void RoutingTable::add_rule(RoutingTable::label_t top_label, RoutingTable::action_t op, Interface* via, size_t weight, type_t type) {
+        add_rule(top_label, forward_t(type, {op}, via, weight));
+    }
+    void RoutingTable::add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label) {
+        for (auto& e : _entries) {
+            std::vector<forward_t> new_rules;
+            for (const auto& f : e._rules) {
+                if (f._via == failed_inf) {
+                    new_rules.emplace_back(f._type, f._ops, backup_inf, f._weight + 1);
+                    new_rules.back()._ops.emplace_back(PUSH, failover_label);
+                }
+            }
+            e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
+        }
     }
 
     bool RoutingTable::merge(const RoutingTable& other, Interface& parent, std::ostream& warnings)
@@ -110,6 +143,10 @@ namespace aalwines
     bool RoutingTable::entry_t::operator==(const entry_t& other) const
     {
         return _top_label == other._top_label;
+    }
+    bool RoutingTable::entry_t::operator!=(const entry_t& other) const
+    {
+        return !(*this == other);
     }
 
     void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex, const Network* network) const
