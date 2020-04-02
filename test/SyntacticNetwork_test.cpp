@@ -64,6 +64,7 @@ Network construct_synthetic_network(int nesting = 1){
         _routers.emplace_back(std::make_unique<Router>(i));
         Router &router = *_routers.back().get();
         router.add_name(router_name);
+        router.get_interface(_all_interfaces, "I" + router_names[i]);
         auto res = _mapping.insert(router_name.c_str(), router_name.length());
         _mapping.get_data(res.second) = &router;
         switch (network_node) {
@@ -256,6 +257,15 @@ Network construct_synthetic_network(int nesting = 1){
 
         //No more edges to add
     }
+
+    //AddRouting to world 1 0 -> World
+    interface1 = _routers[0]->find_interface(router_names[1]);
+    interface2 = _routers[0]->find_interface("I" + router_names[0]);
+    interface1->table().add_rule({Query::MPLS, 0, (uint64_t)4},
+            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}},
+            interface2);
+    //interface1->table().add_rule({Query::MPLS, 0, (uint64_t)4},{RoutingTable::op_t::PUSH, {Query::type_t::MPLS, 0, (uint64_t)22}});
+
     Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
 
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
@@ -264,8 +274,9 @@ Network construct_synthetic_network(int nesting = 1){
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
-    Router* in_going_interface = synthetic_network.get_router(1);
-    synthetic_network.manipulate_network(in_going_interface, 0, 2, synthetic_network2, 0, synthetic_network2.size() - 3);
+    Interface* in_going_interface = synthetic_network2.get_router(0)->find_interface("IRouter0");
+    Interface* in_going_interface2 = synthetic_network.get_router(2)->find_interface("IRouter2");
+    synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network.get_router(0), synthetic_network.get_router(3));
 
     //synthetic_network.print_dot(std::cout);
 
@@ -368,9 +379,10 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
 BOOST_AUTO_TEST_CASE(NetworkConstruction) {
     Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
-    Router* in_going_interface = synthetic_network.get_router(1);
-    synthetic_network.manipulate_network(in_going_interface, 0, 2, synthetic_network2, 0, synthetic_network2.size() - 3);
-    synthetic_network.print_dot(std::cout);
+    //Interface()* in_going_interface = synthetic_network.get_router(2);
+    //Interface()* in_going_nested_interface = synthetic_network2.get_router(0);
+    //synthetic_network.manipulate_network(in_going_interface, 0, 2, synthetic_network2, 0, synthetic_network2.size() - 3);
+    //synthetic_network.print_dot(std::cout);
 
     BOOST_CHECK_EQUAL(true, true);
 }
