@@ -43,6 +43,11 @@ namespace aalwines {
                 return cost_map.at(interface);
             });
         }
+
+
+        static bool make_data_flow(Network &network, const Interface* from, const Interface* to,
+                label_t pre_label, label_t flow_label, const std::vector<const Router*>& path);
+
     };
 }
 

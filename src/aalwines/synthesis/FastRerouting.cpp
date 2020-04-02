@@ -96,4 +96,60 @@ namespace aalwines {
         return false; // No re-route was possible
     }
 
+    Interface* find_via_interface(const Router* from, const Router* to) {
+        for (const auto& i : from->interfaces()) {
+            if (i->target() == to){
+                return i.get();
+            }
+        }
+        return nullptr;
+    }
+    Interface* find_interface_on_router(const Router* router, const Interface* interface) {
+        // Basically removes const from the Interface*, and checks if the interface is actually on the router.
+        if (interface->source() == router) {
+            for (const auto& i : router->interfaces()) {
+                if (i.get() == interface){
+                    return i.get();
+                }
+            }
+        }
+        return nullptr;
+    }
+    bool FastRerouting::make_data_flow(Network &network, const Interface* from, const Interface* to,
+            label_t pre_label, label_t flow_label, const std::vector<const Router*>& path) {
+        assert(!path.empty());
+        // Check if the interfaces is 'outer' interfaces.
+        assert(from->target()->is_null());
+        assert(to->target()->is_null());
+
+        auto in_interface = find_interface_on_router(path[0], from);
+        if (!in_interface) return false;
+        if (path.size() == 1) {
+            // Simple case: Directly in and out.
+            auto out_interface = find_interface_on_router(path[0], to);
+            if(!out_interface) return false;
+            in_interface->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, pre_label}, out_interface);
+            return true;
+        }
+        // Push flow_label on first hops.
+        auto via_interface = find_via_interface(path[0], path[1]);
+        if (!via_interface) return false;
+        in_interface->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, flow_label}, via_interface);
+        // Swap flow_label on intermediate hops.
+        size_t i;
+        for (i = 1; i + 1 < path.size(); ++i) {
+            in_interface = via_interface->match();
+            via_interface = find_via_interface(path[i], path[i+1]);
+            if (!via_interface) return false;
+            in_interface->table().add_rule(flow_label, {RoutingTable::op_t::SWAP, flow_label}, via_interface);
+        }
+        // Pop flow_label on last hop out.
+        in_interface = via_interface->match();
+        auto out_interface = find_interface_on_router(path[i], to);
+        if(!out_interface) return false;
+        in_interface->table().add_rule(flow_label, {RoutingTable::op_t::POP, label_t{}}, out_interface);
+        return true;
+    }
+
+
 }

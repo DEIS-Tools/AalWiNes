@@ -32,14 +32,7 @@
 
 using namespace aalwines;
 
-BOOST_AUTO_TEST_CASE(FastRerouteTest) {
-    std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
-    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
-                                                {"Router1", "Router3", "Router5"},
-                                                {"Router2", "Router4"},
-                                                {"Router3", "Router5"},
-                                                {"Router2", "Router4", "Router6"},
-                                                {"Router5", "iRouter6"}};
+Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links){
     std::vector<std::unique_ptr<Router>> routers;
     std::vector<const Interface*> interfaces;
     Network::routermap_t mapping;
@@ -69,6 +62,18 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
     Router::add_null_router(routers, interfaces, mapping);
 
     Network network(std::move(mapping), std::move(routers), std::move(interfaces));
+    return network;
+}
+
+BOOST_AUTO_TEST_CASE(FastRerouteTest) {
+    std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
+    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
+                                                {"Router1", "Router3", "Router5"},
+                                                {"Router2", "Router4"},
+                                                {"Router3", "Router5"},
+                                                {"Router2", "Router4", "Router6"},
+                                                {"Router5", "iRouter6"}};
+    auto network = make_network(names, links);
 
     auto interface = network.get_router(1)->find_interface(names[4]);
     network.get_router(0)->find_interface(names[1])->match()->table().add_rule(
@@ -80,14 +85,144 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
             {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, 3}},
             network.get_router(4)->find_interface(names[5]));
 
-    Query::label_t max_label(Query::type_t::MPLS, 0, 42);
+    Query::label_t failover_label(Query::type_t::MPLS, 0, 42);
 
     BOOST_TEST_MESSAGE("Before: ");
     std::stringstream s_before;
     network.print_simple(s_before);
     BOOST_TEST_MESSAGE(s_before.str());
 
-    auto success = FastRerouting::make_reroute(network, interface, max_label);
+    auto success = FastRerouting::make_reroute(network, interface, failover_label);
+
+    BOOST_CHECK_EQUAL(success, true);
+
+    BOOST_TEST_MESSAGE("After: ");
+    std::stringstream s_after;
+    network.print_simple(s_after);
+    BOOST_TEST_MESSAGE(s_after.str());
+}
+
+BOOST_AUTO_TEST_CASE(FastRerouteWithDataFlowTest) {
+    std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
+    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
+                                                {"Router1", "Router3", "Router5"},
+                                                {"Router2", "Router4"},
+                                                {"Router3", "Router5"},
+                                                {"Router2", "Router4", "Router6"},
+                                                {"Router5", "iRouter6"}};
+    auto network = make_network(names, links);
+
+    Query::label_t pre_label = Query::label_t::any_ip;
+    Query::label_t flow_label(Query::type_t::MPLS, 0, 123);
+    std::vector<const Router*> path {network.get_router(0),
+                                     network.get_router(1),
+                                     network.get_router(4),
+                                     network.get_router(5)};
+    auto fail_interface = network.get_router(1)->find_interface(names[4]);
+    Query::label_t failover_label(Query::type_t::MPLS, 0, 42);
+
+    BOOST_TEST_MESSAGE("Before: ");
+    std::stringstream s_before;
+    network.print_simple(s_before);
+    BOOST_TEST_MESSAGE(s_before.str());
+
+    auto success1 = FastRerouting::make_data_flow(network,
+            network.get_router(0)->find_interface("iRouter1"),
+            network.get_router(5)->find_interface("iRouter6"),
+            pre_label, flow_label, path);
+
+    BOOST_CHECK_EQUAL(success1, true);
+
+    BOOST_TEST_MESSAGE("After data flow: ");
+    std::stringstream s_middle;
+    network.print_simple(s_middle);
+    BOOST_TEST_MESSAGE(s_middle.str());
+
+    auto success2 = FastRerouting::make_reroute(network, fail_interface, failover_label);
+
+    BOOST_CHECK_EQUAL(success2, true);
+
+    BOOST_TEST_MESSAGE("After re-routing: ");
+    std::stringstream s_after;
+    network.print_simple(s_after);
+    BOOST_TEST_MESSAGE(s_after.str());
+}
+
+
+BOOST_AUTO_TEST_CASE(DataFlowTest) {
+    std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
+    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
+                                                {"Router1",  "Router3", "Router5"},
+                                                {"Router2",  "Router4"},
+                                                {"Router3",  "Router5"},
+                                                {"Router2",  "Router4", "Router6"},
+                                                {"Router5",  "iRouter6"}};
+    auto network = make_network(names, links);
+
+    Query::label_t pre_label = Query::label_t::any_ip;
+    Query::label_t flow_label(Query::type_t::MPLS, 0, 123);
+    std::vector<const Router*> path {network.get_router(0),
+                                     network.get_router(1),
+                                     network.get_router(4),
+                                     network.get_router(5)};
+
+    BOOST_TEST_MESSAGE("Before: ");
+    std::stringstream s_before;
+    network.print_simple(s_before);
+    BOOST_TEST_MESSAGE(s_before.str());
+
+    auto success = FastRerouting::make_data_flow(network, network.get_router(0)->find_interface("iRouter1"),
+            network.get_router(5)->find_interface("iRouter6"), pre_label, flow_label, path);
+
+    BOOST_CHECK_EQUAL(success, true);
+
+    BOOST_TEST_MESSAGE("After: ");
+    std::stringstream s_after;
+    network.print_simple(s_after);
+    BOOST_TEST_MESSAGE(s_after.str());
+}
+
+BOOST_AUTO_TEST_CASE(ShortDataFlowTest) {
+    std::vector<std::string> names{"Router1", "Router2"};
+    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
+                                                {"Router1",  "iRouter2"}};
+    auto network = make_network(names, links);
+
+    Query::label_t pre_label = Query::label_t::any_ip;
+    Query::label_t flow_label(Query::type_t::MPLS, 0, 123);
+    std::vector<const Router*> path {network.get_router(0), network.get_router(1)};
+
+    BOOST_TEST_MESSAGE("Before: ");
+    std::stringstream s_before;
+    network.print_simple(s_before);
+    BOOST_TEST_MESSAGE(s_before.str());
+
+    auto success = FastRerouting::make_data_flow(network, network.get_router(0)->find_interface("iRouter1"),
+            network.get_router(1)->find_interface("iRouter2"), pre_label, flow_label, path);
+
+    BOOST_CHECK_EQUAL(success, true);
+
+    BOOST_TEST_MESSAGE("After: ");
+    std::stringstream s_after;
+    network.print_simple(s_after);
+    BOOST_TEST_MESSAGE(s_after.str());
+}
+BOOST_AUTO_TEST_CASE(ShortestDataFlowTest) {
+    std::vector<std::string> names{"Router1"};
+    std::vector<std::vector<std::string>> links{{"iRouter1", "oRouter1"}};
+    auto network = make_network(names, links);
+
+    Query::label_t pre_label = Query::label_t::any_ip;
+    Query::label_t flow_label(Query::type_t::MPLS, 0, 123);
+    std::vector<const Router*> path {network.get_router(0)};
+
+    BOOST_TEST_MESSAGE("Before: ");
+    std::stringstream s_before;
+    network.print_simple(s_before);
+    BOOST_TEST_MESSAGE(s_before.str());
+
+    auto success = FastRerouting::make_data_flow(network, network.get_router(0)->find_interface("iRouter1"),
+            network.get_router(0)->find_interface("oRouter1"), pre_label, flow_label, path);
 
     BOOST_CHECK_EQUAL(success, true);
 
