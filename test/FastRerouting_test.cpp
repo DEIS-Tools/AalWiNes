@@ -33,12 +33,13 @@
 using namespace aalwines;
 
 BOOST_AUTO_TEST_CASE(FastRerouteTest) {
-    std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5"};
-    std::vector<std::vector<std::string>> links{{"Router2"},
+    std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
+    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
                                                 {"Router1", "Router3", "Router5"},
                                                 {"Router2", "Router4"},
                                                 {"Router3", "Router5"},
-                                                {"Router2", "Router4"}};
+                                                {"Router2", "Router4", "Router6"},
+                                                {"Router5", "iRouter6"}};
     std::vector<std::unique_ptr<Router>> routers;
     std::vector<const Interface*> interfaces;
     Network::routermap_t mapping;
@@ -61,7 +62,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
             auto res1 = mapping.exists(name.c_str(), name.length());
             assert(res1.first);
             auto res2 = mapping.exists(other.c_str(), other.length());
-            assert(res2.first);
+            if(!res2.first) continue;
             mapping.get_data(res1.second)->find_interface(other)->make_pairing(mapping.get_data(res2.second)->find_interface(name));
         }
     }
@@ -74,6 +75,10 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
             {Query::type_t::MPLS, 0, 1},
             {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, 2}},
             interface);
+    network.get_router(1)->find_interface(names[4])->match()->table().add_rule(
+            {Query::type_t::MPLS, 0, 2},
+            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, 3}},
+            network.get_router(4)->find_interface(names[5]));
 
     Query::label_t max_label(Query::type_t::MPLS, 0, 42);
 

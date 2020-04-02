@@ -63,6 +63,8 @@ namespace aalwines {
             if (failed_inf->target() == elem.interface->target()){
                 auto p = elem.back_pointer;
                 assert(p != nullptr);
+                // Copy routing table to incoming failover interface.
+                elem.interface->match()->table().simple_merge(failed_inf->match()->table());
                 // POP at last hop of re-route
                 p->interface->match()->table().add_rule(failover_label, RoutingTable::action_t(), elem.interface);
                 // SWAP for each intermediate hop during re-route
@@ -86,6 +88,7 @@ namespace aalwines {
             for(const auto & i : elem.interface->target()->interfaces()) {
                 auto interface = i.get();
                 if (interface == failed_inf) continue;
+                if (interface->target()->is_null()) continue;
                 if (seen.count(interface->target()) != 0) continue;
                 queue.emplace(elem.priority + cost_fn(interface), interface, pointer);
             }

@@ -111,6 +111,7 @@ namespace aalwines {
         void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0, type_t = MPLS);
         void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
         std::vector<entry_t>::iterator insert_entry(label_t top_label);
+        void simple_merge(const RoutingTable& other);
         
     private:
         std::vector<entry_t> _entries;
