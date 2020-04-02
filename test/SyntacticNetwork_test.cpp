@@ -257,6 +257,7 @@ Network construct_synthetic_network(int nesting = 1){
 
         //No more edges to add
     }
+    Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
 
     //AddRouting to world 1 0 -> World
     interface1 = _routers[0]->find_interface(router_names[1]);
@@ -266,7 +267,6 @@ Network construct_synthetic_network(int nesting = 1){
             interface2);
     //interface1->table().add_rule({Query::MPLS, 0, (uint64_t)4},{RoutingTable::op_t::PUSH, {Query::type_t::MPLS, 0, (uint64_t)22}});
 
-    Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
 
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
@@ -274,8 +274,6 @@ Network construct_synthetic_network(int nesting = 1){
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
-    Interface* in_going_interface = synthetic_network2.get_router(0)->find_interface("IRouter0");
-    Interface* in_going_interface2 = synthetic_network.get_router(2)->find_interface("IRouter2");
     synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network.get_router(0), synthetic_network.get_router(3));
 
     //synthetic_network.print_dot(std::cout);

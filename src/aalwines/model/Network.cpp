@@ -210,8 +210,18 @@ namespace aalwines
         std::map<std::string, std::string> Names;
         std::map<std::string, Router*> Routers;
 
+
+        for(auto& router : _routers){
+            for(auto &inf : router->interfaces()){
+                if(inf->match() != nullptr && inf->match()->source()->is_null()){
+                    inf->remove_pairing(inf->match());
+                }
+            }
+        }
         //Pop NULL ROUTER
+        _mapping.erase(_routers.back()->name().c_str(),_routers.back()->name().length());
         _routers.pop_back();
+
         for (const auto& e : nested_synthetic_network.get_all_routers()) {
             if (e->is_null()) {
                 continue;
@@ -234,17 +244,15 @@ namespace aalwines
             if (e->is_null()) {
                 continue;
             }
-
             Router* router = Routers[e->name()];
             Router* nested_target_router;
-
             Interface* inf1;
             Interface* inf2;
             for(auto& inf : e->interfaces()){
                 std::string name = (inf->target()->is_null()) ? "I" + inf->source()->name() : Names[inf->target()->name()];
                 inf1 = router->find_interface(name) ? : router->get_interface(_all_interfaces, name);
                 nested_target_router = Routers[inf->target()->name()];
-                if(inf1->target() == nullptr && nested_target_router != NULL) {
+                if(inf1->target() == nullptr && nested_target_router != nullptr) {
                     inf2 = nested_target_router->find_interface(router->name()) ? : nested_target_router->get_interface(_all_interfaces, router->name());
                     inf1->make_pairing(inf2);
                 }

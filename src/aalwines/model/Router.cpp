@@ -115,6 +115,8 @@ namespace aalwines
     }
 
     void Interface::remove_pairing(Interface* interface){
+        interface->_matching = nullptr;
+        _matching = nullptr;
         interface->_target = nullptr;
         _target = nullptr;
     }
