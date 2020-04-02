@@ -77,9 +77,17 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
 
     Query::label_t max_label(Query::type_t::MPLS, 0, 42);
 
+    BOOST_TEST_MESSAGE("Before: ");
+    std::stringstream s_before;
+    network.print_simple(s_before);
+    BOOST_TEST_MESSAGE(s_before.str());
+
     auto success = FastRerouting::make_reroute(network, interface, max_label);
 
     BOOST_CHECK_EQUAL(success, true);
 
-    network.write_prex_routing(std::cout);
+    BOOST_TEST_MESSAGE("After: ");
+    std::stringstream s_after;
+    network.print_simple(s_after);
+    BOOST_TEST_MESSAGE(s_after.str());
 }
