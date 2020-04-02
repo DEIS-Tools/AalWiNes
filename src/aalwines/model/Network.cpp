@@ -28,6 +28,7 @@
 #include "filter.h"
 
 #include <cassert>
+#include <map>
 
 namespace aalwines
 {
@@ -35,12 +36,14 @@ namespace aalwines
     Network::Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
     : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
     {
+
         ptrie::set<Query::label_t> all_labels;
         _total_labels = 0;
         for (auto& r : _routers) {
             for (auto& inf : r->interfaces()) {
                 for (auto& e : inf->table().entries()) {
                     if(all_labels.insert(e._top_label).first) ++_total_labels;
+                    if(e._top_label.value() > _max_label) _max_label = e._top_label.value();
                 }
             }
         }
@@ -198,53 +201,184 @@ namespace aalwines
         return _label_cache;
     }
 
-    void Network::manipulate_network(int start_router_index, int end_router_index, Network& nested_synthetic_network,
+    void Network::manipulate_network(Router* in_going_router, int start_router_index, int end_router_index, Network& nested_synthetic_network,
                                int start_router_index2, int end_router_index2){
 
         if(!this->size() || !nested_synthetic_network.size()) throw base_error("Networks must be defined");
 
+        int last_index = this->size();
+        //Give routers distinct names and extend mapping
+        std::map<std::string, std::string> Names;
+        std::map<std::string, Router*> Routers;
+
+        for (const auto& e : nested_synthetic_network.get_all_routers()) {
+            if (e->name().empty() || e->name() == "NULL") {
+                continue;
+            }
+            _routers.emplace_back(std::make_unique<Router>(_routers.size()));
+            Router &router = *_routers.back().get();
+
+            if (std::find_if(_routers.begin(), _routers.end(),
+                             [&](auto &rh) { return (rh->name() == e->name()); }) != _routers.end()) {
+                std::string name = e->name() + "prime";
+                Names[e->name()] = name;
+                router.add_name(Names[e->name()]);
+                auto res = _mapping.insert(name.c_str(), name.length());
+                _mapping.get_data(res.second) = &router;
+            } else {
+                router.add_name(e->name());
+                auto res = _mapping.insert(e->name().c_str(), e->name().length());
+                _mapping.get_data(res.second) = &router;
+            }
+            Routers[e->name()] = &router;
+
+        }
+
+        for (const auto& e : nested_synthetic_network.get_all_routers()) {
+            if (e->name().empty() || e->name() == "NULL") {
+                continue;
+            }
+
+            Router* router = Routers[e->name()];
+            Router* nested_target_router;
+
+            Interface* inf1;
+            Interface* inf2;
+            Interface* in_going;
+            for(auto& inf : e->interfaces()){
+                Router* target_router = inf->target();
+                std::string name;
+                if(Names.find(target_router->name()) == Names.end() || router->name() == target_router->name()){
+                    name = target_router->name();
+                } else {
+                    name = Names[target_router->name()];
+                }
+                inf1 = router->find_interface(name);
+                if(inf1 == nullptr) {
+                    inf1 = router->get_interface(_all_interfaces, name);
+                    nested_target_router = Routers[target_router->name()];
+                    inf2 = nested_target_router->find_interface(router->name()) ? nullptr : nested_target_router->get_interface(_all_interfaces,
+                                                                                                      router->name());
+                    if(inf2 != nullptr)         //Hot Fix, cant find interface with find_interface
+                        inf1->make_pairing(inf2);
+                }
+
+                if(!inf->table().empty()){
+                    for(auto& entry : inf->table().entries()){
+                        auto& _entry = inf1->table().push_entry();
+                        in_going = router->find_interface(Names[entry._ingoing->target()->name()]);
+                        if(in_going == nullptr) {
+                            in_going = router->get_interface(_all_interfaces, Names[entry._ingoing->target()->name()]);
+                            inf2 = Routers[entry._ingoing->target()->name()]->find_interface(router->name() ) ? nullptr : Routers[entry._ingoing->target()->name()]->get_interface(_all_interfaces, router->name());
+                            in_going->make_pairing(inf2);
+                        }
+                        _entry._ingoing = in_going;
+                        _entry._top_label.set_value(entry._top_label.type(), entry._top_label.value() + _max_label, entry._top_label.mask());
+                        for(auto& r : entry._rules){
+                            _entry._rules.emplace_back();
+                            in_going = router->find_interface(Names[r._via->source()->name()]);
+                            if(in_going == nullptr) {
+                                in_going = router->get_interface(_all_interfaces, Names[r._via->target()->name()]);
+                                nested_target_router = Routers[r._via->target()->name()];
+                                inf2 = nested_target_router->find_interface(router->name()) ? nullptr : nested_target_router->get_interface(_all_interfaces,
+                                                                                                                                                  router->name());
+                                if(inf2 != nullptr)         //Hot Fix, cant find interface with find_interface
+                                    in_going->make_pairing(inf2);
+                            }
+                            _entry._rules.back()._via = in_going;
+                            _entry._rules.back()._weight = r._weight;
+                            for(auto& op : r._ops){
+                                _entry._rules.back()._ops.emplace_back();
+                                auto& _op = _entry._rules.back()._ops.back();
+                                _op._op = op._op;
+                                _op._op_label.set_value(op._op_label.type(), op._op_label.value() + _max_label, op._op_label.mask());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         //Modify start and end routers
         Router* router_start = this->get_router(start_router_index);
         Router* router_end = this->get_router(end_router_index);
-        Router* nested_router_start = nested_synthetic_network.get_router(start_router_index2);
-        Router* nested_router_end = nested_synthetic_network.get_router(end_router_index2);
-        //Remove pairing link
+        Router* nested_router_start = this->get_router(last_index + start_router_index2 );
+        Router* nested_router_end = this->get_router(last_index + end_router_index2 );
+
         Interface* interface1 = router_start->find_interface(router_end->name());
         Interface* interface2 = router_end->find_interface(router_start->name());
+        int label_in;
+        int label_out;
+
+        Interface* interface_start = router_start->get_interface(_all_interfaces, Names[nested_router_start->name()]);
+        Interface* interface_n_start = nested_router_start->get_interface(_all_interfaces, router_start->name());
+        interface_start->make_pairing(interface_n_start);
+
+        Interface* in_going_interface = router_start->find_interface(in_going_router->name());
+        //Get routingtable for interface1 and add entry with new ingoing.
+
+        //1 0 -> 0Prime
+        in_going_interface->table().clear();
+        in_going_interface->add_entry(*interface_start, RoutingTable::op_t::PUSH, 0, 4, 4 + this->get_max_label());
+
+        for(auto entry : interface1->table().entries()){
+            label_out = entry._top_label.value();
+            label_in = entry._rules.front()._ops.front()._op_label.value();
+            continue;
+        }
+
+        for(auto entry : interface2->table().entries()){
+            label_out = entry._top_label.value();
+            continue;
+        }
+
+        //Remove pairing interface
+        interface1->table().clear();
+        interface2->table().clear();
+        interface1->remove_pairing(interface2);
         router_start->remove_interface(interface1);
         router_end->remove_interface(interface2);
 
-        interface1 = router_start->get_interface(_all_interfaces, nested_router_start->name());
-        interface2 = nested_router_start->get_interface(nested_synthetic_network.all_interfaces(), router_start->name());
-        interface1->make_pairing(interface2);
-        interface2->make_pairing(interface1);
+        //0 0Prime -> 1
+        interface1 = nested_router_start->find_interface(Names["Router1"]);
+        interface_n_start->add_entry(*interface1, RoutingTable::op_t::SWAP, 0, 4 + this->get_max_label(), 22 + this->get_max_label());
+        //0 0Prime -> 2
+        interface1 = nested_router_start->find_interface(Names["Router2"]);
+        interface_n_start->add_entry(*interface1, RoutingTable::op_t::SWAP, 0, 4 + this->get_max_label(), 6 + this->get_max_label());
 
-        interface1 = router_end->get_interface(_all_interfaces, nested_router_end->name());
-        interface2 = nested_router_end->get_interface(nested_synthetic_network.all_interfaces(), router_end->name());
-        interface1->make_pairing(interface2);
-        interface2->make_pairing(interface1);
 
-        //Construct new network - Mitigate const_cast
-        auto& nested_routers = const_cast<std::vector<std::unique_ptr<Router>>&>(nested_synthetic_network.get_all_routers());
 
-        //Give routers distinct names and extend mapping
-        int name_iterator = 0;
-        std::string name = "Routerer";
-        for (const auto& e : nested_routers){
-            std::string old_name = e.get()->name();
-            if(std::find_if(_routers.begin(), _routers.end(),
-                            [&](auto& rh){ return (rh.get()->name() == e.get()->name() && e.get()->name() != "NULL"); } )->get() != _routers.end()->get()) {
-                e.get()->change_name(name + std::to_string(name_iterator++));
+
+        Interface* interface_end = router_end->get_interface(_all_interfaces, Names[nested_router_end->name()]);
+        Interface* interface_n_end = nested_router_end->get_interface(_all_interfaces, router_end->name());
+        interface_end->make_pairing(interface_n_end);
+
+        interface1 = nested_router_end->find_interface(Names["Router1"]);
+        interface1->add_entry(*interface_n_end, RoutingTable::op_t::POP, 0,  4 + this->get_max_label(), 4);
+    }
+
+    std::vector<Interface*> Network::re_labelling(std::vector<Interface*> interfaces){
+        for(auto& inf : interfaces){
+            RoutingTable table;
+            for(auto& entry : inf->table().entries()){
+                auto& _entry = table.push_entry();
+                _entry = entry;
+                _entry._top_label.set_value(entry._top_label.value() + _max_label);
+                for(auto& rule : _entry._rules){
+                    for(auto& op : rule._ops){
+                        auto type = op._op_label.type();
+                        auto mask = op._op_label.mask();
+                        auto label = op._op_label.value();
+                        op._op_label.set_value(type, label + _max_label, mask);
+                    }
+                }
             }
-            auto res = _mapping.insert(e->name().c_str(), e->name().length());
-            _mapping.get_data(res.second) = e.get();
+            inf->table().clear();
+            std::ostream& warnings = std::cerr;
+            table.sort();
+            inf->table().merge(table, *inf, warnings);
         }
-
-        //Map all routers into one network
-        _routers.insert(std::end(_routers)-1, std::make_move_iterator(nested_routers.begin()), std::make_move_iterator(nested_routers.end()));
-
-        _all_interfaces.insert(_all_interfaces.end(), nested_synthetic_network.all_interfaces().begin(),
-                          nested_synthetic_network.all_interfaces().end());   //Map all interfaces
+        return interfaces;
     }
 
     void Network::print_dot(std::ostream& s)

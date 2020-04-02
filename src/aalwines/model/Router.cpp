@@ -47,6 +47,10 @@ namespace aalwines
     {
         _names.pop_back();
         _names.emplace_back(name);
+        int i = 0;
+        for(auto& inf : _interfaces){
+            inf->update_id(_interfaces.size() + i++);
+        }
     }
 
     const std::string& Router::name() const
@@ -111,9 +115,8 @@ namespace aalwines
     }
 
     void Interface::remove_pairing(Interface* interface){
-        _matching = interface;
-        interface->_matching = this;
         interface->_target = nullptr;
+        _target = nullptr;
     }
 
     void Interface::make_pairing(Interface* interface)
@@ -168,6 +171,26 @@ namespace aalwines
             _matching = iface;
             iface->_matching = this;
         }
+    }
+
+    void Interface::add_entry(Interface &to_interface, RoutingTable::op_t type, int weight, int interface_label_in, int interface_label_out) {
+        RoutingTable table;
+        auto& entry = table.push_entry();
+        entry._ingoing = this;           //From interface
+        Query::type_t q_type = Query::MPLS;
+        entry._top_label.set_value(q_type, interface_label_in, 0);
+
+        entry._rules.emplace_back();
+        entry._rules.back()._via = &to_interface;  //Rule to
+        entry._rules.back()._type = RoutingTable::MPLS;
+        entry._rules.back()._weight = weight;
+        entry._rules.back()._ops.emplace_back();
+        auto& op = entry._rules.back()._ops.back();
+        op._op_label.set_value(q_type, interface_label_out, 0);
+        op._op = type;
+
+        table.sort();
+        this->table().merge(table, *this, std::cerr);
     }
 
     void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher)

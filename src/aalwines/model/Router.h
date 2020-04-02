@@ -64,9 +64,16 @@ public:
     size_t id() const {
         return _id;
     }
+
+    void update_id(uint64_t id_value) {
+        _id = id_value;
+    }
+
     size_t global_id() const {
         return _global_id;
     }
+
+    void add_entry(Interface& to_interface, RoutingTable::op_t type, int weight, int interface_label_in, int interface_label_out);
     
     void remove_pairing(Interface* interface);
     void make_pairing(Interface* interface);
