@@ -47,6 +47,10 @@ namespace aalwines
     {
         _names.pop_back();
         _names.emplace_back(name);
+        int i = 0;
+        for(auto& inf : _interfaces){
+            inf->update_id(_interfaces.size() + i++);
+        }
     }
 
     const std::string& Router::name() const
@@ -111,9 +115,8 @@ namespace aalwines
     }
 
     void Interface::remove_pairing(Interface* interface){
-        _matching = interface;
-        interface->_matching = this;
         interface->_target = nullptr;
+        _target = nullptr;
     }
 
     void Interface::make_pairing(Interface* interface)

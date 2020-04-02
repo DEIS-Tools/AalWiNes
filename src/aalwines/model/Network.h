@@ -49,10 +49,11 @@ public:
     Router *get_router(size_t id);
     const std::vector<std::unique_ptr<Router>>& get_all_routers() const { return _routers; }
 
-    void manipulate_network(int start_router_index, int end_router_index, Network& nested_synthetic_network,
-                            int start_router_index2, int end_router_index2);
+    void manipulate_network(Router *in_going_router, int start_router_index, int end_router_index,
+                            Network &nested_synthetic_network, int start_router_index2, int end_router_index2);
     size_t size() const { return _routers.size(); }
     const routermap_t& get_mapping() const { return _mapping; }
+    const int get_max_label() const { return _max_label; }
 
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact = false);
@@ -71,6 +72,7 @@ private:
     std::vector<const Interface*> _all_interfaces;
     std::unordered_set<Query::label_t> _label_cache;
     std::unordered_set<Query::label_t> _non_service_label;
+    uint64_t _max_label = 0;
 };
 }
 

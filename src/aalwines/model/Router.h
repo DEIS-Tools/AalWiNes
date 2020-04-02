@@ -64,6 +64,11 @@ public:
     size_t id() const {
         return _id;
     }
+
+    void update_id(uint64_t id_value) {
+        _id = id_value;
+    }
+
     size_t global_id() const {
         return _global_id;
     }
