@@ -262,11 +262,51 @@ Network construct_synthetic_network(int nesting = 1){
     //AddRouting to world 1 0 -> World
     interface1 = _routers[0]->find_interface(router_names[1]);
     interface2 = _routers[0]->find_interface("I" + router_names[0]);
-    interface1->table().add_rule({Query::MPLS, 0, (uint64_t)4},
-            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}},
-            interface2);
-    //interface1->table().add_rule({Query::MPLS, 0, (uint64_t)4},{RoutingTable::op_t::PUSH, {Query::type_t::MPLS, 0, (uint64_t)22}});
+    Query::label_t push_label = {Query::MPLS, 0, (uint64_t)4};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::PUSH, {Query::type_t::MPLS, 0, (uint64_t)4}}, interface2);
 
+    //AddRouting to world World 0 -> 1
+    interface1 = _routers[0]->find_interface("I" + router_names[0]);
+    interface2 = _routers[0]->find_interface(router_names[1]);
+    push_label = {Query::MPLS, 0, (uint64_t)4};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)6}}, interface2);
+
+    //AddRouting to world World 0 -> 2
+    interface1 = _routers[0]->find_interface("I" + router_names[0]);
+    interface2 = _routers[0]->find_interface(router_names[2]);
+    push_label = {Query::MPLS, 0, (uint64_t)4};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
+
+    //AddRouting to world World 2 -> 4
+    interface1 = _routers[2]->find_interface("I" + router_names[2]);
+    interface2 = _routers[2]->find_interface(router_names[4]);
+    push_label = {Query::MPLS, 0, (uint64_t)6};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
+
+    //AddRouting to world World 2 -> 3
+    interface1 = _routers[2]->find_interface("I" + router_names[2]);
+    interface2 = _routers[2]->find_interface(router_names[3]);
+    push_label = {Query::MPLS, 0, (uint64_t)6};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)7}}, interface2);
+
+    //AddRouting to world 1 3 -> World
+    interface1 = _routers[3]->find_interface(router_names[1]);
+    interface2 = _routers[3]->find_interface("I" + router_names[3]);
+    push_label = {Query::MPLS, 0, (uint64_t)7};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
+
+    //AddRouting to world 2 3 -> World
+    interface1 = _routers[3]->find_interface(router_names[2]);
+    interface2 = _routers[3]->find_interface("I" + router_names[3]);
+    push_label = {Query::MPLS, 0, (uint64_t)7};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
+
+    //AddRouting to world 4 3 -> World
+    interface1 = _routers[3]->find_interface(router_names[4]);
+    interface2 = _routers[3]->find_interface("I" + router_names[3]);
+    push_label = {Query::MPLS, 0, (uint64_t)33};
+    interface1->table().add_rule(push_label,{RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
 
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
@@ -274,17 +314,18 @@ Network construct_synthetic_network(int nesting = 1){
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
-    synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network.get_router(0), synthetic_network.get_router(3));
+    synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network2.get_router(0), synthetic_network2.get_router(3));
 
     //synthetic_network.print_dot(std::cout);
 
     Builder builder(synthetic_network);
     {
-        std::string query("<.*> [.#Router0] .* [Router0#.] <.*> 0 OVER \n"
+        std::string query("<.*> [.#Router0] .* [Router0prime#.] <.*> 0 OVER \n"
                           "<.*> [Router0#.] .* [.#Router0prime] <.*> 0 OVER \n"
                           "<.*> [.#Router1] .* [Router2prime#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router1prime#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0prime] .* [Router3prime#.] <.*> 0 OVER \n"
+                          "<.*> [Router0prime#.] .* [Router3prime#.] <.*> 0 OVER \n"
                           "<.*> [Router1#.] .* [Router0prime#.] <.*> 0 OVER \n"
                           "<.*> [.#Router3prime] .* [Router2#.] <.*> 0 OVER \n"
         //        "<[6]> [.#Router1] .* [Router3#.] <.*> 0 OVER \n"

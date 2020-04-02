@@ -206,10 +206,8 @@ namespace aalwines
 
         if(!this->size() || !nested_synthetic_network.size()) throw base_error("Networks must be defined");
 
-        //Give routers distinct names and extend mapping
         std::map<std::string, std::string> Names;
         std::map<std::string, Router*> Routers;
-
 
         for(auto& router : _routers){
             for(auto &inf : router->interfaces()){
@@ -249,8 +247,8 @@ namespace aalwines
             Interface* inf1;
             Interface* inf2;
             for(auto& inf : e->interfaces()){
-                std::string name = (inf->target()->is_null()) ? "I" + inf->source()->name() : Names[inf->target()->name()];
-                inf1 = router->find_interface(name) ? : router->get_interface(_all_interfaces, name);
+                std::string target_name = (inf->target()->is_null()) ? "I" + inf->source()->name() : Names[inf->target()->name()];
+                inf1 = router->find_interface(target_name) ? : router->get_interface(_all_interfaces, target_name);
                 nested_target_router = Routers[inf->target()->name()];
                 if(inf1->target() == nullptr && nested_target_router != nullptr) {
                     inf2 = nested_target_router->find_interface(router->name()) ? : nested_target_router->get_interface(_all_interfaces, router->name());
@@ -262,9 +260,8 @@ namespace aalwines
                         for(auto& r : entry._rules){
                             inf2 = router->find_interface(Names[r._via->source()->name()]) ? : router->get_interface(_all_interfaces, Names[r._via->target()->name()]);
                             for(auto& op : r._ops){
-                                inf1->table().add_rule({Query::MPLS, 0, entry._top_label.value()},
-                                                       {op._op,{Query::type_t::MPLS, 0, entry._top_label.value() + this->get_max_label()}},
-                                                       inf2);
+                                inf1->table().add_rule({Query::MPLS, 0, entry._top_label.value()}, //add max_label and check if in_going interface
+                                                       {op._op,{Query::type_t::MPLS, 0, entry._top_label.value()}}, inf2);
                             }
                         }
                     }
@@ -274,10 +271,10 @@ namespace aalwines
 
         //Start and end routers and make pairing
         start_router_nested = Routers[start_router_nested->name()];
-        start_router->find_interface("I" + start_router->name())->make_pairing(start_router_nested->find_interface("IRouter0"));
+        start_router->interface_no(0)->make_pairing(start_router_nested->interface_no(0));
 
         end_router_nested = Routers[end_router_nested->name()];
-        end_router->find_interface("I" + end_router->name())->make_pairing(end_router_nested->find_interface("IRouter3"));
+        end_router->interface_no(0)->make_pairing(end_router_nested->find_interface(Names[end_router_nested->name()]));
 
         Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
     }
