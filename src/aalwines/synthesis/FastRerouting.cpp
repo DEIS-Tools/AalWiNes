@@ -30,67 +30,191 @@
 
 namespace aalwines {
 
-    bool FastRerouting::make_reroute(Network &network, const Interface* failed_inf, label_t failover_label,
-            const std::function<uint32_t(const Interface*)>& cost_fn) {
-        struct queue_elem {
-            queue_elem(uint32_t priority, Interface* interface, const queue_elem* back_pointer = nullptr)
-                : priority(priority), interface(interface), back_pointer(back_pointer) { };
-            uint32_t priority;
-            Interface* interface;
-            const queue_elem* back_pointer;
-            bool operator<(const queue_elem& other) const {
-                return other.priority < priority; // Used in a max-heap, so swap arguments to get a min-heap.
-            }
-            bool operator==(const queue_elem& other) const {
-                return priority == other.priority;
-            }
-            bool operator!=(const queue_elem& other) const {
-                return !(*this == other);
-            }
-        };
-        std::priority_queue<queue_elem> queue;
-        std::unordered_set<Router*> seen;
-        std::vector<std::unique_ptr<queue_elem>> pointers;
-        for(const auto & i : failed_inf->source()->interfaces()) {
-            auto interface = i.get();
-            if (interface == failed_inf) continue;
-            queue.emplace(0, interface);
+    template <typename Edge, typename Weight>
+    struct queue_elem {
+        queue_elem(uint32_t priority, Edge edge, const queue_elem<Edge,Weight>* back_pointer = nullptr)
+                : priority(priority), edge(edge), back_pointer(back_pointer) { };
+        Weight priority;
+        Edge edge;
+        const queue_elem<Edge,Weight>* back_pointer;
+        bool operator<(const queue_elem<Edge,Weight>& other) const {
+            return other.priority < priority; // Used in a max-heap, so swap arguments to get a min-heap.
         }
-        seen.emplace(failed_inf->source());
+    };
+    template <typename Edge, typename Weight, typename Node, typename EdgeFn, typename TargetFn, typename AcceptFn, typename FilterFn, typename CostFn>
+    std::optional<queue_elem<Edge,Weight>> dijkstra(
+            std::vector<std::unique_ptr<queue_elem<Edge,Weight>>>& pointers,
+            Node start_node, EdgeFn&& edges, TargetFn&& target_node, AcceptFn&& accept, FilterFn&& filter_out, CostFn&& cost_fn) {
+        static_assert(std::is_convertible_v<EdgeFn, std::function<std::vector<Edge>(Node)>>);
+        static_assert(std::is_convertible_v<TargetFn, std::function<Router*(Edge)>>);
+        static_assert(std::is_convertible_v<AcceptFn, std::function<bool(Edge)>>);
+        static_assert(std::is_convertible_v<FilterFn, std::function<bool(Edge)>>);
+        static_assert(std::is_convertible_v<CostFn, std::function<Weight(Edge)>>);
+        std::priority_queue<queue_elem<Edge,Weight>> queue;
+        std::unordered_set<Node> seen;
+        for(auto&& edge : edges(start_node)) {
+            if (filter_out(edge)) continue;
+            queue.emplace(0, edge);
+        }
+        seen.emplace(start_node);
         while (!queue.empty()) {
             auto elem = queue.top();
             queue.pop();
-            if (failed_inf->target() == elem.interface->target()){
-                auto p = elem.back_pointer;
-                assert(p != nullptr);
-                // POP at last hop of re-route
-                p->interface->match()->table().add_rule(failover_label, RoutingTable::action_t(), elem.interface);
-                // SWAP for each intermediate hop during re-route
-                auto via = p->interface;
-                for (p = p->back_pointer; p != nullptr; via = p->interface, p = p->back_pointer) {
-                    p->interface->match()->table().add_rule(failover_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, failover_label), via);
-                }
-                assert(p == nullptr);
-                // PUSH at first hop of re-route
-                for (const auto& i : via->source()->interfaces()) {
-                    auto interface = i.get();
-                    if (interface == failed_inf) continue;
-                    interface->table().add_failover_entries(failed_inf, via, failover_label);
-                }
-                return true;
+            if (accept(elem.edge)){
+                return elem;
             }
-            if (!seen.emplace(elem.interface->target()).second) continue;
-            auto u_pointer = std::make_unique<queue_elem>(elem);
+            if (!seen.emplace(target_node(elem.edge)).second) continue;
+            auto u_pointer = std::make_unique<queue_elem<Edge,Weight>>(elem);
             auto pointer = u_pointer.get();
             pointers.push_back(std::move(u_pointer));
-            for(const auto & i : elem.interface->target()->interfaces()) {
-                auto interface = i.get();
-                if (interface == failed_inf) continue;
-                if (seen.count(interface->target()) != 0) continue;
-                queue.emplace(elem.priority + cost_fn(interface), interface, pointer);
+            for(auto&& edge : edges(target_node(elem.edge))) {
+                if (filter_out(edge) || seen.count(target_node(edge)) != 0) continue;
+                queue.emplace(elem.priority + cost_fn(edge), edge, pointer);
             }
         }
-        return false; // No re-route was possible
+        return std::nullopt; // No path was found
+    }
+
+    bool FastRerouting::make_reroute(const Interface* failed_inf, label_t failover_label,
+                                     const std::function<uint32_t(const Interface*)>& cost_fn) {
+        std::vector<std::unique_ptr<queue_elem<Interface*,uint32_t>>> pointers;
+        auto val = dijkstra(pointers, failed_inf->source(),
+            [](const Router* node) { // Get edges in node
+                std::vector<Interface*> result(node->interfaces().size());
+                std::transform(node->interfaces().begin(), node->interfaces().end(), result.begin(),
+                        [](const auto &i){ return i.get(); });
+                return result; // TODO: When C++20 comes with std::ranges, use a transform_view
+            },
+            [](const Interface* interface) { return interface->target(); }, // Get target of edge
+            [failed_target = failed_inf->target()](const Interface* interface) {
+                return failed_target == interface->target(); // Accept if we found the target of failed_inf
+            },
+            [failed_inf](const Interface* interface) { // Don't use failed_inf and the null router.
+                return interface == failed_inf || interface->target()->is_null();
+            }, cost_fn);
+        if (!val) return false;
+        auto elem = val.value();
+        auto p = elem.back_pointer;
+        assert(p != nullptr);
+        // Copy routing table to incoming failover interface.
+        elem.edge->match()->table().simple_merge(failed_inf->match()->table());
+        // POP at last hop of re-route
+        p->edge->match()->table().add_rule(failover_label, RoutingTable::action_t(RoutingTable::op_t::POP, label_t{}), elem.edge);
+        // SWAP for each intermediate hop during re-route
+        auto via = p->edge;
+        for (p = p->back_pointer; p != nullptr; via = p->edge, p = p->back_pointer) {
+            p->edge->match()->table().add_rule(failover_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, failover_label), via);
+        }
+        assert(p == nullptr);
+        // PUSH at first hop of re-route
+        for (const auto& i : via->source()->interfaces()) {
+            auto interface = i.get();
+            if (interface == failed_inf) continue;
+            interface->table().add_failover_entries(failed_inf, via, failover_label);
+        }
+        return true;
+    }
+
+    Interface* find_via_interface(const Router* from, const Router* to) {
+        for (const auto& i : from->interfaces()) {
+            if (i->target() == to){
+                return i.get();
+            }
+        }
+        return nullptr;
+    }
+    Interface* find_interface_on_router(const Router* router, const Interface* interface) {
+        // Basically removes const from the Interface*, and checks if the interface is actually on the router.
+        if (interface->source() == router) {
+            for (const auto& i : router->interfaces()) {
+                if (i.get() == interface){
+                    return i.get();
+                }
+            }
+        }
+        return nullptr;
+    }
+    bool FastRerouting::make_data_flow(const Interface* from, const Interface* to,
+            label_t pre_label, label_t flow_label, const std::vector<const Router*>& path) {
+        assert(!path.empty());
+        // Check if the interfaces is 'outer' interfaces.
+        assert(from->target()->is_null());
+        assert(to->target()->is_null());
+        std::vector<Interface*> interface_path;
+        auto in_interface = find_interface_on_router(path[0], from);
+        if (!in_interface) return false;
+        for (size_t i = 0; i < path.size() - 1; ++i) {
+            auto interface = find_via_interface(path[i], path[i+1]);
+            if (!interface) return false;
+            interface_path.push_back(interface);
+        }
+        auto out_interface = find_interface_on_router(path[path.size()-1], to);
+        if (!out_interface) return false;
+        interface_path.push_back(out_interface);
+        return make_data_flow(in_interface, interface_path, pre_label, flow_label);
+    }
+
+    bool FastRerouting::make_data_flow(Interface* from, const std::vector<Interface*>& path,
+                                       label_t pre_label, label_t flow_label) {
+        assert(!path.empty());
+        // Check if the interfaces is 'outer' interfaces.
+        assert(from->target()->is_null());
+        assert(path[path.size()-1]->target()->is_null());
+        auto in_interface = from;
+        auto via_interface = path[0];
+        if (in_interface->source() != via_interface->source()) return false;
+        if (path.size() == 1) {
+            // Simple case: Directly in and out.
+            in_interface->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, pre_label}, path[0]);
+            return true;
+        }
+        // Push flow_label on first hops.
+        in_interface->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, flow_label}, via_interface);
+
+        for (size_t i = 1; i < path.size(); ++i) {
+            in_interface = via_interface->match();
+            via_interface = path[i];
+            if (in_interface->source() != via_interface->source()) return false;
+            if (i + 1 < path.size()) {
+                // Swap flow_label on intermediate hops.
+                in_interface->table().add_rule(flow_label, {RoutingTable::op_t::SWAP, flow_label}, via_interface);
+            } else {
+                // Pop flow_label on last hop out.
+                in_interface->table().add_rule(flow_label, {RoutingTable::op_t::POP, label_t{}}, via_interface);
+            }
+        }
+        return true;
+    }
+
+    bool FastRerouting::make_data_flow(Interface* from, Interface* to,
+                                       label_t pre_label, label_t flow_label,
+                                       const std::function<uint32_t(const Interface*)>& cost_fn) {
+        if (from->source() == to->source()) {
+            return make_data_flow(from, std::vector<Interface*>{to}, pre_label, flow_label);
+        }
+        std::vector<std::unique_ptr<queue_elem<Interface *, uint32_t>>> pointers;
+        auto val = dijkstra(pointers, from->source(),
+                            [](const Router *node) { // Get edges in node
+                                std::vector<Interface *> result(node->interfaces().size());
+                                std::transform(node->interfaces().begin(), node->interfaces().end(), result.begin(),
+                                               [](const auto &i) { return i.get(); });
+                                return result; // TODO: When C++20 comes with std::ranges, use a transform_view
+                            },
+                            [](const Interface *interface) { return interface->target(); }, // Get target of edge
+                            [goal = to->source()](const Interface *interface) {
+                                return goal == interface->target(); // Accept if we found the source of to
+                            },
+                            [](const Interface *interface) { // Don't use the null router.
+                                return interface->target()->is_null();
+                            }, cost_fn);
+        if (!val) return false;
+        auto elem = val.value();
+        std::vector<Interface*> path{to, elem.edge};
+        for (auto p = elem.back_pointer; p != nullptr; p = p->back_pointer) {
+            path.push_back(p->edge);
+        }
+        std::reverse(path.begin(), path.end());
+        return make_data_flow(from, path, pre_label, flow_label);
     }
 
 }

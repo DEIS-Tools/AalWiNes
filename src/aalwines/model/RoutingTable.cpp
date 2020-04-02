@@ -72,6 +72,27 @@ namespace aalwines
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
         }
     }
+    void RoutingTable::simple_merge(const RoutingTable& other) {
+        assert(std::is_sorted(other._entries.begin(), other._entries.end()));
+        assert(std::is_sorted(_entries.begin(), _entries.end()));
+        auto iit = _entries.begin();
+        for (const auto & e : other._entries) {
+            while (iit != std::end(_entries) && (*iit) < e) ++iit;
+            if (iit == std::end(_entries)) {
+                iit = _entries.insert(iit, e);
+            } else if ((*iit) == e) {
+                if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
+                    e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
+                    continue;
+                assert(false); // TODO: Figure out what to do here!
+                iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
+            } else {
+                assert(e < (*iit));
+                iit = _entries.insert(iit, e);
+            }
+        }
+        assert(std::is_sorted(_entries.begin(), _entries.end()));
+    }
 
     bool RoutingTable::merge(const RoutingTable& other, Interface& parent, std::ostream& warnings)
     {
