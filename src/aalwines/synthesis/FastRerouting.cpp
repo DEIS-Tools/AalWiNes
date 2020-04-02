@@ -39,7 +39,7 @@ namespace aalwines {
             Interface* interface;
             const queue_elem* back_pointer;
             bool operator<(const queue_elem& other) const {
-                return priority < other.priority;
+                return other.priority < priority; // Used in a max-heap, so swap arguments to get a min-heap.
             }
             bool operator==(const queue_elem& other) const {
                 return priority == other.priority;
@@ -56,6 +56,7 @@ namespace aalwines {
             if (interface == failed_inf) continue;
             queue.emplace(0, interface);
         }
+        seen.emplace(failed_inf->source());
         while (!queue.empty()) {
             auto elem = queue.top();
             queue.pop();

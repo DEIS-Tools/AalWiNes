@@ -28,6 +28,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <aalwines/synthesis/FastRerouting.h>
+#include <iostream>
 
 using namespace aalwines;
 
@@ -67,15 +68,18 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
     Router::add_null_router(routers, interfaces, mapping);
 
     Network network(std::move(mapping), std::move(routers), std::move(interfaces));
-    auto interface = network.get_router(1)->find_interface(names[2]);
 
-    // TODO: Add data-flow to routing tables before making re-route.
+    auto interface = network.get_router(1)->find_interface(names[4]);
+    network.get_router(0)->find_interface(names[1])->match()->table().add_rule(
+            {Query::type_t::MPLS, 0, 1},
+            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, 2}},
+            interface);
 
-    Query::label_t max_label(Query::type_t::MPLS, 0, std::numeric_limits<uint64_t>::max());
+    Query::label_t max_label(Query::type_t::MPLS, 0, 42);
 
     auto success = FastRerouting::make_reroute(network, interface, max_label);
 
     BOOST_CHECK_EQUAL(success, true);
 
-
+    network.write_prex_routing(std::cout);
 }
