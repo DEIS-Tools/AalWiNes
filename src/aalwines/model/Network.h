@@ -73,7 +73,6 @@ private:
     std::unordered_set<Query::label_t> _label_cache;
     std::unordered_set<Query::label_t> _non_service_label;
     uint64_t _max_label = 0;
-    std::vector<Interface*> re_labelling(std::vector<Interface *> interfaces);
 };
 }
 

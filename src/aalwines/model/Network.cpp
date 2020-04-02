@@ -304,11 +304,10 @@ namespace aalwines
         Router* router_end = this->get_router(end_router_index);
         Router* nested_router_start = this->get_router(last_index + start_router_index2 );
         Router* nested_router_end = this->get_router(last_index + end_router_index2 );
+        Router* nested_start = nested_synthetic_network.get_router(start_router_index2 );
 
         Interface* interface1 = router_start->find_interface(router_end->name());
         Interface* interface2 = router_end->find_interface(router_start->name());
-        int label_in;
-        int label_out;
 
         Interface* interface_start = router_start->get_interface(_all_interfaces, Names[nested_router_start->name()]);
         Interface* interface_n_start = nested_router_start->get_interface(_all_interfaces, router_start->name());
@@ -317,20 +316,17 @@ namespace aalwines
         Interface* in_going_interface = router_start->find_interface(in_going_router->name());
         //Get routingtable for interface1 and add entry with new ingoing.
 
+        for(auto entry : in_going_interface->table().entries()){
+            in_going_interface->table().erase_entry(entry);
+            in_going_interface->table().add_rule({Query::MPLS, 0, entry._top_label.value()},
+                    {RoutingTable::op_t::PUSH,{Query::type_t::MPLS, 0, entry._top_label.value() + this->get_max_label()}},
+                    interface_start);
+        }
+
         //1 0 -> 0Prime
-        in_going_interface->table().clear();
-        in_going_interface->add_entry(*interface_start, RoutingTable::op_t::PUSH, 0, 4, 4 + this->get_max_label());
-
-        for(auto entry : interface1->table().entries()){
-            label_out = entry._top_label.value();
-            label_in = entry._rules.front()._ops.front()._op_label.value();
-            continue;
-        }
-
-        for(auto entry : interface2->table().entries()){
-            label_out = entry._top_label.value();
-            continue;
-        }
+        //label_in = in_going_interface->table().entries().front()._top_label.value();
+        //in_going_interface->table().clear();
+        //in_going_interface->add_entry(*interface_start, RoutingTable::op_t::PUSH, 0, label_in, label_in + this->get_max_label());
 
         //Remove pairing interface
         interface1->table().clear();
@@ -339,14 +335,26 @@ namespace aalwines
         router_start->remove_interface(interface1);
         router_end->remove_interface(interface2);
 
+        for(auto& inf : nested_start->interfaces()){
+            for (auto& entry :inf->table().entries()){
+                for(auto& rule : entry._rules){
+                    for(auto &op : rule._ops){
+                        //interface_n_start->table().add_rule({Query::MPLS, 0, entry._top_label.value() + this->get_max_label()},{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, op._op_label.value() + this->get_max_label()}}, interface1);
+                    }
+                }
+            }
+        }
+
         //0 0Prime -> 1
         interface1 = nested_router_start->find_interface(Names["Router1"]);
-        interface_n_start->add_entry(*interface1, RoutingTable::op_t::SWAP, 0, 4 + this->get_max_label(), 22 + this->get_max_label());
+        interface_n_start->table().add_rule({Query::MPLS, 0, (uint64_t)4 + this->get_max_label()},
+                                   {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22 + this->get_max_label()}},
+                                   interface1);
         //0 0Prime -> 2
         interface1 = nested_router_start->find_interface(Names["Router2"]);
-        interface_n_start->add_entry(*interface1, RoutingTable::op_t::SWAP, 0, 4 + this->get_max_label(), 6 + this->get_max_label());
-
-
+        interface_n_start->table().add_rule({Query::MPLS, 0, (uint64_t)4 + this->get_max_label()},
+                                            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)6 + this->get_max_label()}},
+                                            interface1);
 
 
         Interface* interface_end = router_end->get_interface(_all_interfaces, Names[nested_router_end->name()]);
@@ -354,31 +362,9 @@ namespace aalwines
         interface_end->make_pairing(interface_n_end);
 
         interface1 = nested_router_end->find_interface(Names["Router1"]);
-        interface1->add_entry(*interface_n_end, RoutingTable::op_t::POP, 0,  4 + this->get_max_label(), 4);
-    }
-
-    std::vector<Interface*> Network::re_labelling(std::vector<Interface*> interfaces){
-        for(auto& inf : interfaces){
-            RoutingTable table;
-            for(auto& entry : inf->table().entries()){
-                auto& _entry = table.push_entry();
-                _entry = entry;
-                _entry._top_label.set_value(entry._top_label.value() + _max_label);
-                for(auto& rule : _entry._rules){
-                    for(auto& op : rule._ops){
-                        auto type = op._op_label.type();
-                        auto mask = op._op_label.mask();
-                        auto label = op._op_label.value();
-                        op._op_label.set_value(type, label + _max_label, mask);
-                    }
-                }
-            }
-            inf->table().clear();
-            std::ostream& warnings = std::cerr;
-            table.sort();
-            inf->table().merge(table, *inf, warnings);
-        }
-        return interfaces;
+        interface1->table().add_rule({Query::MPLS, 0, (uint64_t)4 + this->get_max_label()},
+                                     {RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)4 + this->get_max_label()}},
+                                     interface_n_end);
     }
 
     void Network::print_dot(std::ostream& s)

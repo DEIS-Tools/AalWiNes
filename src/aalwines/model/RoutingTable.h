@@ -71,6 +71,7 @@ namespace aalwines {
                 : _type(type), _ops(std::move(ops)), _via(via), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
+            bool operator==(const forward_t& other) const;
         };
 
         struct entry_t {
@@ -85,7 +86,7 @@ namespace aalwines {
             static void print_label(label_t label, std::ostream& s, bool quote = true);
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
             void clear() { _rules.clear(); }
-            //void erase_rule(const forward_t& rule){ _rules.erase(std::remove(_rules.begin(), _rules.end(), rule), _rules.end()); }
+            void erase_rule(const forward_t& rule){ _rules.erase(std::remove(_rules.begin(), _rules.end(), rule), _rules.end()); }
         };
 
     public:
