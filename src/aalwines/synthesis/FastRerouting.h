@@ -34,8 +34,15 @@ namespace aalwines {
         using label_t = RoutingTable::label_t;
 
     public:
-        static bool make_reroute(Network &network, const Interface* failed_inf, label_t failover_label);
+        static bool make_reroute(Network &network, const Interface* failed_inf, label_t failover_label,
+                const std::function<uint32_t(const Interface*)>& cost_fn = [](const Interface* interface){return 1;});
 
+        static bool make_reroute(Network &network, const Interface* failed_inf, label_t failover_label,
+                                 const std::unordered_map<const Interface*,uint32_t>& cost_map) {
+            return FastRerouting::make_reroute(network, failed_inf, failover_label, [&cost_map](const Interface* interface) {
+                return cost_map.at(interface);
+            });
+        }
     };
 }
 

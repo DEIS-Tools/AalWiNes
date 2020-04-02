@@ -26,16 +26,16 @@
 
 #include <queue>
 #include <cassert>
-#include <iostream>
 #include "FastRerouting.h"
 
 namespace aalwines {
 
-    bool FastRerouting::make_reroute(Network &network, const Interface* failed_inf, label_t failover_label){
+    bool FastRerouting::make_reroute(Network &network, const Interface* failed_inf, label_t failover_label,
+            const std::function<uint32_t(const Interface*)>& cost_fn) {
         struct queue_elem {
-            queue_elem(int priority, Interface* interface, const queue_elem* back_pointer = nullptr)
+            queue_elem(uint32_t priority, Interface* interface, const queue_elem* back_pointer = nullptr)
                 : priority(priority), interface(interface), back_pointer(back_pointer) { };
-            int priority;
+            uint32_t priority;
             Interface* interface;
             const queue_elem* back_pointer;
             bool operator<(const queue_elem& other) const {
@@ -87,7 +87,7 @@ namespace aalwines {
                 auto interface = i.get();
                 if (interface == failed_inf) continue;
                 if (seen.count(interface->target()) != 0) continue;
-                queue.emplace(elem.priority + 1, interface, pointer); // TODO: Implement weight/cost instead of 1.
+                queue.emplace(elem.priority + cost_fn(interface), interface, pointer);
             }
         }
         return false; // No re-route was possible
