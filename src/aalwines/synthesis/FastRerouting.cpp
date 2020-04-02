@@ -75,7 +75,7 @@ namespace aalwines {
         return std::nullopt; // No path was found
     }
 
-    bool FastRerouting::make_reroute(Network &network, const Interface* failed_inf, label_t failover_label,
+    bool FastRerouting::make_reroute(const Interface* failed_inf, label_t failover_label,
                                      const std::function<uint32_t(const Interface*)>& cost_fn) {
         std::vector<std::unique_ptr<queue_elem<Interface*,uint32_t>>> pointers;
         auto val = dijkstra(pointers, failed_inf->source(),
@@ -87,7 +87,7 @@ namespace aalwines {
             },
             [](const Interface* interface) { return interface->target(); }, // Get target of edge
             [failed_target = failed_inf->target()](const Interface* interface) {
-                return failed_target == interface->target(); // Accept if we found the targer of failed_inf
+                return failed_target == interface->target(); // Accept if we found the target of failed_inf
             },
             [failed_inf](const Interface* interface) { // Don't use failed_inf and the null router.
                 return interface == failed_inf || interface->target()->is_null();
@@ -134,7 +134,7 @@ namespace aalwines {
         }
         return nullptr;
     }
-    bool FastRerouting::make_data_flow(Network &network, const Interface* from, const Interface* to,
+    bool FastRerouting::make_data_flow(const Interface* from, const Interface* to,
             label_t pre_label, label_t flow_label, const std::vector<const Router*>& path) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
@@ -151,10 +151,10 @@ namespace aalwines {
         auto out_interface = find_interface_on_router(path[path.size()-1], to);
         if (!out_interface) return false;
         interface_path.push_back(out_interface);
-        return make_data_flow(network, in_interface, interface_path, pre_label, flow_label);
+        return make_data_flow(in_interface, interface_path, pre_label, flow_label);
     }
 
-    bool FastRerouting::make_data_flow(Network &network, Interface* from, const std::vector<Interface*>& path,
+    bool FastRerouting::make_data_flow(Interface* from, const std::vector<Interface*>& path,
                                        label_t pre_label, label_t flow_label) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
@@ -186,5 +186,35 @@ namespace aalwines {
         return true;
     }
 
+    bool FastRerouting::make_data_flow(Interface* from, Interface* to,
+                                       label_t pre_label, label_t flow_label,
+                                       const std::function<uint32_t(const Interface*)>& cost_fn) {
+        if (from->source() == to->source()) {
+            return make_data_flow(from, std::vector<Interface*>{to}, pre_label, flow_label);
+        }
+        std::vector<std::unique_ptr<queue_elem<Interface *, uint32_t>>> pointers;
+        auto val = dijkstra(pointers, from->source(),
+                            [](const Router *node) { // Get edges in node
+                                std::vector<Interface *> result(node->interfaces().size());
+                                std::transform(node->interfaces().begin(), node->interfaces().end(), result.begin(),
+                                               [](const auto &i) { return i.get(); });
+                                return result; // TODO: When C++20 comes with std::ranges, use a transform_view
+                            },
+                            [](const Interface *interface) { return interface->target(); }, // Get target of edge
+                            [goal = to->source()](const Interface *interface) {
+                                return goal == interface->target(); // Accept if we found the source of to
+                            },
+                            [](const Interface *interface) { // Don't use the null router.
+                                return interface->target()->is_null();
+                            }, cost_fn);
+        if (!val) return false;
+        auto elem = val.value();
+        std::vector<Interface*> path{to, elem.edge};
+        for (auto p = elem.back_pointer; p != nullptr; p = p->back_pointer) {
+            path.push_back(p->edge);
+        }
+        std::reverse(path.begin(), path.end());
+        return make_data_flow(from, path, pre_label, flow_label);
+    }
 
 }
