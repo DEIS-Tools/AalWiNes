@@ -16,33 +16,6 @@
 
 using namespace aalwines;
 
-void add_entry(Interface& from_interface, Interface& to_interface, RoutingTable::op_t type, int weight, int interface_label_in, int interface_label_out = 0) {
-    RoutingTable table;
-    auto& entry = table.push_entry();
-    entry._ingoing = &from_interface;           //From interface
-    Query::type_t q_type = Query::MPLS;
-    entry._top_label.set_value(q_type, interface_label_in, 0);
-
-    entry._rules.emplace_back();
-    entry._rules.back()._via = &to_interface;  //Rule to
-    entry._rules.back()._type = RoutingTable::MPLS;
-    entry._rules.back()._weight = weight;
-    entry._rules.back()._ops.emplace_back();
-    auto& op = entry._rules.back()._ops.back();
-    op._op_label.set_value(q_type, interface_label_out, 0);
-    op._op = type;
-
-    std::ostream& warnings = std::cerr;
-    table.sort();
-    from_interface.table().merge(table, from_interface, warnings);
-}
-
-void pair_and_assert(Interface* interface1, Interface* interface2){
-    interface1->make_pairing(interface2);
-    assert(interface1->match() == interface2);
-    assert(interface2->match() == interface1);
-}
-
 Network construct_synthetic_network(int nesting = 1){
     int router_size = 5 * nesting;
     std::string router_name = "Router";
@@ -264,6 +237,39 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
         std::cout << "\n";
         std::cout << "\n}}" << std::endl;
     }
+}
+
+BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
+    Network synthetic_network = construct_synthetic_network(1);
+    Network synthetic_network2 = construct_synthetic_network();
+    synthetic_network.inject_network(
+            synthetic_network.get_router(0)->find_interface("Router2"),
+            std::move(synthetic_network2),
+            synthetic_network2.get_router(0)->find_interface("iRouter0"),
+            synthetic_network2.get_router(3)->find_interface("iRouter3"),
+            {Query::MPLS, 0, (uint64_t)4},
+            {Query::MPLS, 0, (uint64_t)7});
+
+    std::vector<const Router*> path {synthetic_network.get_router(0),
+                                     synthetic_network.get_router(6),
+                                     synthetic_network.get_router(8),
+                                     synthetic_network.get_router(9),
+                                     synthetic_network.get_router(2)};
+
+    FastRerouting::make_data_flow(
+            synthetic_network.get_router(0)->find_interface("iRouter0"),
+            synthetic_network.get_router(2)->find_interface("iRouter2"),
+            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+
+    Builder builder(synthetic_network);
+    {
+        std::string query("<.*> [.#Router0] .* [Router2'#.] <.*> 0 OVER \n"
+                          "<.*> [Router0#.] .* [Router0'#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router1] .* [Router2'#.] <.*> 0 OVER \n"
+        );
+        build_query(query, &synthetic_network, builder);
+    }
+
     BOOST_CHECK_EQUAL(true, true);
 }
 
