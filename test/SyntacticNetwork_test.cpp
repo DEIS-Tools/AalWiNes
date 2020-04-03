@@ -7,7 +7,7 @@
 #include <boost/test/unit_test.hpp>
 #include <aalwines/model/Network.h>
 #include <aalwines/query/QueryBuilder.h>
-#include <pdaaal/Solver_Adapter.h>
+#include <pdaaal/SolverAdapter.h>
 #include <fstream>
 #include <aalwines/utils/outcome.h>
 #include <aalwines/model/NetworkPDAFactory.h>
@@ -121,7 +121,7 @@ void build_query(std::string query, Network* synthetic_network, Builder builder)
     builder.do_parse(qstream);
     size_t query_no = 0;
 
-    pdaaal::Solver_Adapter solver;
+    pdaaal::SolverAdapter solver;
     for(auto& q : builder._result) {
         query_no++;
         std::vector<Query::mode_t> modes{q.approximation()};
