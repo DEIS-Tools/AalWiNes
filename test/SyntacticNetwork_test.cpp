@@ -314,20 +314,26 @@ Network construct_synthetic_network(int nesting = 1){
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
-    synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network2.get_router(0), synthetic_network2.get_router(3));
+    synthetic_network.inject_network(
+            synthetic_network.get_router(0)->find_interface("Router2"),
+            std::move(synthetic_network2),
+            synthetic_network2.get_router(0)->find_interface("IRouter0"),
+            synthetic_network2.get_router(3)->find_interface("IRouter3"),
+            {Query::MPLS, 0, (uint64_t)4},
+            {Query::MPLS, 0, (uint64_t)7});
 
     //synthetic_network.print_dot(std::cout);
 
     Builder builder(synthetic_network);
     {
-        std::string query("<.*> [.#Router0] .* [Router0prime#.] <.*> 0 OVER \n"
-                          "<.*> [Router0#.] .* [.#Router0prime] <.*> 0 OVER \n"
-                          "<.*> [.#Router1] .* [Router2prime#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router0] .* [Router1prime#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router0prime] .* [Router3prime#.] <.*> 0 OVER \n"
-                          "<.*> [Router0prime#.] .* [Router3prime#.] <.*> 0 OVER \n"
-                          "<.*> [Router1#.] .* [Router0prime#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router3prime] .* [Router2#.] <.*> 0 OVER \n"
+        std::string query("<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
+                          "<.*> [Router0#.] .* [.#Router0'] <.*> 0 OVER \n"
+                          "<.*> [.#Router1] .* [Router2'#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router0] .* [Router1'#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router0'] .* [Router3'#.] <.*> 0 OVER \n"
+                          "<.*> [Router0'#.] .* [Router3'#.] <.*> 0 OVER \n"
+                          "<.*> [Router1#.] .* [Router0'#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router3'] .* [Router2#.] <.*> 0 OVER \n"
         //        "<[6]> [.#Router1] .* [Router3#.] <.*> 0 OVER \n"
         //        "<.*> [Router0#.] .* [.#Router4] <.*> 0 OVER \n"
 //                "<.*> [Router0#.] .* [Router2#.] <.*> 0 OVER \n"

@@ -57,7 +57,7 @@ namespace aalwines
     void RoutingTable::add_rule(label_t top_label, forward_t&& rule) {
         insert_entry(top_label)->_rules.emplace_back(std::move(rule));
     }
-    void RoutingTable::add_rule(RoutingTable::label_t top_label, RoutingTable::action_t op, Interface* via, size_t weight, type_t type) {
+    void RoutingTable::add_rule(label_t top_label, action_t op, Interface* via, size_t weight, type_t type) {
         add_rule(top_label, forward_t(type, {op}, via, weight));
     }
     void RoutingTable::add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label) {
@@ -72,6 +72,26 @@ namespace aalwines
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
         }
     }
+    void RoutingTable::entry_t::add_to_outgoing(const Interface *outgoing, RoutingTable::action_t action) {
+        for (auto&& f : _rules) {
+            if (f._via == outgoing) {
+                f._ops.push_back(action);
+            }
+        }
+    }
+    void RoutingTable::add_to_outgoing(const Interface* outgoing, label_t top_label, action_t action) {
+        for (auto& e : _entries) {
+            if (e._top_label == top_label) {
+                e.add_to_outgoing(outgoing, action);
+            }
+        }
+    }
+    void RoutingTable::add_to_outgoing(const Interface* outgoing, action_t action) {
+        for (auto& e : _entries) {
+            e.add_to_outgoing(outgoing, action);
+        }
+    }
+
     void RoutingTable::simple_merge(const RoutingTable& other) {
         assert(std::is_sorted(other._entries.begin(), other._entries.end()));
         assert(std::is_sorted(_entries.begin(), _entries.end()));
