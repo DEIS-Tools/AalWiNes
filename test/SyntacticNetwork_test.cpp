@@ -115,62 +115,10 @@ Network construct_synthetic_network(int nesting = 1){
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
 
-BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
-    Network synthetic_network = construct_synthetic_network(1);
-    Network synthetic_network2 = construct_synthetic_network();
-    synthetic_network.inject_network(
-            synthetic_network.get_router(0)->find_interface("Router2"),
-            std::move(synthetic_network2),
-            synthetic_network2.get_router(0)->find_interface("IRouter0"),
-            synthetic_network2.get_router(3)->find_interface("IRouter3"),
-            {Query::MPLS, 0, (uint64_t)4},
-            {Query::MPLS, 0, (uint64_t)7});
-
-    std::vector<const Router*> path {synthetic_network.get_router(0),
-                                     synthetic_network.get_router(2),
-                                     synthetic_network.get_router(4),
-                                     synthetic_network.get_router(3)};
-
-    FastRerouting::make_data_flow(
-            synthetic_network.get_router(0)->find_interface("iRouter0"),
-            synthetic_network.get_router(3)->find_interface("iRouter3"),
-            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
-
-
-    //synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network2.get_router(0), synthetic_network2.get_router(3));
-
-    std::stringstream s_middle;
-    synthetic_network.print_simple(s_middle);
-    BOOST_TEST_MESSAGE(s_middle.str());
-
-    Builder builder(synthetic_network);
-    {
-        std::string query("<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
-                          "<.*> [Router0#.] .* [.#Router0'] <.*> 0 OVER \n"
-                          "<.*> [.#Router1] .* [Router2'#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router0] .* [Router1'#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router0'] .* [Router3'#.] <.*> 0 OVER \n"
-                          "<.*> [Router0'#.] .* [Router3'#.] <.*> 0 OVER \n"
-                          "<.*> [Router1#.] .* [Router0'#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router3'] .* [Router2#.] <.*> 0 OVER \n"
-        //        "<[6]> [.#Router1] .* [Router3#.] <.*> 0 OVER \n"
-        //        "<.*> [Router0#.] .* [.#Router4] <.*> 0 OVER \n"
-//                "<.*> [Router0#.] .* [Router2#.] <.*> 0 OVER \n"
-//                "<.*> [Router0#.] .* [Router3#.] <.*> 0 OVER \n"
-//                "<.*> [.#Router0] .* [Router7#.] <.*> 0 OVER \n"
-//                "<.*> [Router1#.] .* [.#Router7] <.*> 0 OVER \n"
-//                "<.*> [Router0#.] .* [.#Router7] <.*> 0 OVER \n"
-//                "<.*> [.#Router0] .* [Router9#.] <.*> 0 OVER \n"
-//                "<.*> [.#Router5] .* [Router7#.] <.*> 0 OVER \n"
-//                "<.*> [.#Router8] .* [Router2#.] <.*> 0 OVER \n"
-//                "<.*> [.#Router8] .* [Router2#.] <.*> 0 OVER \n"
-//                "<.*> [Router4#.] .* [Router2#.] <.*> 0 OVER \n"
-        );
-        //Adapt to existing query parser
-        std::istringstream qstream(query);
-        builder.do_parse(qstream);
-    }
-
+void build_query(std::string query, Network* synthetic_network, Builder builder){
+    //Adapt to existing query parser
+    std::istringstream qstream(query);
+    builder.do_parse(qstream);
     size_t query_no = 0;
 
     pdaaal::Solver_Adapter solver;
@@ -192,7 +140,7 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
 
         for (auto m : modes) {
             q.set_approximation(m);
-            NetworkPDAFactory factory(q, synthetic_network, no_ip_swap);
+            NetworkPDAFactory factory(q, *synthetic_network, no_ip_swap);
             auto pda = factory.compile();
             reduction = pdaaal::Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
             bool need_trace = was_dual || get_trace;
@@ -239,6 +187,7 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     }
 }
 
+
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
     Network synthetic_network2 = construct_synthetic_network();
@@ -273,13 +222,54 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     BOOST_CHECK_EQUAL(true, true);
 }
 
-BOOST_AUTO_TEST_CASE(NetworkConstruction) {
+BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace1) {
     Network synthetic_network = construct_synthetic_network(1);
+
+    std::vector<const Router*> path {synthetic_network.get_router(0),
+                                     synthetic_network.get_router(2),
+                                     synthetic_network.get_router(4)};
+
+    FastRerouting::make_data_flow(
+            synthetic_network.get_router(0)->find_interface("iRouter0"),
+            synthetic_network.get_router(4)->find_interface("iRouter4"),
+            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+
     Network synthetic_network2 = construct_synthetic_network();
-    //Interface()* in_going_interface = synthetic_network.get_router(2);
-    //Interface()* in_going_nested_interface = synthetic_network2.get_router(0);
-    //synthetic_network.manipulate_network(in_going_interface, 0, 2, synthetic_network2, 0, synthetic_network2.size() - 3);
-    //synthetic_network.print_dot(std::cout);
+
+    path = {synthetic_network.get_router(0),
+            synthetic_network.get_router(2),
+            synthetic_network.get_router(3)};
+
+    FastRerouting::make_data_flow(
+            synthetic_network2.get_router(0)->find_interface("iRouter0"),
+            synthetic_network2.get_router(3)->find_interface("iRouter3"),
+            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+
+    std::stringstream s_before;
+    synthetic_network.print_simple(s_before);
+    BOOST_TEST_MESSAGE(s_before.str());
+
+    synthetic_network.inject_network(
+            synthetic_network.get_router(0)->find_interface("Router2"),
+            std::move(synthetic_network2),
+            synthetic_network2.get_router(0)->find_interface("iRouter0"),
+            synthetic_network2.get_router(3)->find_interface("iRouter3"),
+            {Query::MPLS, 0, (uint64_t)4},
+            {Query::MPLS, 0, (uint64_t)7});
+
+    BOOST_TEST_MESSAGE("After: ");
+    std::stringstream s_after;
+    synthetic_network.print_simple(s_after);
+    BOOST_TEST_MESSAGE(s_after.str());
+
+    Builder builder(synthetic_network);
+    {
+        std::string query("<.*> [.#Router0] .* [Router2'#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router0] .* [Router2#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router1] .* [Router2'#.] <.*> 0 OVER \n"
+        );
+        build_query(query, &synthetic_network, builder);
+    }
 
     BOOST_CHECK_EQUAL(true, true);
 }
