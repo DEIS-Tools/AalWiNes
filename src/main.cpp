@@ -31,7 +31,8 @@
 
 #include <aalwines/query/parsererrors.h>
 #include <pdaaal/PDAFactory.h>
-#include <pdaaal/Solver_Adapter.h>
+#include <aalwines/engine/Moped.h>
+#include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
@@ -66,6 +67,7 @@ int main(int argc, const char** argv)
     bool print_dot = false;
     bool no_parser_warnings = false;
     bool silent = false;
+    bool dump_to_moped = false;
     bool no_timing = false;
     std::string topology_destination;
     std::string routing_destination;
@@ -75,7 +77,7 @@ int main(int argc, const char** argv)
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
-            //("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
+            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
             ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
             ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
     ;
@@ -107,7 +109,7 @@ int main(int argc, const char** argv)
             ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,2=post*,3=pre*")
+            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
             ;    
     
     opts.add(input);
@@ -134,7 +136,13 @@ int main(int argc, const char** argv)
         std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
     }
-    
+
+    if(engine != 0 && dump_to_moped)
+    {
+        std::cerr << "Cannot both verify (--engine > 0) and dump model (--dump-for-moped) to stdout" << std::endl;
+        exit(-1);
+    }
+
     if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty()))
     {
         std::cerr << "--junos cannot be used with --topology or --routing." << std::endl;
@@ -220,21 +228,30 @@ int main(int argc, const char** argv)
         queryparsingwatch.stop();
         
         size_t query_no = 0;
-        std::cout << "{\n";
-        if(!no_timing)
-        {
-            std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration())
-                      << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
+        if(!dump_to_moped) {
+            std::cout << "{\n";
+            if (!no_timing) {
+                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration())
+                          << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
+            }
+            std::cout << "\t\"answers\":{\n";
         }
-        std::cout << "\t\"answers\":{\n";
-
-        Solver_Adapter solver;
+        Moped moped;
+        SolverAdapter solver;
         
         for(auto& q : builder._result)
         {
             ++query_no;
             stopwatch compilation_time(false);
-
+            if(dump_to_moped)
+            {
+                compilation_time.start();
+                NetworkPDAFactory factory(q, network, no_ip_swap);
+                auto pda = factory.compile();
+                Moped::dump_pda(pda, std::cout);
+            }
+            else
+            {
             std::vector<Query::mode_t> modes{q.approximation()};
             bool was_dual = q.approximation() == Query::DUAL;
             if(was_dual)
@@ -259,10 +276,15 @@ int main(int argc, const char** argv)
                 bool engine_outcome;
                 bool need_trace = was_dual || get_trace;
 
-                switch(engine)
-                {
+                switch(engine) {
                 case 1:
-                    throw base_error("Moped is not supported --engine mode given");
+                    engine_outcome = moped.verify(pda, need_trace);
+                    verification_time.stop();
+                    if(need_trace && engine_outcome) {
+                        trace = moped.get_trace(pda);
+                        if (factory.write_json_trace(proof, trace))
+                            result = utils::YES;
+                    }
                     break;
                 case 2: {
                     auto solver_result1 = solver.post_star(pda);
@@ -335,6 +357,10 @@ int main(int argc, const char** argv)
             if(query_no != builder._result.size())
                 std::cout << ",";
             std::cout << "\n";
+            }
+        }
+        if(!dump_to_moped)
+        {
             std::cout << "\n}}" << std::endl;
         }
     }
