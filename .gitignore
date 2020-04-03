@@ -33,5 +33,3 @@
 /build/
 .idea/
 /cmake-build-debug
-
-src/aalwines/query/

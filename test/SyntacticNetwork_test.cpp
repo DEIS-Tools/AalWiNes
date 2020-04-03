@@ -161,6 +161,7 @@ void build_query(std::string query, Network* synthetic_network, Builder builder)
                 break;
         }
         std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":";
+        BOOST_CHECK_EQUAL(result, utils::YES);
         switch (result) {
             case utils::MAYBE:
                 std::cout << "null";
@@ -186,7 +187,6 @@ void build_query(std::string query, Network* synthetic_network, Builder builder)
         std::cout << "\n}}" << std::endl;
     }
 }
-
 
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
@@ -229,24 +229,26 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace1) {
                                      synthetic_network.get_router(2),
                                      synthetic_network.get_router(4)};
 
-    FastRerouting::make_data_flow(
+    auto success = FastRerouting::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(4)->find_interface("iRouter4"),
             Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
 
     Network synthetic_network2 = construct_synthetic_network();
 
-    path = {synthetic_network.get_router(0),
-            synthetic_network.get_router(2),
-            synthetic_network.get_router(3)};
+    path = {synthetic_network2.get_router(0),
+            synthetic_network2.get_router(2),
+            synthetic_network2.get_router(3)};
 
-    FastRerouting::make_data_flow(
+    auto success1 = FastRerouting::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
 
+    BOOST_CHECK_EQUAL(success, success1);
+
     std::stringstream s_before;
-    synthetic_network.print_simple(s_before);
+    synthetic_network2.print_simple(s_before);
     BOOST_TEST_MESSAGE(s_before.str());
 
     synthetic_network.inject_network(
@@ -266,10 +268,8 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace1) {
     {
         std::string query("<.*> [.#Router0] .* [Router2'#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router2#.] <.*> 0 OVER \n"
-                          "<.*> [.#Router1] .* [Router2'#.] <.*> 0 OVER \n"
+                          "<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
         );
         build_query(query, &synthetic_network, builder);
     }
-
-    BOOST_CHECK_EQUAL(true, true);
 }
