@@ -75,7 +75,7 @@ namespace aalwines {
         return std::nullopt; // No path was found
     }
 
-    bool FastRerouting::make_reroute(const Interface* failed_inf, label_t failover_label,
+    bool FastRerouting::make_reroute(const Interface* failed_inf, const std::function<label_t(void)>& next_label,
                                      const std::function<uint32_t(const Interface*)>& cost_fn) {
         std::vector<std::unique_ptr<queue_elem<Interface*,uint32_t>>> pointers;
         auto val = dijkstra(pointers, failed_inf->source(),
@@ -99,18 +99,21 @@ namespace aalwines {
         // Copy routing table to incoming failover interface.
         elem.edge->match()->table().simple_merge(failed_inf->match()->table());
         // POP at last hop of re-route
-        p->edge->match()->table().add_rule(failover_label, RoutingTable::action_t(RoutingTable::op_t::POP, label_t{}), elem.edge);
+        auto label = next_label();
+        p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::POP, label_t{}), elem.edge);
         // SWAP for each intermediate hop during re-route
         auto via = p->edge;
         for (p = p->back_pointer; p != nullptr; via = p->edge, p = p->back_pointer) {
-            p->edge->match()->table().add_rule(failover_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, failover_label), via);
+            auto old_label = label;
+            label = next_label();
+            p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::SWAP, old_label), via);
         }
         assert(p == nullptr);
         // PUSH at first hop of re-route
         for (const auto& i : via->source()->interfaces()) {
             auto interface = i.get();
             if (interface == failed_inf) continue;
-            interface->table().add_failover_entries(failed_inf, via, failover_label);
+            interface->table().add_failover_entries(failed_inf, via, label);
         }
         return true;
     }
@@ -135,7 +138,7 @@ namespace aalwines {
         return nullptr;
     }
     bool FastRerouting::make_data_flow(const Interface* from, const Interface* to,
-            label_t pre_label, label_t flow_label, const std::vector<const Router*>& path) {
+            const std::function<label_t(void)>& next_label, const std::vector<const Router*>& path) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
@@ -151,46 +154,31 @@ namespace aalwines {
         auto out_interface = find_interface_on_router(path[path.size()-1], to);
         if (!out_interface) return false;
         interface_path.push_back(out_interface);
-        return make_data_flow(in_interface, interface_path, pre_label, flow_label);
+        return make_data_flow(in_interface, interface_path, next_label);
     }
 
     bool FastRerouting::make_data_flow(Interface* from, const std::vector<Interface*>& path,
-                                       label_t pre_label, label_t flow_label) {
+            const std::function<label_t(void)>& next_label) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
         assert(path[path.size()-1]->target()->is_null());
-        auto in_interface = from;
-        auto via_interface = path[0];
-        if (in_interface->source() != via_interface->source()) return false;
-        if (path.size() == 1) {
-            // Simple case: Directly in and out.
-            in_interface->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, pre_label}, path[0]);
-            return true;
-        }
-        // Push flow_label on first hops.
-        in_interface->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, flow_label}, via_interface);
-
-        for (size_t i = 1; i < path.size(); ++i) {
-            in_interface = via_interface->match();
-            via_interface = path[i];
-            if (in_interface->source() != via_interface->source()) return false;
-            if (i + 1 < path.size()) {
-                // Swap flow_label on intermediate hops.
-                in_interface->table().add_rule(flow_label, {RoutingTable::op_t::SWAP, flow_label}, via_interface);
-            } else {
-                // Pop flow_label on last hop out.
-                in_interface->table().add_rule(flow_label, {RoutingTable::op_t::POP, label_t{}}, via_interface);
-            }
+        auto pre_label = next_label();
+        // Swap labels on hops.
+        for (auto via : path) {
+            if (from->source() != via->source()) return false;
+            auto swap_label = next_label();
+            from->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, swap_label}, via);
+            from = via->match();
+            pre_label = swap_label;
         }
         return true;
     }
 
-    bool FastRerouting::make_data_flow(Interface* from, Interface* to,
-                                       label_t pre_label, label_t flow_label,
-                                       const std::function<uint32_t(const Interface*)>& cost_fn) {
+    bool FastRerouting::make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
+            const std::function<uint32_t(const Interface*)>& cost_fn) {
         if (from->source() == to->source()) {
-            return make_data_flow(from, std::vector<Interface*>{to}, pre_label, flow_label);
+            return make_data_flow(from, std::vector<Interface*>{to}, next_label);
         }
         std::vector<std::unique_ptr<queue_elem<Interface *, uint32_t>>> pointers;
         auto val = dijkstra(pointers, from->source(),
@@ -214,7 +202,7 @@ namespace aalwines {
             path.push_back(p->edge);
         }
         std::reverse(path.begin(), path.end());
-        return make_data_flow(from, path, pre_label, flow_label);
+        return make_data_flow(from, path, next_label);
     }
 
 }

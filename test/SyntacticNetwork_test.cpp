@@ -204,11 +204,13 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
                                      synthetic_network.get_router(8),
                                      synthetic_network.get_router(9),
                                      synthetic_network.get_router(2)};
+    uint64_t i = 42;
+    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
 
     FastRerouting::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(2)->find_interface("iRouter2"),
-            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+            next_label, path);
 
     Builder builder(synthetic_network);
     {
@@ -228,22 +230,22 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace1) {
     std::vector<const Router*> path {synthetic_network.get_router(0),
                                      synthetic_network.get_router(2),
                                      synthetic_network.get_router(4)};
-
+    uint64_t i = 42;
+    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
     auto success = FastRerouting::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(4)->find_interface("iRouter4"),
-            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+            next_label, path);
 
     Network synthetic_network2 = construct_synthetic_network();
 
     path = {synthetic_network2.get_router(0),
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
-
     auto success1 = FastRerouting::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
-            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+            next_label, path);
 
     BOOST_CHECK_EQUAL(success, success1);
 
@@ -256,8 +258,8 @@ BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace1) {
             std::move(synthetic_network2),
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
-            {Query::MPLS, 0, (uint64_t)4},
-            {Query::MPLS, 0, (uint64_t)7});
+            {Query::MPLS, 0, (uint64_t)46},
+            {Query::MPLS, 0, (uint64_t)49});
 
     BOOST_TEST_MESSAGE("After: ");
     std::stringstream s_after;

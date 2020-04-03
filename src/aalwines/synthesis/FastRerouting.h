@@ -34,25 +34,25 @@ namespace aalwines {
         using label_t = RoutingTable::label_t;
 
     public:
-        static bool make_reroute(const Interface* failed_inf, label_t failover_label,
+        static bool make_reroute(const Interface* failed_inf, const std::function<label_t(void)>& next_label,
                 const std::function<uint32_t(const Interface*)>& cost_fn = [](const Interface* interface){return 1;});
 
-        static bool make_reroute(const Interface* failed_inf, label_t failover_label,
+        static bool make_reroute(const Interface* failed_inf, const std::function<label_t(void)>& next_label,
                                  const std::unordered_map<const Interface*,uint32_t>& cost_map) {
-            return FastRerouting::make_reroute(failed_inf, failover_label, [&cost_map](const Interface* interface) {
+            return FastRerouting::make_reroute(failed_inf, next_label, [&cost_map](const Interface* interface) {
                 return cost_map.at(interface);
             });
         }
 
         static bool make_data_flow(const Interface* from, const Interface* to,
-                label_t pre_label, label_t flow_label, const std::vector<const Router*>& path);
+                const std::function<label_t(void)>& next_label, const std::vector<const Router*>& path);
         static bool make_data_flow(Interface* from, const std::vector<Interface*>& path,
-                label_t pre_label, label_t flow_label);
-        static bool make_data_flow(Interface* from, Interface* to, label_t pre_label, label_t flow_label,
+                const std::function<label_t(void)>& next_label);
+        static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
                 const std::function<uint32_t(const Interface*)>& cost_fn = [](const Interface* interface){return 1;});
-        static bool make_data_flow(Interface* from, Interface* to, label_t pre_label, label_t flow_label,
+        static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
                 const std::unordered_map<const Interface*,uint32_t>& cost_map) {
-            return FastRerouting::make_data_flow(from, to, pre_label, flow_label, [&cost_map](const Interface* interface) {
+            return FastRerouting::make_data_flow(from, to, next_label, [&cost_map](const Interface* interface) {
                 return cost_map.at(interface);
             });
         }
