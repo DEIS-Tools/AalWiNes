@@ -12,6 +12,7 @@
 #include <aalwines/utils/outcome.h>
 #include <aalwines/model/NetworkPDAFactory.h>
 #include <pdaaal/Reducer.h>
+#include <aalwines/synthesis/FastRerouting.h>
 
 using namespace aalwines;
 
@@ -59,39 +60,48 @@ Network construct_synthetic_network(int nesting = 1){
     bool fall_through = false;
     int last_nesting_begin = nesting * 5 - 5;
 
+    std::vector<std::vector<std::string>> links;
+
     for(int i = 0; i < router_size; i++, network_node++) {
         router_name = router_names[i];
         _routers.emplace_back(std::make_unique<Router>(i));
         Router &router = *_routers.back().get();
         router.add_name(router_name);
-        router.get_interface(_all_interfaces, "I" + router_names[i]);
+        router.get_interface(_all_interfaces, "i" + router_names[i]);
         auto res = _mapping.insert(router_name.c_str(), router_name.length());
         _mapping.get_data(res.second) = &router;
         switch (network_node) {
             case 1:
                 router.get_interface(_all_interfaces, router_names[i - 1]);
                 router.get_interface(_all_interfaces, router_names[i + 2]);
+                links.push_back({router_names[i - 1], router_names[i + 2]} );
                 break;
             case 2:
                 router.get_interface(_all_interfaces, router_names[i + 1]);
                 router.get_interface(_all_interfaces, router_names[i + 2]);
+                links.push_back({router_names[i + 1], router_names[i + 2]});
                 if(nested){
                     router.get_interface(_all_interfaces, router_names[i + 6]);
+                    links.back().push_back({router_names[i + 6]});
                 } else {
                     router.get_interface(_all_interfaces, router_names[i - 2]);
+                    links.back().push_back({router_names[i - 2]});
                 }
                 break;
             case 3:
                 router.get_interface(_all_interfaces, router_names[i - 2]);
                 router.get_interface(_all_interfaces, router_names[i + 1]);
                 router.get_interface(_all_interfaces, router_names[i - 1]);
+                links.push_back({router_names[i - 2], router_names[i + 1], router_names[i - 1]});
                 if(i != 3) {
                     router.get_interface(_all_interfaces, router_names[i - 6]);
+                    links.back().push_back({router_names[i - 6]});
                 }
                 break;
             case 4:
                 router.get_interface(_all_interfaces, router_names[i - 2]);
                 router.get_interface(_all_interfaces, router_names[i - 1]);
+                links.push_back({router_names[i - 2], router_names[i - 1]});
                 break;
             case 5:
                 network_node = 0;   //Fall through
@@ -101,13 +111,17 @@ Network construct_synthetic_network(int nesting = 1){
                 fall_through = true;
             case 0:
                 router.get_interface(_all_interfaces, router_names[i + 1]);
+                links.push_back({router_names[i + 1]});
                 if(nested){
                     router.get_interface(_all_interfaces, router_names[i + 5]);
+                    links.back().push_back({router_names[i + 5]});
                 } else {
                     router.get_interface(_all_interfaces, router_names[i + 2]);
+                    links.back().push_back({router_names[i + 2]});
                 }
                 if(fall_through){
                     router.get_interface(_all_interfaces, router_names[i - 5]);
+                    links.back().push_back({router_names[i - 5]});
                     fall_through = false;
                 }
                 break;
@@ -115,212 +129,43 @@ Network construct_synthetic_network(int nesting = 1){
                 throw base_error("Something went wrong in the construction");
         }
     }
-    Interface* passing_interface = nullptr;
-    Interface* passing_interface1 = nullptr;
-    Interface* to_interface = nullptr;
-    Interface* interface1 = nullptr;
-    Interface* interface2 = nullptr;
-
-    for(int i = 0; 0 < nesting; nesting--, i+=5) {
-        //Node0
-        interface1 = _routers[i]->find_interface(router_names[i + 1]);
-        interface2 = _routers[i + 1]->find_interface(router_names[i]);
-        pair_and_assert(interface1, interface2);
-
-        if(nesting > 1) {
-            passing_interface = _routers[i]->find_interface(router_names[i + 5]);
-            interface2 = _routers[i + 5]->find_interface(router_names[i]);
-            pair_and_assert(passing_interface, interface2);
-
-            //Add routing (1) 0 -> 5, (5) 0 -> 1
-            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::PUSH, 0, 4, 4 );
-            add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 5, 22);
-
-            //Add routing (0) 5 -> 6, (6) 5 -> 0
-            interface1 = _routers[i + 5]->find_interface(router_names[i + 6]);
-            add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 4, 22);
-            add_entry(*interface1, *interface2, aalwines::RoutingTable::POP, 0, 4);
-
-            //if next is not nested
-            if(i + 10 == router_size){
-                //Add routing (0) 5 -> 7, (7) 5 -> 0
-                interface1 = _routers[i + 5]->find_interface(router_names[i + 7]);
-                add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 4, 6);
-                add_entry(*interface1, *interface2, aalwines::RoutingTable::POP, 0, 5);
-            }
-        } else {
-            passing_interface = _routers[i]->find_interface(router_names[i + 2]);
-            interface2 = _routers[i + 2]->find_interface(router_names[i]);
-            pair_and_assert(passing_interface, interface2);
-            //Add routings 2 0 -> 1, 1 0 -> 2 ||
-            //Add routings 7 5 -> 6, 6 5 -> 7
-            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 5, 22);
-            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 6);
+    for (size_t i = 0; i < router_size; ++i) {
+        for (const auto &other : links[i]) {
+            auto res1 = _mapping.exists(router_names[i].c_str(), router_names[i].length());
+            assert(res1.first);
+            auto res2 = _mapping.exists(other.c_str(), other.length());
+            if(!res2.first) continue;
+            _mapping.get_data(res1.second)->find_interface(other)->make_pairing(_mapping.get_data(res2.second)->find_interface(router_names[i]));
         }
-
-        //Node1
-        passing_interface = _routers[i + 1]->find_interface(router_names[i + 0]);
-
-        interface1 = _routers[i + 1]->find_interface(router_names[i + 3]);
-        interface2 = _routers[i + 3]->find_interface(router_names[i + 1]);
-        pair_and_assert(interface1, interface2);
-
-        //Add entries 0 - 3, 3 - 0
-        add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 6, 7);
-        add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 22, 4);
-
-        //Node2
-        to_interface = _routers[i + 2]->find_interface(router_names[i + 3]);
-        interface2 = _routers[i + 3]->find_interface(router_names[i + 2]);
-        pair_and_assert(to_interface, interface2);
-
-        interface1 = _routers[i + 2]->find_interface(router_names[i + 4]);
-        interface2 = _routers[i + 4]->find_interface(router_names[i + 2]);
-        pair_and_assert(interface1, interface2);
-
-        //Add entries 4 2 -> 3, 3 2 -> 4
-        add_entry(*interface1, *to_interface, aalwines::RoutingTable::SWAP, 0, 33, 10);
-        add_entry(*to_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 22);
-
-        if(nesting > 1) {
-            interface1 = _routers[i + 2]->find_interface(router_names[i + 8]);
-            interface2 = _routers[i + 8]->find_interface(router_names[i + 2]);
-            pair_and_assert(interface1, interface2);
-
-            passing_interface = _routers[i + 2]->find_interface(router_names[i + 3]);
-            passing_interface1 = _routers[i + 2]->find_interface(router_names[i + 4]);
-            //Add entries 3 2 -> 8, 8 2 -> 3
-            add_entry(*passing_interface, *interface1, aalwines::RoutingTable::PUSH, 0, 7, 10);
-
-            add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 4, 10);
-
-            //Add entries 4 2 -> 8, 8 2 -> 4
-            add_entry(*passing_interface1, *interface1, aalwines::RoutingTable::PUSH, 0, 33, 10);
-            add_entry(*interface1, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 4, 22);
-        } else {
-            passing_interface = _routers[i + 2]->find_interface(router_names[i + 0]);
-            passing_interface1 = _routers[i + 2]->find_interface(router_names[i + 4]);
-
-            //Add entries 0 2 -> 3, 3 2 -> 0
-            add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::SWAP, 0, 6, 7);
-            add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::SWAP, 0, 6, 5);
-
-            //Add entries 0 2 -> 4, 4 2 -> 0
-            add_entry(*passing_interface, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 6, 22);
-            add_entry(*passing_interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 6, 5);
-        }
-
-        //Node3
-        passing_interface = _routers[i + 3]->find_interface(router_names[i + 1]);
-        interface1 = _routers[i + 3]->find_interface(router_names[i + 4]);
-        interface2 = _routers[i + 4]->find_interface(router_names[i + 3]);
-        pair_and_assert(interface1, interface2);
-
-        //Add entries 1 - 4, 4 - 1
-        add_entry(*passing_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 9);
-        add_entry(*interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 33, 22);
-
-        passing_interface1 = _routers[i + 3]->find_interface(router_names[i + 2]);
-        //Add entries 2 3 -> 4, 4 - 2
-        add_entry(*passing_interface1, *interface1, aalwines::RoutingTable::SWAP, 0, 7, 9);
-        add_entry(*interface1, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 33, 7);
-
-        //Add entries 1 3 -> 2, 2 3 -> 1
-        add_entry(*passing_interface, *passing_interface1, aalwines::RoutingTable::SWAP, 0, 7, 7);
-        add_entry(*passing_interface1, *passing_interface, aalwines::RoutingTable::SWAP, 0, 10, 22);
-
-        if(nesting > 1){
-            interface1 = _routers[i + 8]->find_interface(router_names[i + 6]);
-            passing_interface = _routers[i + 8]->find_interface(router_names[i + 7]);
-            interface2 = _routers[i + 8]->find_interface(router_names[i + 9]);
-            to_interface = _routers[i + 8]->find_interface(router_names[i + 2]);
-
-            //Add entries 6 8 -> 2, 2 8 -> 6
-            add_entry(*interface1, *to_interface, aalwines::RoutingTable::POP, 0, 7);
-            add_entry(*to_interface, *interface1, aalwines::RoutingTable::SWAP, 0, 10, 22);
-
-            //Add entries 9 8 -> 2, 2 8 -> 9
-            add_entry(*interface2, *to_interface, aalwines::RoutingTable::POP, 0, 12);
-            add_entry(*to_interface, *interface2, aalwines::RoutingTable::SWAP, 0, 7, 9);
-
-            //Add entries 7 8 -> 2, 2 8 -> 7
-            add_entry(*passing_interface, *to_interface, aalwines::RoutingTable::POP, 0, 7);
-            add_entry(*to_interface, *passing_interface, aalwines::RoutingTable::SWAP, 0, 10, 6);
-        }
-
-        //Node4
-        interface1 = _routers[i + 4]->find_interface(router_names[i + 2]);
-        interface2 = _routers[i + 4]->find_interface(router_names[i + 3]);
-        //Add entries 2 - 3, 3 - 2
-        add_entry(*interface1, *interface2, aalwines::RoutingTable::SWAP, 0, 22, 12);
-        add_entry(*interface2, *interface1, aalwines::RoutingTable::SWAP, 0, 9, 33);
-
-        //No more edges to add
     }
     Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
-
-    //AddRouting to world 1 0 -> World
-    interface1 = _routers[0]->find_interface(router_names[1]);
-    interface2 = _routers[0]->find_interface("I" + router_names[0]);
-    Query::label_t push_label = {Query::MPLS, 0, (uint64_t)4};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::PUSH, {Query::type_t::MPLS, 0, (uint64_t)4}}, interface2);
-
-    //AddRouting to world World 0 -> 1
-    interface1 = _routers[0]->find_interface("I" + router_names[0]);
-    interface2 = _routers[0]->find_interface(router_names[1]);
-    push_label = {Query::MPLS, 0, (uint64_t)4};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)6}}, interface2);
-
-    //AddRouting to world World 0 -> 2
-    interface1 = _routers[0]->find_interface("I" + router_names[0]);
-    interface2 = _routers[0]->find_interface(router_names[2]);
-    push_label = {Query::MPLS, 0, (uint64_t)4};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
-
-    //AddRouting to world World 2 -> 4
-    interface1 = _routers[2]->find_interface("I" + router_names[2]);
-    interface2 = _routers[2]->find_interface(router_names[4]);
-    push_label = {Query::MPLS, 0, (uint64_t)6};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
-
-    //AddRouting to world World 2 -> 3
-    interface1 = _routers[2]->find_interface("I" + router_names[2]);
-    interface2 = _routers[2]->find_interface(router_names[3]);
-    push_label = {Query::MPLS, 0, (uint64_t)6};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, (uint64_t)7}}, interface2);
-
-    //AddRouting to world 1 3 -> World
-    interface1 = _routers[3]->find_interface(router_names[1]);
-    interface2 = _routers[3]->find_interface("I" + router_names[3]);
-    push_label = {Query::MPLS, 0, (uint64_t)7};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
-
-    //AddRouting to world 2 3 -> World
-    interface1 = _routers[3]->find_interface(router_names[2]);
-    interface2 = _routers[3]->find_interface("I" + router_names[3]);
-    push_label = {Query::MPLS, 0, (uint64_t)7};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
-
-    //AddRouting to world 4 3 -> World
-    interface1 = _routers[3]->find_interface(router_names[4]);
-    interface2 = _routers[3]->find_interface("I" + router_names[3]);
-    push_label = {Query::MPLS, 0, (uint64_t)33};
-    interface1->table().add_rule(push_label,{RoutingTable::op_t::POP, {Query::type_t::MPLS, 0, (uint64_t)22}}, interface2);
-
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
 
 BOOST_AUTO_TEST_CASE(NetworkConstructionAndTrace) {
     Network synthetic_network = construct_synthetic_network(1);
-    Network synthetic_network2 = construct_synthetic_network();
-    synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network2.get_router(0), synthetic_network2.get_router(3));
+    //Network synthetic_network2 = construct_synthetic_network();
 
-    //synthetic_network.print_dot(std::cout);
+    std::vector<const Router*> path {synthetic_network.get_router(0),
+                                     synthetic_network.get_router(2),
+                                     synthetic_network.get_router(4),
+                                     synthetic_network.get_router(3)};
+
+    FastRerouting::make_data_flow(
+            synthetic_network.get_router(0)->find_interface("iRouter0"),
+            synthetic_network.get_router(3)->find_interface("iRouter3"),
+            Query::label_t::any_ip, Query::label_t(Query::type_t::MPLS, 0, 123), path);
+
+
+    //synthetic_network.manipulate_network( synthetic_network.get_router(0), synthetic_network.get_router(2), synthetic_network2, synthetic_network2.get_router(0), synthetic_network2.get_router(3));
+
+    std::stringstream s_middle;
+    synthetic_network.print_simple(s_middle);
+    BOOST_TEST_MESSAGE(s_middle.str());
 
     Builder builder(synthetic_network);
     {
-        std::string query("<.*> [.#Router0] .* [Router0prime#.] <.*> 0 OVER \n"
+        std::string query("<.*> [.#Router0] .* [Router4#.] <.*> 0 OVER \n"
                           "<.*> [Router0#.] .* [.#Router0prime] <.*> 0 OVER \n"
                           "<.*> [.#Router1] .* [Router2prime#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router1prime#.] <.*> 0 OVER \n"
