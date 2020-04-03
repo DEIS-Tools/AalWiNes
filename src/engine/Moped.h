@@ -27,7 +27,7 @@
 #ifndef MOPED_H
 #define MOPED_H
 
-#include <pdaaal/TypedPDA.h>
+#include <pdaaal/PDAAdapter.h>
 #include "utils/errors.h"
 
 #include <cassert>
@@ -43,10 +43,12 @@ namespace pdaaal {
         Moped();
         ~Moped();
         bool verify(const std::string& tmpfile, bool build_trace);
-        
-        bool verify(const PDA& pda, bool build_trace);
 
-        static void dump_pda(const PDA& pda, std::ostream& s);
+        template<typename T, typename W, typename C>
+        bool verify(const PDAAdapter<T,W,C>& pda, bool build_trace);
+
+        template<typename T, typename W, typename C>
+        static void dump_pda(const PDAAdapter<T,W,C>& pda, std::ostream& s);
         
         template<typename T>
         std::vector<typename TypedPDA<T>::tracestate_t> get_trace(TypedPDA<T>& pda) const;
@@ -58,7 +60,98 @@ namespace pdaaal {
         std::vector<std::string> _raw_trace;
         // trace?
     };
-    
+
+    template<typename T, typename W, typename C>
+    bool Moped::verify(const PDAAdapter<T,W,C>& pda, bool build_trace)
+    {
+        _raw_trace.clear();
+        std::fstream file;
+        file.open(_tmpfilepath, std::fstream::out | std::fstream::trunc);
+        dump_pda(pda, file);
+        file.close();
+        return verify(_tmpfilepath, build_trace);
+    }
+
+    template<typename T, typename W, typename C>
+    void Moped::dump_pda(const PDAAdapter<T,W,C>& pda, std::ostream& s) {
+        using rule_t = rule_t<W,C>;
+        using state_t = typename PDAAdapter<T,W,C>::state_t;
+        auto write_op = [](std::ostream& s, const rule_t& rule, std::string noop) {
+            assert(rule._to != 0);
+            switch (rule._operation) {
+                case pdaaal::SWAP:
+                    s << "l" << rule._op_label;
+                    break;
+                case pdaaal::PUSH:
+                    s << "l" << rule._op_label;
+                    s << " ";
+                case pdaaal::NOOP:
+                    s << noop;
+                    break;
+                case pdaaal::POP:
+                default:
+                    break;
+            }
+        };
+
+        s << "(I<_>)\n";
+        // lets start by the initial transitions
+        auto& is = pda.states()[pda.initial()];
+        for (auto& r : is._rules) {
+            if (r._to != 0) {
+                assert(r._operation == pdaaal::PUSH);
+                s << "I<_> --> S" << r._to << "<";
+                write_op(s, r, "_");
+                s << ">\n";
+            } else {
+                assert(r._operation == pdaaal::NOOP);
+                s << "I<_> --> D<_>\n";
+                return;
+            }
+        }
+        for (size_t sid = 1; sid < pda.states().size(); ++sid) {
+            if(sid == pda.initial()) continue;
+            const state_t& state = pda.states()[sid];
+            for (auto& r : state._rules) {
+                if (r._to == 0) {
+                    assert(r._operation == pdaaal::NOOP);
+                    s << "S" << sid << "<_> --> DONE<_>\n";
+                    continue;
+                }
+                if (r._labels.empty()) continue;
+                if(!r._labels.wildcard())
+                {
+                    auto& symbols = r._labels.labels();
+                    for (auto& symbol : symbols) {
+                        s << "S" << sid << "<l";
+                        s << symbol;
+                        s << "> --> ";
+                        s << "S" << r._to;
+                        s << "<";
+                        std::stringstream ss;
+                        ss << "l" << symbol;
+                        write_op(s, r, ss.str());
+                        s << ">\n";
+                    }
+                }
+                else
+                {
+                    for (size_t symbol = 0; symbol < pda.number_of_labels(); ++symbol) {
+                        s << "S" << sid << "<l";
+                        s << symbol;
+                        s << "> --> ";
+                        s << "S" << r._to;
+                        s << "<";
+                        std::stringstream ss;
+                        ss << "l" << symbol;
+                        write_op(s, r, ss.str());
+                        s << ">\n";
+                    }
+                }
+            }
+        }
+    }
+
     template<typename T>
     std::vector<typename TypedPDA<T>::tracestate_t> Moped::get_trace(TypedPDA<T>& pda) const
     {
