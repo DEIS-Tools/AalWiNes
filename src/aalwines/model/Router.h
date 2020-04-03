@@ -72,6 +72,9 @@ public:
     size_t global_id() const {
         return _global_id;
     }
+    void update_global_id(size_t global_id) {
+        _global_id = global_id;
+    }
     
     void remove_pairing(Interface* interface);
     void make_pairing(Interface* interface);
@@ -94,6 +97,9 @@ public:
 
     size_t index() const {
         return _index;
+    }
+    void update_index(size_t index) {
+        _index = index;
     }
     
     bool is_null() const {

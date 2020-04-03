@@ -49,8 +49,8 @@ public:
     Router *get_router(size_t id);
     const std::vector<std::unique_ptr<Router>>& get_all_routers() const { return _routers; }
 
-    void manipulate_network(Router* start_router, Router* end_router, Network& nested_synthetic_network,
-                                     Router* start_router_nested, Router* end_router_nested);
+    void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
+            Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
     size_t size() const { return _routers.size(); }
     const routermap_t& get_mapping() const { return _mapping; }
     const int get_max_label() const { return _max_label; }

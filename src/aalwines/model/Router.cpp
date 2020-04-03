@@ -47,10 +47,6 @@ namespace aalwines
     {
         _names.pop_back();
         _names.emplace_back(name);
-        int i = 0;
-        for(auto& inf : _interfaces){
-            inf->update_id(_interfaces.size() + i++);
-        }
     }
 
     const std::string& Router::name() const
