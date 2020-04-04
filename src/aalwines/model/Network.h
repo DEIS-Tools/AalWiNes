@@ -51,6 +51,7 @@ public:
 
     void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
+    void concat_network(Interface *link, Network &&nested_network, Interface *nested_ingoing, RoutingTable::label_t post_label);
     size_t size() const { return _routers.size(); }
     const routermap_t& get_mapping() const { return _mapping; }
     const int get_max_label() const { return _max_label; }
@@ -73,6 +74,7 @@ private:
     std::unordered_set<Query::label_t> _label_cache;
     std::unordered_set<Query::label_t> _non_service_label;
     uint64_t _max_label = 0;
+    void move_network(Network* nested_network);
 };
 }
 

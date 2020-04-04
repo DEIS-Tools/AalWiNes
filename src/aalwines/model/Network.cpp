@@ -202,28 +202,14 @@ namespace aalwines
         return _label_cache;
     }
 
-    void Network::inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
-            Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label) {
-        assert(nested_ingoing->target()->is_null());
-        assert(nested_outgoing->target()->is_null());
-        assert(this->size());
-        assert(nested_network.size());
-
-        // Pair interfaces for injection and create virtual interface to filter post_label before POP.
-        auto link_end = link->match();
-        link->make_pairing(nested_ingoing);
-        auto virtual_guard = nested_outgoing->source()->get_interface(_all_interfaces, "__virtual_guard__"); // Assumes these names are unique for this router.
-        auto nested_end_link = nested_outgoing->source()->get_interface(_all_interfaces, "__end_link__");
-        nested_outgoing->make_pairing(virtual_guard);
-        link_end->make_pairing(nested_end_link);
-
+    void Network::move_network(Network* nested_network){
         // Find NULL router
         auto res = _mapping.insert("NULL", 4);
         assert(!res.first);
         auto nullrouter = _mapping.get_data(res.second);
 
         // Move old network into new network.
-        for (auto&& e : nested_network._routers) {
+        for (auto&& e : nested_network->_routers) {
             if (e->is_null()) {
                 continue;
             }
@@ -252,6 +238,24 @@ namespace aalwines
             _routers.emplace_back(std::move(e));
             _mapping.get_data(_mapping.insert(name.c_str(), name.length()).second) = _routers.back().get();
         }
+    }
+
+    void Network::inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
+            Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label) {
+        assert(nested_ingoing->target()->is_null());
+        assert(nested_outgoing->target()->is_null());
+        assert(this->size());
+        assert(nested_network.size());
+
+        // Pair interfaces for injection and create virtual interface to filter post_label before POP.
+        auto link_end = link->match();
+        link->make_pairing(nested_ingoing);
+        auto virtual_guard = nested_outgoing->source()->get_interface(_all_interfaces, "__virtual_guard__"); // Assumes these names are unique for this router.
+        auto nested_end_link = nested_outgoing->source()->get_interface(_all_interfaces, "__end_link__");
+        nested_outgoing->make_pairing(virtual_guard);
+        link_end->make_pairing(nested_end_link);
+
+        move_network(&nested_network);
 
         // Add push and pop rules.
         for (auto&& interface : link->source()->interfaces()) {
@@ -259,6 +263,18 @@ namespace aalwines
                     {RoutingTable::op_t::PUSH, pre_label});
         }
         virtual_guard->table().add_rule(post_label, {RoutingTable::op_t::POP, RoutingTable::label_t{}}, nested_end_link);
+    }
+
+    void Network::concat_network(Interface* link, Network&& nested_network, Interface* nested_ingoing, RoutingTable::label_t post_label) {
+        assert(nested_ingoing->target()->is_null());
+        assert(link->target()->is_null());
+        assert(this->size());
+        assert(nested_network.size());
+
+        move_network(&nested_network);
+
+        // Pair interfaces for concatenation.
+        link->make_pairing(nested_ingoing);
     }
 
     void Network::print_dot(std::ostream& s)
