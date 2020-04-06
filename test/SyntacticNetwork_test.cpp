@@ -18,26 +18,26 @@
 
 using namespace aalwines;
 
-Network construct_synthetic_network(int nesting = 1){
-    int router_size = 5 * nesting;
+Network construct_synthetic_network(size_t nesting = 1){
+    size_t router_size = 5 * nesting;
     std::string router_name = "Router";
     std::vector<std::string> router_names;
     std::vector<std::unique_ptr<Router> > _routers;
     std::vector<const Interface*> _all_interfaces;
     Network::routermap_t _mapping;
 
-    for(int i = 0; i < router_size; i++) {
+    for(size_t i = 0; i < router_size; i++) {
         router_names.push_back(router_name + std::to_string(i));
     }
 
-    int network_node = 0;
+    size_t network_node = 0;
     bool nested = nesting > 1;
     bool fall_through = false;
-    int last_nesting_begin = nesting * 5 - 5;
+    size_t last_nesting_begin = nesting * 5 - 5;
 
     std::vector<std::vector<std::string>> links;
 
-    for(int i = 0; i < router_size; i++, network_node++) {
+    for(size_t i = 0; i < router_size; i++, network_node++) {
         router_name = router_names[i];
         _routers.emplace_back(std::make_unique<Router>(i));
         Router &router = *_routers.back().get();
@@ -117,7 +117,7 @@ Network construct_synthetic_network(int nesting = 1){
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
 
-void performance_query(std::string query, Network* synthetic_network, Builder builder){
+void performance_query(const std::string& query, Network& synthetic_network, Builder builder){
     //Adapt to existing query parser
     std::istringstream qstream(query);
     builder.do_parse(qstream);
@@ -129,32 +129,35 @@ void performance_query(std::string query, Network* synthetic_network, Builder bu
     std::pair<size_t, size_t> reduction;
     std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> trace;
     builder._result[0].set_approximation(modes[0]);
-    NetworkPDAFactory factory(builder._result[0], *synthetic_network, false);
+    NetworkPDAFactory factory(builder._result[0], synthetic_network, false);
     auto pda = factory.compile();
     reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
 
+    std::stringstream results;
     stopwatch verification_time_post(false);
 
     verification_time_post.start();
     auto solver_result1 = solver.post_star<pdaaal::Trace_Type::Any>(pda);
     trace = solver.get_trace(pda, std::move(solver_result1.second));
-    factory.write_json_trace(std::cout, trace);
+    factory.write_json_trace(results, trace);
     verification_time_post.stop();
 
-    std::cout << "\npost*-time: " << verification_time_post.duration();
+    results << std::endl << "post*-time: " << verification_time_post.duration() << std::endl << std::endl;
 
     stopwatch verification_time_moped(false);
 
     verification_time_moped.start();
-    moped.verify(pda, false);
+    moped.verify(pda, true);
     trace = moped.get_trace(pda);
-    factory.write_json_trace(std::cout, trace);
+    factory.write_json_trace(results, trace);
     verification_time_moped.stop();
 
-    std::cout << "\nmoped-time: \n" << verification_time_moped.duration();
+    results << std::endl << "moped-time: " << verification_time_moped.duration() << std::endl << std::endl;
+
+    BOOST_TEST_MESSAGE(results.str());
 }
 
-void build_query(std::string query, Network* synthetic_network, Builder builder){
+void build_query(const std::string& query, Network& synthetic_network, Builder builder){
     //Adapt to existing query parser
     std::istringstream qstream(query);
     builder.do_parse(qstream);
@@ -179,7 +182,7 @@ void build_query(std::string query, Network* synthetic_network, Builder builder)
 
         for (auto m : modes) {
             q.set_approximation(m);
-            NetworkPDAFactory factory(q, *synthetic_network, no_ip_swap);
+            NetworkPDAFactory factory(q, synthetic_network, no_ip_swap);
             auto pda = factory.compile();
             reduction = pdaaal::Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
             bool need_trace = was_dual || get_trace;
@@ -273,7 +276,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace) {
                           "<.*> [.#Router0] .* [Router9#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
         );
-        build_query(query, &synthetic_network, builder);
+        build_query(query, synthetic_network, builder);
     }
 }
 
@@ -325,7 +328,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace1) {
                           "<.*> [.#Router0] .* [Router2#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
         );
-        build_query(query, &synthetic_network, builder);
+        build_query(query, synthetic_network, builder);
     }
 }
 
@@ -380,7 +383,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace2) {
                           "<.*> [.#Router0] .* [Router2'#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
         );
-        build_query(query, &synthetic_network, builder);
+        build_query(query, synthetic_network, builder);
     }
 }
 
@@ -431,7 +434,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace) {
                           "<.*> [.#Router0] .* [Router2'#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
         );
-        build_query(query, &synthetic_network, builder);
+        build_query(query, synthetic_network, builder);
     }
 }
 
@@ -478,7 +481,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace1) {
                           "<.*> [.#Router0] .* [Router2'#.] <.*> 0 OVER \n"
                           "<.*> [.#Router0] .* [Router0'#.] <.*> 0 OVER \n"
         );
-        build_query(query, &synthetic_network, builder);
+        build_query(query, synthetic_network, builder);
     }
 }
 
@@ -500,7 +503,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance) {
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* [Router4#.] <.*> 0 OVER \n");
-        performance_query(query, &synthetic_network, builder);
+        performance_query(query, synthetic_network, builder);
     }
 }
 
@@ -526,7 +529,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance1) {
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* [Router24#.] <.*> 0 OVER \n");
-        performance_query(query, &synthetic_network, builder);
+        performance_query(query, synthetic_network, builder);
     }
 }
 

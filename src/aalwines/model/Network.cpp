@@ -202,14 +202,14 @@ namespace aalwines
         return _label_cache;
     }
 
-    void Network::move_network(Network* nested_network){
+    void Network::move_network(Network&& nested_network){
         // Find NULL router
         auto res = _mapping.insert("NULL", 4);
         assert(!res.first);
         auto nullrouter = _mapping.get_data(res.second);
 
         // Move old network into new network.
-        for (auto&& e : nested_network->_routers) {
+        for (auto&& e : nested_network._routers) {
             if (e->is_null()) {
                 continue;
             }
@@ -255,7 +255,7 @@ namespace aalwines
         nested_outgoing->make_pairing(virtual_guard);
         link_end->make_pairing(nested_end_link);
 
-        move_network(&nested_network);
+        move_network(std::move(nested_network));
 
         // Add push and pop rules.
         for (auto&& interface : link->source()->interfaces()) {
@@ -271,7 +271,7 @@ namespace aalwines
         assert(this->size());
         assert(nested_network.size());
 
-        move_network(&nested_network);
+        move_network(std::move(nested_network));
 
         // Pair interfaces for concatenation.
         link->make_pairing(nested_ingoing);
