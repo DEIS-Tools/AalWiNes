@@ -47,7 +47,7 @@ namespace aalwines {
      *   ], ...
      * ]
      * where
-     *  - ATOM = {"hops", "failures", "tunnel_depth", "latency"}
+     *  - ATOM = {"hops", "failures", "tunnels", "latency"}
      *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
@@ -61,7 +61,7 @@ namespace aalwines {
             default_weight_function,
             link_failures,
             number_of_hops,
-            tunnel_depth,
+            tunnels,
             latency,
         };
 
@@ -78,7 +78,7 @@ namespace aalwines {
                     return [](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
                         return last_op && !r._via->is_virtual() ? 1 : 0;
                     };
-                case AtomicProperty::tunnel_depth:
+                case AtomicProperty::tunnels:
                     return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
                         return std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
                     };
@@ -130,8 +130,8 @@ namespace aalwines {
                 p = AtomicProperty::number_of_hops;
             } else if (s == "failures") {
                 p = AtomicProperty::link_failures;
-            } else if (s == "tunnel_depth") {
-                p = AtomicProperty::tunnel_depth;
+            } else if (s == "tunnels") {
+                p = AtomicProperty::tunnels;
             } else if (s == "latency") {
                 p = AtomicProperty::latency;
             } else {
