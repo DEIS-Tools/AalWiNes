@@ -26,7 +26,11 @@ target_include_directories(aalwines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_executable(aalwines-bin main.cpp)
 target_link_libraries(aalwines-bin PRIVATE aalwines)
 set_target_properties(aalwines-bin PROPERTIES OUTPUT_NAME aalwines)
-install(TARGETS aalwines aalwines-bin
+
+add_executable(zoo-routing topology_zoo_main.cpp)
+target_link_libraries(zoo-routing PRIVATE aalwines)
+
+install(TARGETS aalwines aalwines-bin zoo-routing
 		RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
