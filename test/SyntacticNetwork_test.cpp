@@ -583,9 +583,3 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
     }
     BOOST_TEST_MESSAGE(trace.str());
 }
-
-
-
-BOOST_AUTO_TEST_CASE(ParseGML) {
-    TopologyZooBuilder::parse("./Aarnet.gml", std::cout);
-}

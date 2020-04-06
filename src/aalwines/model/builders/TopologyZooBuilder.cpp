@@ -1,5 +1,5 @@
 //
-// Created by dank on 4/6/20.
+// Created by Dan Kristiansen on 4/6/20.
 //
 
 #include <fstream>
@@ -28,12 +28,14 @@ namespace aalwines {
         std::vector<std::pair<size_t, size_t >> _all_links;
         std::vector<std::pair<std::string, Coordinate>> _all_routers;
         std::map<const size_t, std::string> _router_map;
+        std::vector<std::vector<std::string>> _return_links;
 
         while (std::getline(file, str, ' ')) {
             if(str =="node") {
                 while (std::getline(file, str, ' ')){
                     if(str == "id"){
                         file >> id;
+                        _return_links.emplace_back();
                     }
                     else if(str == "label"){
                         file >> router_name;
@@ -68,12 +70,11 @@ namespace aalwines {
             }
         }
 
-        std::vector<std::vector<std::string>> _return_links;
-        for(int i = 0; i < _all_routers.size(); i++){
-            _return_links.emplace_back();
+        for(size_t i = 0; i < _all_routers.size(); i++){
             for(auto& link : _all_links){
                 if(link.first == i){
-                    _return_links.back().emplace_back(_router_map[link.second]);
+                    _return_links[i].emplace_back(_router_map[link.second]);
+                    _return_links[link.second].emplace_back(_router_map[link.first]);
                 }
             }
         }

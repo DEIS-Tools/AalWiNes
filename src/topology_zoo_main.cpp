@@ -78,9 +78,7 @@ int main(int argc, const char** argv)
     //std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
     auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
 
-
     // TODO: Construct routes on network!
-
 
     std::ofstream out_topo(topology_destination);
     if(out_topo.is_open()) {
@@ -96,5 +94,4 @@ int main(int argc, const char** argv)
         std::cerr << "Could not open --write-routing\"" << routing_destination << "\" for writing" << std::endl;
         exit(-1);
     }
-
 }
