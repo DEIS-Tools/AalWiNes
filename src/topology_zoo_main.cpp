@@ -65,13 +65,18 @@ int main(int argc, const char** argv)
         std::cerr << "Please provide topology zoo input file" << std::endl;
         exit(-1);
     }
-    if (topology_destination.empty() || routing_destination.empty()) {
+    size_t dot_pos = topo_zoo.find_last_of('.');
+    if (topology_destination.empty() && routing_destination.empty() && dot_pos > 0 && topo_zoo.substr(dot_pos + 1) =="gml") {
+        const auto name = topo_zoo.substr(0, dot_pos);
+        topology_destination = name + "-topo.xml";
+        routing_destination = name + "-routing.xml";
+    } else if (topology_destination.empty() || routing_destination.empty()) {
         std::cerr << "Please provide routing and topology output file" << std::endl;
         exit(-1);
     }
 
-    std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
-    auto network = TopologyZooBuilder::parse(topo_zoo, warnings);
+    //std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
+    auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
 
 
     // TODO: Construct routes on network!
