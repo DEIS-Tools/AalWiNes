@@ -23,13 +23,13 @@ namespace aalwines {
             return _longitude;
         }
         void write_xml_attributes(std::ostream& s) const {
-            s << " latitude=\"" << _latitude << "\" longitude=\"" << _longitude << "\" "
+            s << " latitude=\"" << _latitude << "\" longitude=\"" << _longitude << "\" ";
         }
 
     private:
         double _latitude;
         double _longitude;
-    }
+    };
 }
 
 #endif //AALWINES_COORDINATE_H
