@@ -438,7 +438,11 @@ namespace aalwines
         {
             if(r->is_null()) continue;
             if(r->interfaces().empty()) continue;
-            s << "    <router name=\"" << r->name() << "\">\n";
+            s << "    <router name=\"" << r->name() << "\"";
+            if (r->coordinate()) {
+                r->coordinate().value().write_xml_attributes(s);
+            }
+            s << ">\n";
             s << "      <interfaces>\n";
             for(auto& inf : r->interfaces())
             {

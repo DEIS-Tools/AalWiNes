@@ -34,9 +34,8 @@
 namespace aalwines
 {
 
-    Router::Router(size_t id, bool is_null) : _index(id), _is_null(is_null)
-    {
-    }
+    Router::Router(size_t id, bool is_null) : _index(id), _is_null(is_null) {}
+    Router::Router(size_t id, Coordinate coordinate) : _index(id), _is_null(false), _coordinate(coordinate) {};
 
     void Router::add_name(const std::string& name)
     {
