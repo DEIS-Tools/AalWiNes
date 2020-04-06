@@ -50,10 +50,10 @@ if (AALWINES_GetDependencies)
             EXPECTED_HASH SHA256=3b5d2b8f8282b80557091514d8ab97e27f9574336c804ee666fda673a9b59926
     )
     ExternalProject_add(pdaaal-ext
-        GIT_REPOSITORY git@github.com:DEIS-Tools/PDAAAL.git
-        GIT_TAG 0a55572529dbc9e64a232e2ba22ede1b10fbd8eb
+        URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.zip
+        URL_HASH SHA512=320b2b06206d471dfb416076f420dfa8a87667d59bc859a573d8120705f05035d113e6ca7906ea9951c2130a2a9c62391a3d498298c9a8d5416fec430b527e7e
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release
-        )
+    )
 
     # we can now include external libraries
     include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
