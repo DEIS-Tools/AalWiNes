@@ -115,6 +115,12 @@ namespace aalwines {
             return pdaaal::ordered_weight_function(fns);
         }
 
+        static auto default_weight_fn() {
+            return pdaaal::ordered_weight_function(std::vector<linear_weight_function>{linear_weight_function{[](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+                return 0;
+            }}});
+        }
+
     private:
         atomic_property_function parse_atom(const json& elem) const {
             if (!elem.contains("atom")) {
@@ -135,7 +141,7 @@ namespace aalwines {
             } else if (s == "latency") {
                 p = AtomicProperty::latency;
             } else {
-                throw base_error("Unknown atomic property. ");
+                throw base_error("Unknown atomic property: " + s);
             }
             return get_atom(p);
         }

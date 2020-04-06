@@ -252,6 +252,9 @@ int main(int argc, const char** argv)
                 }
             }
             // weightparsingwatch.stop();
+        } else {
+            // TODO: Make the rest of main use unweighted version rather than creating a default weight function here.
+            weight_fn.emplace(NetworkWeight::default_weight_fn());
         }
 
         size_t query_no = 0;
