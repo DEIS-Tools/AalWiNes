@@ -18,35 +18,28 @@
  */
 
 /*
- * File:   coordinate.h
+ * File:   coordinate.cpp
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 06-04-2020
  */
 
-#ifndef AALWINES_COORDINATE_H
-#define AALWINES_COORDINATE_H
-
-#include <ostream>
+#include "coordinate.h"
+#include <cmath>
 
 namespace aalwines {
 
-    class Coordinate {
-    public:
-        explicit Coordinate(std::pair<double, double> pair) : Coordinate(pair.first, pair.second) {};
-        Coordinate(double latitude, double longitude);
-        [[nodiscard]] double distance_to(const Coordinate& other) const;
-        [[nodiscard]] double latitude() const { return _latitude; }
-        [[nodiscard]] double longitude() const { return _longitude; }
-        void write_xml_attributes(std::ostream& s) const;
+    Coordinate::Coordinate(double latitude, double longitude) : _latitude(latitude), _longitude(longitude),
+        _rad_lat(M_PI / 180 * latitude), _rad_long(M_PI / 180 * longitude) {}
 
-    private:
-        static constexpr double _R_km = 6372.8;
-        const double _latitude;
-        const double _longitude;
-        const double _rad_lat;
-        const double _rad_long;
-    };
+    double Coordinate::distance_to(const Coordinate& other) const {
+        // Using the Haversine formula.
+        return _R_km * 2 * std::asin(std::sqrt(std::pow((_rad_lat - other._rad_lat)/2, 2) +
+        std::cos(_rad_lat) * std::cos(other._rad_lat) * std::pow(std::sin((_rad_long - other._rad_long) / 2), 2)));
+    }
+
+    void Coordinate::write_xml_attributes(std::ostream& s) const {
+        s << " latitude=\"" << _latitude << "\" longitude=\"" << _longitude << "\" ";
+    }
 }
 
-#endif //AALWINES_COORDINATE_H
