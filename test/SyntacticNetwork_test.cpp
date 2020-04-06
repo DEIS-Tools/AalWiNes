@@ -15,6 +15,7 @@
 #include <aalwines/synthesis/FastRerouting.h>
 #include <aalwines/engine/Moped.h>
 #include <aalwines/utils/stopwatch.h>
+#include <aalwines/model/builders/TopologyZooBuilder.h>
 
 using namespace aalwines;
 
@@ -581,4 +582,10 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
         performance_query(query, synthetic_network, builder, trace);
     }
     BOOST_TEST_MESSAGE(trace.str());
+}
+
+
+
+BOOST_AUTO_TEST_CASE(ParseGML) {
+    TopologyZooBuilder::parse("./Aarnet.gml", std::cout);
 }
