@@ -65,6 +65,8 @@ public:
     bool is_service_label(const Query::label_t&) const;
     void write_prex_topology(std::ostream& s);
     void write_prex_routing(std::ostream& s);
+
+    static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
 private:
     // NO TOUCHEE AFTER INIT!
     routermap_t _mapping;

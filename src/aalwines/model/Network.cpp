@@ -472,4 +472,37 @@ namespace aalwines
         }
         s << "  </links>\n</network>\n";
     }
+
+    Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links){
+        std::vector<std::unique_ptr<Router>> routers;
+        std::vector<const Interface*> interfaces;
+        Network::routermap_t mapping;
+        for (size_t i = 0; i < names.size(); ++i) {
+            auto name = names[i];
+            size_t id = routers.size();
+            routers.emplace_back(std::make_unique<Router>(id));
+            Router& router = *routers.back().get();
+            router.add_name(name);
+            auto res = mapping.insert(name.c_str(), name.length());
+            assert(res.first);
+            mapping.get_data(res.second) = &router;
+            for (const auto& other : links[i]) {
+                router.get_interface(interfaces, other);
+            }
+        }
+        for (size_t i = 0; i < names.size(); ++i) {
+            auto name = names[i];
+            for (const auto &other : links[i]) {
+                auto res1 = mapping.exists(name.c_str(), name.length());
+                assert(res1.first);
+                auto res2 = mapping.exists(other.c_str(), other.length());
+                if(!res2.first) continue;
+                mapping.get_data(res1.second)->find_interface(other)->make_pairing(mapping.get_data(res2.second)->find_interface(name));
+            }
+        }
+        Router::add_null_router(routers, interfaces, mapping);
+
+        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
+    }
+
 }
