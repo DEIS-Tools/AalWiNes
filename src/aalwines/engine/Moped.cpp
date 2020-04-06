@@ -34,16 +34,14 @@
 namespace pdaaal
 {
 
-    Moped::Moped()
-    {
-        _tmpfilepath = boost::filesystem::unique_path().native();    
+    Moped::Moped() : _verification_time(false) {
+        _tmpfilepath = boost::filesystem::unique_path().native();
         std::fstream file;
         file.open(_tmpfilepath, std::fstream::out);
         file.close();
     }
 
-    Moped::~Moped()
-    {
+    Moped::~Moped() {
         boost::filesystem::remove(_tmpfilepath);
     }
 
@@ -62,7 +60,9 @@ namespace pdaaal
         cmd << " -s0 " << tmpfile;
         cmd << " -r DONE:_";
         auto cstr = cmd.str();
+        _verification_time.start();
         auto res = exec(cstr.c_str());
+        _verification_time.stop();
         return parse_result(res, build_trace);
     }
     

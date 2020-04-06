@@ -117,7 +117,7 @@ Network construct_synthetic_network(size_t nesting = 1){
     return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
 }
 
-void performance_query(const std::string& query, Network& synthetic_network, Builder builder, std::stringstream* trace_stream){
+void performance_query(const std::string& query, Network& synthetic_network, Builder builder, std::ostream& trace_stream){
     //Adapt to existing query parser
     std::istringstream qstream(query);
     builder.do_parse(qstream);
@@ -136,26 +136,22 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     std::stringstream results;
     stopwatch verification_time_post(false);
 
-    *trace_stream << std::endl << "Post*: " <<std::endl;
+    trace_stream << std::endl << "Post*: " <<std::endl;
 
     verification_time_post.start();
     auto solver_result1 = solver.post_star<pdaaal::Trace_Type::Any>(pda);
-    trace = solver.get_trace(pda, std::move(solver_result1.second));
-    factory.write_json_trace(*trace_stream, trace);
     verification_time_post.stop();
+    trace = solver.get_trace(pda, std::move(solver_result1.second));
+    factory.write_json_trace(trace_stream, trace);
 
     results << std::endl << "post*-time: " << verification_time_post.duration() << std::endl;
 
-    stopwatch verification_time_moped(false);
-
-    *trace_stream << std::endl << "Moped: " <<std::endl;
-    verification_time_moped.start();
-    moped.verify(pda, true);
+    trace_stream << std::endl << "Moped: " << std::endl;
+    moped.verify(pda, false);
     trace = moped.get_trace(pda);
-    factory.write_json_trace(*trace_stream, trace);
-    verification_time_moped.stop();
+    factory.write_json_trace(trace_stream, trace);
 
-    results << std::endl << "moped-time: " << verification_time_moped.duration() << std::endl;
+    results << std::endl << "moped-time: " << moped.verification_duration() << std::endl;
 
     BOOST_TEST_MESSAGE(results.str());
 }
@@ -507,7 +503,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance) {
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* [Router4#.] <.*> 0 OVER \n");
-        performance_query(query, synthetic_network, builder, &trace);
+        performance_query(query, synthetic_network, builder, trace);
     }
 }
 
@@ -534,7 +530,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance1) {
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* [Router24#.] <.*> 0 OVER \n");
-        performance_query(query, synthetic_network, builder, &trace);
+        performance_query(query, synthetic_network, builder, trace);
     }
 }
 
@@ -582,7 +578,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* [Router24#.] <.*> 0 OVER \n");
-        performance_query(query, synthetic_network, builder, &trace);
+        performance_query(query, synthetic_network, builder, trace);
     }
     BOOST_TEST_MESSAGE(trace.str());
 }
