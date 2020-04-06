@@ -8,34 +8,38 @@
 
 namespace aalwines {
 
-    Network aalwines::TopologyZooBuilder::parse(const std::string &gml, std::ostream &warnings) {
+    Network aalwines::TopologyZooBuilder::parse(const std::string &gml) {
         std::ifstream file(gml);
 
         if(not file){
             std::cerr << "Error file not found." << std::endl;
         }
 
-        std::string id;
+        size_t id;
         std::string longitude;
         std::string latitude;
-        std::pair<double, double> coordinates;
-        std::string router_name;
-        std::vector<parse_router> routers;
-        std::vector<parse_link> links;
+        std::pair<double, double> coordinate;
+        std::basic_string<char> router_name;
 
-        std::string source;
-        std::string target;
+        size_t source;
+        size_t target;
         std::string str;
+
+        std::vector<std::pair<size_t, size_t >> _all_links;
+        std::vector<std::pair<std::string, Coordinate>> _all_routers;
+        std::map<const size_t, std::string> _router_map;
 
         while (std::getline(file, str, ' ')) {
             if(str =="node") {
                 while (std::getline(file, str, ' ')){
                     if(str == "id"){
-                        std::getline(file, id);
+                        file >> id;
                     }
                     else if(str == "label"){
-                        std::getline(file, router_name);
-                        std::remove(router_name.begin(), router_name.end(), '"');
+                        file >> router_name;
+                        router_name.erase(router_name.begin() ,router_name.begin() + 1);
+                        router_name.erase(router_name.end()-1, router_name.end());
+                        //std::remove(router_name.begin(), router_name.end(), '"');
                     }
                     else if(str == "Longitude"){
                         std::getline(file, longitude);
@@ -44,8 +48,9 @@ namespace aalwines {
                         std::getline(file, latitude);
                     }
                     else if(str == "]\n"){
-                        coordinates = std::make_pair( std::stod (longitude), std::stod (latitude));
-                        routers.emplace_back(parse_router(std::stod (id), router_name, coordinates));
+                        coordinate = std::make_pair( std::stod (longitude), std::stod (latitude));
+                        _all_routers.emplace_back(std::make_pair(router_name, coordinate));
+                        _router_map.insert({id, router_name});
                         break;
                     }
                 }
@@ -53,15 +58,25 @@ namespace aalwines {
             else if(str == "edge"){
                 while (std::getline(file, str, ' ')) {
                     if (str == "source") {
-                        std::getline(file, source);
+                        file >> source;
                     } else if (str == "target") {
-                        std::getline(file, target);
-                        links.emplace_back(parse_link(std::stod(source), std::stod(target)));
+                        file >> target;
+                        _all_links.emplace_back(source, target);
                         break;
                     }
                 }
             }
         }
-        //return Network::make_network();
+
+        std::vector<std::vector<std::string>> _return_links;
+        for(int i = 0; i < _all_routers.size(); i++){
+            _return_links.emplace_back();
+            for(auto& link : _all_links){
+                if(link.first == i){
+                    _return_links.back().emplace_back(_router_map[link.second]);
+                }
+            }
+        }
+        return Network::make_network(_all_routers, _return_links);
     }
 }
