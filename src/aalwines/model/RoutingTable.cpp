@@ -61,12 +61,35 @@ namespace aalwines
         add_rule(top_label, forward_t(type, {op}, via, weight));
     }
     void RoutingTable::forward_t::add_action(action_t action) {
-        if (action._op == PUSH && !_ops.empty() && _ops.back()._op == POP) {
-            _ops.back()._op = SWAP;
-            _ops.back()._op_label = action._op_label;
-        } else {
+        if (_ops.empty()) {
             _ops.push_back(action);
+            return;
         }
+        switch (action._op) {
+            case PUSH:
+                if (_ops.back()._op == POP) {
+                    _ops.pop_back();
+                    add_action(action_t{SWAP, action._op_label});
+                    return;
+                }
+                break;
+            case SWAP: // TODO: case SWAP and case POP doesn't seem happen, so do we want to keep it?
+                if (_ops.back()._op == SWAP || _ops.back()._op == PUSH) {
+                    _ops.back()._op_label = action._op_label;
+                    return;
+                }
+                break;
+            case POP:
+                if (_ops.back()._op == SWAP) {
+                    _ops.pop_back();
+                    add_action(action_t{POP, label_t{}});
+                    return;
+                }
+                break;
+            default:
+                break;
+        }
+        _ops.push_back(action);
     }
     void RoutingTable::add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label) {
         for (auto& e : _entries) {
