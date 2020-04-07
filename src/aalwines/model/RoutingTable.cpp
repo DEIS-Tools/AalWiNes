@@ -104,7 +104,7 @@ namespace aalwines
                 if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
                     e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
                     continue;
-                assert(false); // TODO: Figure out what to do here!
+                //assert(false); // TODO: Figure out what to do here!
                 iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
             } else {
                 assert(e < (*iit));

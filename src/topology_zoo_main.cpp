@@ -82,15 +82,23 @@ int main(int argc, const char** argv)
     // TODO: Construct routes on network!
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto cost = [](const Interface* interface){ return interface->source()->coordinate() && interface->target()->coordinate() ?
+                interface->source()->coordinate()->distance_to(interface->target()->coordinate().value()) : 1 ; };
+
     for(auto &r : network.get_all_routers()){
-        for(auto& inf : r->interfaces()){
-            if (inf->target()->is_null()) continue;
-            auto success = FastRerouting::make_data_flow(inf.get(), inf->match(), next_label, {r, inf->match()});
-            assert(success);
-            success = FastRerouting::make_reroute(inf.get(), next_label);
+        if(r->is_null()) continue;
+        for(auto &r_p : network.get_all_routers()){
+            if (r == r_p || r_p->is_null()) continue;
+            auto success = FastRerouting::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
             assert(success);
         }
     }
+    for(auto& inf : network.all_interfaces()){
+        if (inf->target()->is_null()) continue;
+        auto success = FastRerouting::make_reroute(inf, next_label, cost);
+        //assert(success);
+    }
+
 
     std::ofstream out_topo(topology_destination);
     if(out_topo.is_open()) {

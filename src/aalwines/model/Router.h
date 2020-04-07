@@ -107,6 +107,14 @@ public:
     [[nodiscard]] bool is_null() const {
         return _is_null;
     }
+
+    Interface* get_null_interface() {
+        for(auto& inf : _interfaces){
+            if(inf->target()->is_null()){
+                return inf.get();
+            }
+        }
+    }
     
     void add_name(const std::string& name);
     void change_name(const std::string& name);
