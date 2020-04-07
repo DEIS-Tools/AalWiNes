@@ -26,8 +26,8 @@
 
 #ifndef PREXBUILDER_H
 #define PREXBUILDER_H
-#include "model/Router.h"
-#include "model/Network.h"
+#include "aalwines/model/Router.h"
+#include "aalwines/model/Network.h"
 
 #include <rapidxml.hpp>
 

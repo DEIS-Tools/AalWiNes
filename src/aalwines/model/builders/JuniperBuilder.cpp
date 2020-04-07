@@ -25,7 +25,7 @@
  */
 
 #include "JuniperBuilder.h"
-#include "model/Network.h"
+#include "aalwines/model/Network.h"
 
 #include <boost/filesystem/path.hpp>
 

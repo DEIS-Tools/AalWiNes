@@ -21,25 +21,21 @@
 // Created by Peter G. Jensen
 //
 
-#include "utils/errors.h"
-#include "query/QueryBuilder.h"
+#include <aalwines/utils/errors.h>
+#include <aalwines/query/QueryBuilder.h>
 
-#include "model/builders/JuniperBuilder.h"
-#include "model/builders/PRexBuilder.h"
+#include <aalwines/model/builders/JuniperBuilder.h>
+#include <aalwines/model/builders/PRexBuilder.h>
 
-#include "model/Router.h"
-#include "model/Network.h"
-#include "model/NetworkPDAFactory.h"
+#include <aalwines/model/NetworkPDAFactory.h>
 
-#include "query/parsererrors.h"
+#include <aalwines/query/parsererrors.h>
 #include <pdaaal/PDAFactory.h>
-#include "engine/Moped.h"
+#include <aalwines/engine/Moped.h>
 #include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
-#include "utils/stopwatch.h"
-#include "utils/outcome.h"
-
-#include <ptrie/ptrie_map.h>
+#include <aalwines/utils/stopwatch.h>
+#include <aalwines/utils/outcome.h>
 
 #include <boost/program_options.hpp>
 
@@ -47,8 +43,6 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include <memory.h>
-#include <boost/filesystem/path.hpp>
 
 namespace po = boost::program_options;
 using namespace aalwines;

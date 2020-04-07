@@ -24,7 +24,7 @@
 #include "QueryBuilder.h"
 #include "parsererrors.h"
 #include "Scanner.h"
-#include "utils/parsing.h"
+#include "aalwines/utils/parsing.h"
 
 #include <cassert>
 #include <iostream>

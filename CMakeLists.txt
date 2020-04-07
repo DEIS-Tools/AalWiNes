@@ -62,3 +62,13 @@ if (AALWINES_GetDependencies)
 endif (AALWINES_GetDependencies)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/)
+
+set(BUILD_TESTING ON)
+
+option(AALWINES_BuildTests "Build the unit tests when BUILD_TESTING is enabled." ON)
+if(BUILD_TESTING AND AALWINES_BuildTests)
+    #testing
+    add_subdirectory(${CMAKE_SOURCE_DIR}/test/)
+    enable_testing()
+    add_test(NAME SyntacticNetwork    COMMAND SyntacticNetwork)
+endif()

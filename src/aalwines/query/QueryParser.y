@@ -34,8 +34,8 @@
     #include <unordered_set>
     #include <memory>
     #include <pdaaal/NFA.h>
-    #include "model/Query.h"
-    #include "model/filter.h"
+    #include "aalwines/model/Query.h"
+    #include "aalwines/model/filter.h"
 
     namespace aalwines {
         class Builder;
@@ -58,9 +58,9 @@
 %code {
     #include "QueryBuilder.h"
     #include "Scanner.h"
-    #include "model/Query.h"
+    #include "aalwines/model/Query.h"
     #include <pdaaal/NFA.h>
-    #include "model/filter.h"
+    #include "aalwines/model/filter.h"
 
     using namespace pdaaal;
     using namespace aalwines;
