@@ -35,10 +35,9 @@ namespace aalwines {
                 while (std::getline(file, str, ' ')){
                     if(str == "id"){
                         file >> id;
-                        _return_links.emplace_back();
                     }
                     else if(str == "label"){
-                        file >> router_name;
+                        std::getline(file, router_name);
                         router_name.erase(router_name.begin() ,router_name.begin() + 1);
                         router_name.erase(router_name.end()-1, router_name.end());
                         //std::remove(router_name.begin(), router_name.end(), '"');
@@ -53,6 +52,8 @@ namespace aalwines {
                         coordinate = std::make_pair( std::stod (longitude), std::stod (latitude));
                         _all_routers.emplace_back(std::make_pair(router_name, coordinate));
                         _router_map.insert({id, router_name});
+                        _return_links.emplace_back();
+                        longitude = latitude = "";
                         break;
                     }
                 }
