@@ -89,8 +89,7 @@ int main(int argc, const char** argv)
         if(r->is_null()) continue;
         for(auto &r_p : network.get_all_routers()){
             if (r == r_p || r_p->is_null()) continue;
-            auto success = FastRerouting::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
-            assert(success);
+            FastRerouting::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
         }
     }
     for(auto& inf : network.all_interfaces()){
