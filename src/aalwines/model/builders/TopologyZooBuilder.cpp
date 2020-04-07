@@ -40,7 +40,8 @@ namespace aalwines {
                         std::getline(file, router_name);
                         router_name.erase(router_name.begin() ,router_name.begin() + 1);
                         router_name.erase(router_name.end()-1, router_name.end());
-                        //std::remove(router_name.begin(), router_name.end(), '"');
+                        //Get_interface dont handle ' ' very well
+                        std::replace(router_name.begin(), router_name.end(), ' ', '_');
                     }
                     else if(str == "Longitude"){
                         std::getline(file, longitude);

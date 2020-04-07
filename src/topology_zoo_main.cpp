@@ -95,10 +95,8 @@ int main(int argc, const char** argv)
     }
     for(auto& inf : network.all_interfaces()){
         if (inf->target()->is_null() || inf->source()->is_null()) continue;
-        auto success = FastRerouting::make_reroute(inf, next_label, cost);
-        //assert(success);
+        FastRerouting::make_reroute(inf, next_label, cost);
     }
-
 
     std::ofstream out_topo(topology_destination);
     if(out_topo.is_open()) {
