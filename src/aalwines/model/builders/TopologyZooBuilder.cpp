@@ -8,6 +8,25 @@
 
 namespace aalwines {
 
+    // Stolen from: https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
+    // trim from start (in place)
+    static inline void ltrim(std::string &s) {
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
+            return !std::isspace(ch);
+        }));
+    }
+    // trim from end (in place)
+    static inline void rtrim(std::string &s) {
+        s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) {
+            return !std::isspace(ch);
+        }).base(), s.end());
+    }
+    // trim from both ends (in place)
+    static inline void trim(std::string &s) {
+        ltrim(s);
+        rtrim(s);
+    }
+
     Network aalwines::TopologyZooBuilder::parse(const std::string &gml) {
         std::ifstream file(gml);
 
@@ -15,51 +34,48 @@ namespace aalwines {
             std::cerr << "Error file not found." << std::endl;
         }
 
-        size_t id;
-        std::string longitude;
-        std::string latitude;
-        std::pair<double, double> coordinate;
-        std::basic_string<char> router_name;
-
-        size_t source;
-        size_t target;
-        std::string str;
-
         std::vector<std::pair<size_t, size_t >> _all_links;
         std::vector<std::pair<std::string, Coordinate>> _all_routers;
         std::map<const size_t, std::string> _router_map;
         std::vector<std::vector<std::string>> _return_links;
 
+        std::string str;
         while (std::getline(file, str, ' ')) {
             if(str =="node") {
-                while (std::getline(file, str, ' ')){
-                    if(str == "id"){
-                        file >> id;
+                size_t id;
+                std::string router_name;
+                double latitude = 0;
+                double longitude = 0;
+                while (std::getline(file, str)){
+                    trim(str);
+                    auto pos = str.find(' ');
+                    if (pos == str.size()) continue;
+                    std::string key = str.substr(0, pos);
+                    if(key == "id"){
+                        id = std::stoul(str.substr(pos+1));
                     }
-                    else if(str == "label"){
-                        std::getline(file, router_name);
-                        router_name.erase(router_name.begin() ,router_name.begin() + 1);
-                        router_name.erase(router_name.end()-1, router_name.end());
+                    else if(key == "label"){
+                        router_name = str.substr(pos+2, str.size() - pos - 3);
                         //Get_interface dont handle ' ' very well
                         std::replace(router_name.begin(), router_name.end(), ' ', '_');
                     }
-                    else if(str == "Longitude"){
-                        std::getline(file, longitude);
+                    else if(key == "Latitude"){
+                        latitude = std::stod(str.substr(pos+1));
                     }
-                    else if(str == "Latitude"){
-                        std::getline(file, latitude);
+                    else if(key == "Longitude"){
+                        longitude = std::stod(str.substr(pos+1));
                     }
-                    else if(str == "]\n"){
-                        coordinate = std::make_pair( std::stod (longitude), std::stod (latitude));
-                        _all_routers.emplace_back(std::make_pair(router_name, coordinate));
+                    else if(key == "]"){
+                        _all_routers.emplace_back(router_name, Coordinate{latitude, longitude});
                         _router_map.insert({id, router_name});
                         _return_links.emplace_back();
-                        longitude = latitude = "";
                         break;
                     }
                 }
             }
             else if(str == "edge"){
+                size_t source;
+                size_t target;
                 while (std::getline(file, str, ' ')) {
                     if (str == "source") {
                         file >> source;
