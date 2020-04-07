@@ -75,6 +75,7 @@ namespace aalwines {
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
             bool operator!=(const forward_t& other) const;
+            void add_action(action_t action);
         };
 
         struct entry_t {

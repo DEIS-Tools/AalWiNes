@@ -60,22 +60,30 @@ namespace aalwines
     void RoutingTable::add_rule(label_t top_label, action_t op, Interface* via, size_t weight, type_t type) {
         add_rule(top_label, forward_t(type, {op}, via, weight));
     }
+    void RoutingTable::forward_t::add_action(action_t action) {
+        if (action._op == PUSH && !_ops.empty() && _ops.back()._op == POP) {
+            _ops.back()._op = SWAP;
+            _ops.back()._op_label = action._op_label;
+        } else {
+            _ops.push_back(action);
+        }
+    }
     void RoutingTable::add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label) {
         for (auto& e : _entries) {
             std::vector<forward_t> new_rules;
             for (const auto& f : e._rules) {
                 if (f._via == failed_inf) {
                     new_rules.emplace_back(f._type, f._ops, backup_inf, f._weight + 1);
-                    new_rules.back()._ops.emplace_back(PUSH, failover_label);
+                    new_rules.back().add_action(action_t{PUSH, failover_label});
                 }
             }
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
         }
     }
-    void RoutingTable::entry_t::add_to_outgoing(const Interface *outgoing, RoutingTable::action_t action) {
+    void RoutingTable::entry_t::add_to_outgoing(const Interface *outgoing, action_t action) {
         for (auto&& f : _rules) {
             if (f._via == outgoing) {
-                f._ops.push_back(action);
+                f.add_action(action);
             }
         }
     }
