@@ -104,16 +104,21 @@ namespace aalwines
                 if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
                     e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
                     continue;
-                if (e._rules.size() <= iit->_rules.size()) {
-                    bool is_subset = true; // TODO: Consider sorted entries for faster merge.
-                    for (auto&& entry : e._rules) {
-                        if (std::find(iit->_rules.begin(), iit->_rules.end(), entry) == iit->_rules.end()) {
-                            is_subset = false;
-                            break;
-                        }
+                bool legal_merge = true;
+                for (auto&& rule: e._rules) { // TODO: Consider sorted rules for faster merge.
+                    // Already exists
+                    if (std::find(iit->_rules.begin(), iit->_rules.end(), rule) != iit->_rules.end()) continue;
+                    // Different traffic engineering group
+                    if (std::find_if(iit->_rules.begin(), iit->_rules.end(),
+                            [w = rule._weight](const forward_t& r){ return r._weight == w; })
+                            == iit->_rules.end()) {
+                        iit->_rules.push_back(rule);
+                    } else {
+                        legal_merge = false;
+                        break;
                     }
-                    if (is_subset) continue;
                 }
+                if (legal_merge) continue;
                 assert(false); // TODO: Figure out what to do here!
                 iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
             } else {
