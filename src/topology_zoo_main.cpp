@@ -29,6 +29,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <aalwines/synthesis/FastRerouting.h>
 
 namespace po = boost::program_options;
 using namespace aalwines;
@@ -79,6 +80,17 @@ int main(int argc, const char** argv)
     auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
 
     // TODO: Construct routes on network!
+    uint64_t i = 42;
+    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    for(auto &r : network.get_all_routers()){
+        for(auto& inf : r->interfaces()){
+            if (inf->target()->is_null()) continue;
+            auto success = FastRerouting::make_data_flow(inf.get(), inf->match(), next_label, {r, inf->match()});
+            assert(success);
+            success = FastRerouting::make_reroute(inf.get(), next_label);
+            assert(success);
+        }
+    }
 
     std::ofstream out_topo(topology_destination);
     if(out_topo.is_open()) {
