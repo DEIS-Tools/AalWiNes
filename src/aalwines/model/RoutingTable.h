@@ -59,6 +59,8 @@ namespace aalwines {
             action_t() = default;
             action_t(op_t op, label_t op_label) : _op(op), _op_label(op_label) {};
             void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
+            bool operator==(const action_t& other) const;
+            bool operator!=(const action_t& other) const;
         };
 
         struct forward_t {
@@ -72,6 +74,7 @@ namespace aalwines {
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
+            bool operator!=(const forward_t& other) const;
         };
 
         struct entry_t {

@@ -104,7 +104,17 @@ namespace aalwines
                 if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
                     e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
                     continue;
-                //assert(false); // TODO: Figure out what to do here!
+                if (e._rules.size() <= iit->_rules.size()) {
+                    bool is_subset = true; // TODO: Consider sorted entries for faster merge.
+                    for (auto&& entry : e._rules) {
+                        if (std::find(iit->_rules.begin(), iit->_rules.end(), entry) == iit->_rules.end()) {
+                            is_subset = false;
+                            break;
+                        }
+                    }
+                    if (is_subset) continue;
+                }
+                assert(false); // TODO: Figure out what to do here!
                 iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
             } else {
                 assert(e < (*iit));
@@ -187,6 +197,19 @@ namespace aalwines
     }
     bool RoutingTable::entry_t::operator!=(const entry_t& other) const
     {
+        return !(*this == other);
+    }
+    bool RoutingTable::forward_t::operator==(const forward_t& other) const {
+        return _type == other._type && _via == other._via && _weight == other._weight
+            && _ops.size() == other._ops.size() && std::equal(_ops.begin(), _ops.end(), other._ops.begin());
+    }
+    bool RoutingTable::forward_t::operator!=(const forward_t& other) const {
+        return !(*this == other);
+    }
+    bool RoutingTable::action_t::operator==(const action_t& other) const {
+        return _op == other._op && _op_label == other._op_label;
+    }
+    bool RoutingTable::action_t::operator!=(const action_t& other) const {
         return !(*this == other);
     }
 
