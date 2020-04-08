@@ -1,0 +1,6 @@
+[
+    {
+        "Description": "Exist any trace from Ottawa to Edmonton where the initial stack label is 5654 and size one, and the end stack size one.",
+        "Query": "<[5654]> [.#Ottawa] .* [.#Edmonton] <.> 0 OVER"
+    }
+]

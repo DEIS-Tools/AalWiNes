@@ -1,0 +1,14 @@
+[
+    {
+        "Description": "Exist any trace from Stockton to Miami.",
+        "Query": "<.*> [.#Stockton] .* [Miami#.] <.*> 0 OVER"
+    },
+    {
+        "Description": "Exist a trace from Stockton to Santa Clata through any sub trace.",
+        "Query": "<.> [.#Stockton] .* [Santa_Clara#.] <.> 0 OVER"
+    },
+    {
+        "Description": "Exist a trace from Chicago to Santa Clata through any sub trace without Los Angeles and one faillink.",
+        "Query": "<.> [.#Chicago] [^.#Los_Angeles]* [Santa_Clara#.] <.> 1 OVER"
+    }
+]

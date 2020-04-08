@@ -1,22 +1,18 @@
 [
     {
-        "Description": "Exist any trace, such that Zurich is connected to Paris through any trace with one failover link.",
-        "Query": "<.*> [.#Perth1] .* [Perth2#.] <.*> 2 OVER"
-    },
-    {
-        "Description": "Exist any trace, such that Zurich is connected to Paris through any trace with one failover link.",
-        "Query": "<.*> [.#Canberra2] .* [Canberra1#.] <.*> 1 OVER"
-    },
-    {
-        "Description": "Exist any trace from Zurich to Budapest.",
+        "Description": "Exist any trace from Sydney1 to Perth1.",
         "Query": "<.*> [.#Sydney1] .* [Perth1#.] <.*> 0 OVER"
     },
     {
-        "Description": "Exist a trace from an interface with target Toronto and a stack [2882] of size one, such that it is connected to Singapore through any trace.",
+        "Description": "Exist a trace from Sydney2 to Armidale through any sub trace.",
         "Query": "<.*> [.#Sydney2] .* [Armidale#.] <.> 0 OVER"
     },
     {
-        "Description": "Exist a trace from an interface with target Toronto and a stack [2882] of size one, such that it is connected to Singapore through any trace with one failover link.",
-        "Query": "<.*> [.#Sydney2] .* [Armidale#.] <.> 1 OVER"
+        "Description": "Exist a trace from Sydney2 to Armidale through any sub trace with minimum two hops, such that the (Sydney2, Armidale)-link is omitted.",
+        "Query": "<.*> [.#Sydney2] ...* [Armidale#.] <.> 1 OVER"
+    },
+    {
+        "Description": "Exist any trace from Canberra2 to Canberra1 not using the (Canberra2, Canberra1)-link.",
+        "Query": "<.*> [.#Canberra2] ...* [Canberra1#.] <.*> 1 OVER"
     }
 ]

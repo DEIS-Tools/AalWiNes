@@ -1,0 +1,14 @@
+[
+    {
+        "Description": "Exist any trace from London to San Francisco.",
+        "Query": "<.> [.#London] .* [San_Francisco#.] <.> 0 OVER"
+    },
+    {
+        "Description": "Exist a trace from London to San Francisco with one faillink.",
+        "Query": "<.> [.#London] .* [San_Francisco#.] <.> 1 OVER"
+    },
+    {
+        "Description": "Exist a trace from London, through Paris, to Amserdam with one faillink.",
+        "Query": "<.> [.#London] [.#Paris] .* [Amsterdam#.] <.> 1 OVER"
+    }
+]
