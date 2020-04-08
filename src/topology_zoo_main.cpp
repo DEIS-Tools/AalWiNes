@@ -78,6 +78,7 @@ int main(int argc, const char** argv)
 
     //std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
     auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
+    std::vector<std::pair<Router*, Router*>> unlinked_routers;
 
     // TODO: Construct routes on network!
     uint64_t i = 42;
@@ -89,7 +90,10 @@ int main(int argc, const char** argv)
         if(r->is_null()) continue;
         for(auto &r_p : network.get_all_routers()){
             if (r == r_p || r_p->is_null()) continue;
-            FastRerouting::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
+            auto success = FastRerouting::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
+            if(!success){
+                unlinked_routers.emplace_back(std::make_pair(r.get(), r_p.get()));
+            }
         }
     }
     for(auto& inf : network.all_interfaces()){

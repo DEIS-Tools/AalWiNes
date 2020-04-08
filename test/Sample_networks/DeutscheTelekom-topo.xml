@@ -1,0 +1,697 @@
+<network>
+  <routers>
+    <router name="Zurich" latitude="47.3667" longitude="8.55" >
+      <interfaces>
+        <interface name="iZurich"/>
+        <interface name="Paris"/>
+        <interface name="Geneva"/>
+        <interface name="Stuttgart"/>
+        <interface name="Milan"/>
+        <interface name="Barcelona"/>
+      </interfaces>
+    </router>
+    <router name="Geneva" latitude="46.2022" longitude="6.14569" >
+      <interfaces>
+        <interface name="iGeneva"/>
+        <interface name="Zurich"/>
+        <interface name="Paris"/>
+        <interface name="Milan"/>
+      </interfaces>
+    </router>
+    <router name="Budapest" latitude="47.498" longitude="19.0399" >
+      <interfaces>
+        <interface name="iBudapest"/>
+        <interface name="Vienna"/>
+        <interface name="Munich"/>
+      </interfaces>
+    </router>
+    <router name="Stuttgart" latitude="48.7823" longitude="9.17702" >
+      <interfaces>
+        <interface name="iStuttgart"/>
+        <interface name="Zurich"/>
+      </interfaces>
+    </router>
+    <router name="Madrid" latitude="40.4165" longitude="-3.70256" >
+      <interfaces>
+        <interface name="iMadrid"/>
+        <interface name="Paris"/>
+        <interface name="Lisbon"/>
+        <interface name="Barcelona"/>
+      </interfaces>
+    </router>
+    <router name="Lisbon" latitude="38.7167" longitude="-9.13333" >
+      <interfaces>
+        <interface name="iLisbon"/>
+        <interface name="Madrid"/>
+      </interfaces>
+    </router>
+    <router name="Milan" latitude="45.4643" longitude="9.18951" >
+      <interfaces>
+        <interface name="iMilan"/>
+        <interface name="Zurich"/>
+        <interface name="Geneva"/>
+        <interface name="Paris"/>
+      </interfaces>
+    </router>
+    <router name="Barcelona" latitude="41.3888" longitude="2.15899" >
+      <interfaces>
+        <interface name="iBarcelona"/>
+        <interface name="Zurich"/>
+        <interface name="Madrid"/>
+      </interfaces>
+    </router>
+    <router name="Paris" latitude="48.8534" longitude="2.3488" >
+      <interfaces>
+        <interface name="iParis"/>
+        <interface name="Zurich"/>
+        <interface name="Geneva"/>
+        <interface name="Madrid"/>
+        <interface name="Milan"/>
+        <interface name="London"/>
+        <interface name="Frankfurt"/>
+        <interface name="Amsterdam"/>
+        <interface name="Ashburn"/>
+      </interfaces>
+    </router>
+    <router name="London" latitude="51.5085" longitude="-0.12574" >
+      <interfaces>
+        <interface name="iLondon"/>
+        <interface name="Paris"/>
+        <interface name="New_York"/>
+        <interface name="Frankfurt"/>
+        <interface name="Amsterdam"/>
+        <interface name="Ashburn"/>
+        <interface name="Dusseldorf"/>
+      </interfaces>
+    </router>
+    <router name="Tokyo" latitude="35.6149" longitude="139.581" >
+      <interfaces>
+        <interface name="iTokyo"/>
+        <interface name="San_Jose"/>
+        <interface name="Hong_Kong"/>
+      </interfaces>
+    </router>
+    <router name="Chicago" latitude="41.85" longitude="-87.65" >
+      <interfaces>
+        <interface name="iChicago"/>
+        <interface name="Toronto"/>
+        <interface name="New_York"/>
+        <interface name="Palo_Alto"/>
+      </interfaces>
+    </router>
+    <router name="Washington" latitude="38.8951" longitude="-77.0364" >
+      <interfaces>
+        <interface name="iWashington"/>
+        <interface name="Ashburn"/>
+        <interface name="New_York"/>
+        <interface name="Miami"/>
+        <interface name="Los_Angeles"/>
+      </interfaces>
+    </router>
+    <router name="Miami" latitude="25.7743" longitude="-80.1937" >
+      <interfaces>
+        <interface name="iMiami"/>
+        <interface name="Washington"/>
+      </interfaces>
+    </router>
+    <router name="Los_Angeles" latitude="34.0522" longitude="-118.244" >
+      <interfaces>
+        <interface name="iLos_Angeles"/>
+        <interface name="Washington"/>
+        <interface name="San_Jose"/>
+        <interface name="Hong_Kong"/>
+        <interface name="Singapore"/>
+        <interface name="Palo_Alto"/>
+      </interfaces>
+    </router>
+    <router name="Palo_Alto" latitude="37.4419" longitude="-122.143" >
+      <interfaces>
+        <interface name="iPalo_Alto"/>
+        <interface name="Chicago"/>
+        <interface name="Los_Angeles"/>
+        <interface name="San_Jose"/>
+        <interface name="Ashburn"/>
+        <interface name="New_York"/>
+      </interfaces>
+    </router>
+    <router name="San_Jose" latitude="9.93333" longitude="-84.0833" >
+      <interfaces>
+        <interface name="iSan_Jose"/>
+        <interface name="Tokyo"/>
+        <interface name="Los_Angeles"/>
+        <interface name="Palo_Alto"/>
+        <interface name="New_York"/>
+      </interfaces>
+    </router>
+    <router name="Hong_Kong" latitude="22.2855" longitude="114.158" >
+      <interfaces>
+        <interface name="iHong_Kong"/>
+        <interface name="Tokyo"/>
+        <interface name="Los_Angeles"/>
+        <interface name="Singapore"/>
+      </interfaces>
+    </router>
+    <router name="Singapore" latitude="1.28967" longitude="103.85" >
+      <interfaces>
+        <interface name="iSingapore"/>
+        <interface name="Los_Angeles"/>
+        <interface name="Hong_Kong"/>
+        <interface name="Frankfurt"/>
+      </interfaces>
+    </router>
+    <router name="Toronto" latitude="43.7001" longitude="-79.4163" >
+      <interfaces>
+        <interface name="iToronto"/>
+        <interface name="Chicago"/>
+        <interface name="New_York"/>
+      </interfaces>
+    </router>
+    <router name="New_York" latitude="40.7143" longitude="-74.006" >
+      <interfaces>
+        <interface name="iNew_York"/>
+        <interface name="London"/>
+        <interface name="Chicago"/>
+        <interface name="Washington"/>
+        <interface name="Palo_Alto"/>
+        <interface name="San_Jose"/>
+        <interface name="Toronto"/>
+        <interface name="Leipzig"/>
+        <interface name="Frankfurt"/>
+        <interface name="Hanover"/>
+        <interface name="Dusseldorf"/>
+      </interfaces>
+    </router>
+    <router name="Frankfurt" latitude="50.1167" longitude="8.68333" >
+      <interfaces>
+        <interface name="iFrankfurt"/>
+        <interface name="Paris"/>
+        <interface name="London"/>
+        <interface name="Singapore"/>
+        <interface name="New_York"/>
+        <interface name="Moscow"/>
+        <interface name="Amsterdam"/>
+        <interface name="Ashburn"/>
+      </interfaces>
+    </router>
+    <router name="Cologne" latitude="50.9333" longitude="6.95" >
+      <interfaces>
+        <interface name="iCologne"/>
+      </interfaces>
+    </router>
+    <router name="Hanover" latitude="52.3705" longitude="9.73322" >
+      <interfaces>
+        <interface name="iHanover"/>
+        <interface name="New_York"/>
+        <interface name="Ashburn"/>
+      </interfaces>
+    </router>
+    <router name="Amsterdam" latitude="52.374" longitude="4.88969" >
+      <interfaces>
+        <interface name="iAmsterdam"/>
+        <interface name="Paris"/>
+        <interface name="London"/>
+        <interface name="Frankfurt"/>
+        <interface name="Hamburg"/>
+        <interface name="Dusseldorf"/>
+      </interfaces>
+    </router>
+    <router name="Ashburn" latitude="39.0437" longitude="-77.4875" >
+      <interfaces>
+        <interface name="iAshburn"/>
+        <interface name="Paris"/>
+        <interface name="London"/>
+        <interface name="Washington"/>
+        <interface name="Palo_Alto"/>
+        <interface name="Frankfurt"/>
+        <interface name="Hanover"/>
+        <interface name="Leipzig"/>
+        <interface name="Dusseldorf"/>
+      </interfaces>
+    </router>
+    <router name="Hamburg" latitude="53.55" longitude="10" >
+      <interfaces>
+        <interface name="iHamburg"/>
+        <interface name="Amsterdam"/>
+        <interface name="Stockholm"/>
+        <interface name="Copenhagen"/>
+      </interfaces>
+    </router>
+    <router name="Dortmund" latitude="51.5167" longitude="7.45" >
+      <interfaces>
+        <interface name="iDortmund"/>
+      </interfaces>
+    </router>
+    <router name="Dusseldorf" latitude="51.2217" longitude="6.77616" >
+      <interfaces>
+        <interface name="iDusseldorf"/>
+        <interface name="London"/>
+        <interface name="New_York"/>
+        <interface name="Amsterdam"/>
+        <interface name="Ashburn"/>
+      </interfaces>
+    </router>
+    <router name="Vienna" latitude="48.2085" longitude="16.3721" >
+      <interfaces>
+        <interface name="iVienna"/>
+        <interface name="Budapest"/>
+        <interface name="Prague"/>
+        <interface name="Munich"/>
+      </interfaces>
+    </router>
+    <router name="Munich" latitude="48.1374" longitude="11.5755" >
+      <interfaces>
+        <interface name="iMunich"/>
+        <interface name="Budapest"/>
+        <interface name="Vienna"/>
+      </interfaces>
+    </router>
+    <router name="Copenhagen" latitude="55.6759" longitude="12.5655" >
+      <interfaces>
+        <interface name="iCopenhagen"/>
+        <interface name="Hamburg"/>
+        <interface name="Stockholm"/>
+      </interfaces>
+    </router>
+    <router name="Stockholm" latitude="59.3326" longitude="18.0649" >
+      <interfaces>
+        <interface name="iStockholm"/>
+        <interface name="Hamburg"/>
+        <interface name="Copenhagen"/>
+      </interfaces>
+    </router>
+    <router name="Warsaw" latitude="52.2298" longitude="21.0118" >
+      <interfaces>
+        <interface name="iWarsaw"/>
+        <interface name="Berlin"/>
+        <interface name="Nuremberg"/>
+      </interfaces>
+    </router>
+    <router name="Moscow" latitude="55.7522" longitude="37.6156" >
+      <interfaces>
+        <interface name="iMoscow"/>
+        <interface name="Frankfurt"/>
+      </interfaces>
+    </router>
+    <router name="Berlin" latitude="52.5244" longitude="13.4105" >
+      <interfaces>
+        <interface name="iBerlin"/>
+        <interface name="Warsaw"/>
+      </interfaces>
+    </router>
+    <router name="Leipzig" latitude="51.3396" longitude="12.3713" >
+      <interfaces>
+        <interface name="iLeipzig"/>
+        <interface name="New_York"/>
+        <interface name="Ashburn"/>
+      </interfaces>
+    </router>
+    <router name="Prague" latitude="50.088" longitude="14.4208" >
+      <interfaces>
+        <interface name="iPrague"/>
+        <interface name="Vienna"/>
+        <interface name="Nuremberg"/>
+      </interfaces>
+    </router>
+    <router name="Nuremberg" latitude="49.4478" longitude="11.0683" >
+      <interfaces>
+        <interface name="iNuremberg"/>
+        <interface name="Warsaw"/>
+        <interface name="Prague"/>
+      </interfaces>
+    </router>
+  </routers>
+  <links>
+    <link>
+      <sides>
+        <shared_interface interface="Paris" router="Zurich"/>
+        <shared_interface interface="Zurich" router="Paris"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Geneva" router="Zurich"/>
+        <shared_interface interface="Zurich" router="Geneva"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Stuttgart" router="Zurich"/>
+        <shared_interface interface="Zurich" router="Stuttgart"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Milan" router="Zurich"/>
+        <shared_interface interface="Zurich" router="Milan"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Barcelona" router="Zurich"/>
+        <shared_interface interface="Zurich" router="Barcelona"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Paris" router="Geneva"/>
+        <shared_interface interface="Geneva" router="Paris"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Milan" router="Geneva"/>
+        <shared_interface interface="Geneva" router="Milan"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Vienna" router="Budapest"/>
+        <shared_interface interface="Budapest" router="Vienna"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Munich" router="Budapest"/>
+        <shared_interface interface="Budapest" router="Munich"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Paris" router="Madrid"/>
+        <shared_interface interface="Madrid" router="Paris"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Lisbon" router="Madrid"/>
+        <shared_interface interface="Madrid" router="Lisbon"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Barcelona" router="Madrid"/>
+        <shared_interface interface="Madrid" router="Barcelona"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Paris" router="Milan"/>
+        <shared_interface interface="Milan" router="Paris"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="London" router="Paris"/>
+        <shared_interface interface="Paris" router="London"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Frankfurt" router="Paris"/>
+        <shared_interface interface="Paris" router="Frankfurt"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Amsterdam" router="Paris"/>
+        <shared_interface interface="Paris" router="Amsterdam"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Ashburn" router="Paris"/>
+        <shared_interface interface="Paris" router="Ashburn"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="New_York" router="London"/>
+        <shared_interface interface="London" router="New_York"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Frankfurt" router="London"/>
+        <shared_interface interface="London" router="Frankfurt"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Amsterdam" router="London"/>
+        <shared_interface interface="London" router="Amsterdam"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Ashburn" router="London"/>
+        <shared_interface interface="London" router="Ashburn"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Dusseldorf" router="London"/>
+        <shared_interface interface="London" router="Dusseldorf"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="San_Jose" router="Tokyo"/>
+        <shared_interface interface="Tokyo" router="San_Jose"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Hong_Kong" router="Tokyo"/>
+        <shared_interface interface="Tokyo" router="Hong_Kong"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Toronto" router="Chicago"/>
+        <shared_interface interface="Chicago" router="Toronto"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="New_York" router="Chicago"/>
+        <shared_interface interface="Chicago" router="New_York"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Palo_Alto" router="Chicago"/>
+        <shared_interface interface="Chicago" router="Palo_Alto"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Ashburn" router="Washington"/>
+        <shared_interface interface="Washington" router="Ashburn"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="New_York" router="Washington"/>
+        <shared_interface interface="Washington" router="New_York"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Miami" router="Washington"/>
+        <shared_interface interface="Washington" router="Miami"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Los_Angeles" router="Washington"/>
+        <shared_interface interface="Washington" router="Los_Angeles"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="San_Jose" router="Los_Angeles"/>
+        <shared_interface interface="Los_Angeles" router="San_Jose"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Hong_Kong" router="Los_Angeles"/>
+        <shared_interface interface="Los_Angeles" router="Hong_Kong"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Singapore" router="Los_Angeles"/>
+        <shared_interface interface="Los_Angeles" router="Singapore"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Palo_Alto" router="Los_Angeles"/>
+        <shared_interface interface="Los_Angeles" router="Palo_Alto"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="San_Jose" router="Palo_Alto"/>
+        <shared_interface interface="Palo_Alto" router="San_Jose"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Ashburn" router="Palo_Alto"/>
+        <shared_interface interface="Palo_Alto" router="Ashburn"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="New_York" router="Palo_Alto"/>
+        <shared_interface interface="Palo_Alto" router="New_York"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="New_York" router="San_Jose"/>
+        <shared_interface interface="San_Jose" router="New_York"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Singapore" router="Hong_Kong"/>
+        <shared_interface interface="Hong_Kong" router="Singapore"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Frankfurt" router="Singapore"/>
+        <shared_interface interface="Singapore" router="Frankfurt"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="New_York" router="Toronto"/>
+        <shared_interface interface="Toronto" router="New_York"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Leipzig" router="New_York"/>
+        <shared_interface interface="New_York" router="Leipzig"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Frankfurt" router="New_York"/>
+        <shared_interface interface="New_York" router="Frankfurt"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Hanover" router="New_York"/>
+        <shared_interface interface="New_York" router="Hanover"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Dusseldorf" router="New_York"/>
+        <shared_interface interface="New_York" router="Dusseldorf"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Moscow" router="Frankfurt"/>
+        <shared_interface interface="Frankfurt" router="Moscow"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Amsterdam" router="Frankfurt"/>
+        <shared_interface interface="Frankfurt" router="Amsterdam"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Ashburn" router="Frankfurt"/>
+        <shared_interface interface="Frankfurt" router="Ashburn"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Ashburn" router="Hanover"/>
+        <shared_interface interface="Hanover" router="Ashburn"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Hamburg" router="Amsterdam"/>
+        <shared_interface interface="Amsterdam" router="Hamburg"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Dusseldorf" router="Amsterdam"/>
+        <shared_interface interface="Amsterdam" router="Dusseldorf"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Leipzig" router="Ashburn"/>
+        <shared_interface interface="Ashburn" router="Leipzig"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Dusseldorf" router="Ashburn"/>
+        <shared_interface interface="Ashburn" router="Dusseldorf"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Stockholm" router="Hamburg"/>
+        <shared_interface interface="Hamburg" router="Stockholm"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Copenhagen" router="Hamburg"/>
+        <shared_interface interface="Hamburg" router="Copenhagen"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Prague" router="Vienna"/>
+        <shared_interface interface="Vienna" router="Prague"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Munich" router="Vienna"/>
+        <shared_interface interface="Vienna" router="Munich"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Stockholm" router="Copenhagen"/>
+        <shared_interface interface="Copenhagen" router="Stockholm"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Berlin" router="Warsaw"/>
+        <shared_interface interface="Warsaw" router="Berlin"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Nuremberg" router="Warsaw"/>
+        <shared_interface interface="Warsaw" router="Nuremberg"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Nuremberg" router="Prague"/>
+        <shared_interface interface="Prague" router="Nuremberg"/>
+      </sides>
+    </link>
+  </links>
+</network>
