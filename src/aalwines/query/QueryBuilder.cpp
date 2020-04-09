@@ -176,7 +176,7 @@ namespace aalwines
         filter_t res;
         if(!_post && !_link)
         {
-            res._from = [&](const char* name)
+            res._from = [str](const char* name)
             {
                 return (str.compare(name) == 0);
             };
