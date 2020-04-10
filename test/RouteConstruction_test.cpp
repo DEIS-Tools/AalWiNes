@@ -34,12 +34,12 @@ using namespace aalwines;
 
 BOOST_AUTO_TEST_CASE(FastRerouteTest) {
     std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
-    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
+    std::vector<std::vector<std::string>> links{{"Router2"},
                                                 {"Router1", "Router3", "Router5"},
                                                 {"Router2", "Router4"},
                                                 {"Router3", "Router5"},
                                                 {"Router2", "Router4", "Router6"},
-                                                {"Router5", "iRouter6"}};
+                                                {"Router5"}};
     auto network = Network::make_network(names, links);
 
     auto interface = network.get_router(1)->find_interface(names[4]);
@@ -72,12 +72,12 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
 
 BOOST_AUTO_TEST_CASE(FastRerouteWithDataFlowTest) {
     std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
-    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
+    std::vector<std::vector<std::string>> links{{"Router2"},
                                                 {"Router1", "Router3", "Router5"},
                                                 {"Router2", "Router4"},
                                                 {"Router3", "Router5"},
                                                 {"Router2", "Router4", "Router6"},
-                                                {"Router5", "iRouter6"}};
+                                                {"Router5"}};
     auto network = Network::make_network(names, links);
 
     std::vector<const Router*> path {network.get_router(0),
@@ -118,12 +118,12 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithDataFlowTest) {
 
 BOOST_AUTO_TEST_CASE(DataFlowTest) {
     std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
-    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
-                                                {"Router1",  "Router3", "Router5"},
-                                                {"Router2",  "Router4"},
-                                                {"Router3",  "Router5"},
-                                                {"Router2",  "Router4", "Router6"},
-                                                {"Router5",  "iRouter6"}};
+    std::vector<std::vector<std::string>> links{{"Router2"},
+                                                {"Router1", "Router3", "Router5"},
+                                                {"Router2", "Router4"},
+                                                {"Router3", "Router5"},
+                                                {"Router2", "Router4", "Router6"},
+                                                {"Router5"}};
     auto network = Network::make_network(names, links);
 
     std::vector<const Router*> path {network.get_router(0),
@@ -152,12 +152,12 @@ BOOST_AUTO_TEST_CASE(DataFlowTest) {
 
 BOOST_AUTO_TEST_CASE(DataFlowWithDijkstraTest) {
     std::vector<std::string> names{"Router1", "Router2", "Router3", "Router4", "Router5", "Router6"};
-    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
-                                                {"Router1",  "Router3", "Router5"},
-                                                {"Router2",  "Router4"},
-                                                {"Router3",  "Router5"},
-                                                {"Router2",  "Router4", "Router6"},
-                                                {"Router5",  "iRouter6"}};
+    std::vector<std::vector<std::string>> links{{"Router2"},
+                                                {"Router1", "Router3", "Router5"},
+                                                {"Router2", "Router4"},
+                                                {"Router3", "Router5"},
+                                                {"Router2", "Router4", "Router6"},
+                                                {"Router5"}};
     auto network = Network::make_network(names, links);
 
     BOOST_TEST_MESSAGE("Before: ");
@@ -181,8 +181,8 @@ BOOST_AUTO_TEST_CASE(DataFlowWithDijkstraTest) {
 
 BOOST_AUTO_TEST_CASE(ShortDataFlowTest) {
     std::vector<std::string> names{"Router1", "Router2"};
-    std::vector<std::vector<std::string>> links{{"iRouter1", "Router2"},
-                                                {"Router1",  "iRouter2"}};
+    std::vector<std::vector<std::string>> links{{"Router2"},
+                                                {"Router1"}};
     auto network = Network::make_network(names, links);
 
     std::vector<const Router*> path {network.get_router(0), network.get_router(1)};

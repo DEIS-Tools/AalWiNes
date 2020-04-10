@@ -89,8 +89,6 @@ namespace aalwines {
             void print_json(std::ostream&) const;
             static void print_label(label_t label, std::ostream& s, bool quote = true);
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
-            void clear() { _rules.clear(); }
-            void erase_rule(const forward_t& rule){ _rules.erase(std::remove(_rules.begin(), _rules.end(), rule), _rules.end()); }
             void add_to_outgoing(const Interface* outgoing, action_t action);
         };
 
@@ -106,7 +104,6 @@ namespace aalwines {
         bool check_nondet(std::ostream& e);
         entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
         void pop_entry() { _entries.pop_back(); }
-        void clear() { _entries.clear(); }
 
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);
         void add_rule(label_t top_label, const forward_t& rule);

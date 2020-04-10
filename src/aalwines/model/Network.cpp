@@ -483,6 +483,7 @@ namespace aalwines
             auto res = mapping.insert(name.c_str(), name.length());
             assert(res.first);
             mapping.get_data(res.second) = &router;
+            router.get_interface(interfaces, "i" + name);
             for (const auto& other : links[i]) {
                 router.get_interface(interfaces, other);
             }
