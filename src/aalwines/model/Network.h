@@ -41,10 +41,6 @@ class Network {
 public:
     using routermap_t = ptrie::map<char, Router*>;
     Network(routermap_t&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
-    Network(const Network&) = default;
-    Network(Network&&) = default;
-    Network& operator=(const Network&) = default;
-    Network& operator=(Network&&) = default;
 
     Router *get_router(size_t id);
 
@@ -56,7 +52,7 @@ public:
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact = false);
     std::unordered_set<Query::label_t> all_labels();
-    std::vector<const Interface*>& all_interfaces() { return _all_interfaces; }
+    const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);
     void print_simple(std::ostream& s);
     bool is_service_label(const Query::label_t&) const;

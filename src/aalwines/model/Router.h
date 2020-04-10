@@ -64,19 +64,13 @@ public:
     size_t id() const {
         return _id;
     }
-
-    void update_id(uint64_t id_value) {
-        _id = id_value;
-    }
-
     size_t global_id() const {
         return _global_id;
     }
     void update_global_id(size_t global_id) {
         _global_id = global_id;
     }
-    
-    void remove_pairing(Interface* interface);
+
     void make_pairing(Interface* interface);
     void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
     Interface* match() const { return _matching; }
@@ -113,7 +107,6 @@ public:
 
     void print_dot(std::ostream& out);
     const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
-    void remove_interface(Interface* interface);
     Interface* find_interface(std::string iface);
     Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr);
     Interface* interface_no(size_t i) const {
