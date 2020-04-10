@@ -24,10 +24,10 @@
  * Created on 01-04-2020
  */
 
-#define BOOST_TEST_MODULE FastRerouting
+#define BOOST_TEST_MODULE RouteConstruction
 
 #include <boost/test/unit_test.hpp>
-#include <aalwines/synthesis/FastRerouting.h>
+#include <aalwines/synthesis/RouteConstruction.h>
 #include <iostream>
 
 using namespace aalwines;
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
     network.print_simple(s_before);
     BOOST_TEST_MESSAGE(s_before.str());
 
-    auto success = FastRerouting::make_reroute(interface, next_label);
+    auto success = RouteConstruction::make_reroute(interface, next_label);
 
     BOOST_CHECK_EQUAL(success, true);
 
@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithDataFlowTest) {
     network.print_simple(s_before);
     BOOST_TEST_MESSAGE(s_before.str());
 
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(5)->find_interface("iRouter6"),
             next_label, path);
@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithDataFlowTest) {
     network.print_simple(s_middle);
     BOOST_TEST_MESSAGE(s_middle.str());
 
-    auto success2 = FastRerouting::make_reroute(fail_interface, next_label);
+    auto success2 = RouteConstruction::make_reroute(fail_interface, next_label);
 
     BOOST_CHECK_EQUAL(success2, true);
 
@@ -137,7 +137,7 @@ BOOST_AUTO_TEST_CASE(DataFlowTest) {
     BOOST_TEST_MESSAGE(s_before.str());
 
     uint64_t i = 100;
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(5)->find_interface("iRouter6"),
             [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE(DataFlowWithDijkstraTest) {
     BOOST_TEST_MESSAGE(s_before.str());
 
     uint64_t i = 100;
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(5)->find_interface("iRouter6"),
             [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);});
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(ShortDataFlowTest) {
     BOOST_TEST_MESSAGE(s_before.str());
 
     uint64_t i = 100;
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(1)->find_interface("iRouter2"),
             [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
@@ -219,7 +219,7 @@ BOOST_AUTO_TEST_CASE(ShortestDataFlowTest) {
     BOOST_TEST_MESSAGE(s_before.str());
 
     uint64_t i = 100;
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(0)->find_interface("oRouter1"),
             [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
@@ -243,7 +243,7 @@ BOOST_AUTO_TEST_CASE(ShortestDataFlowWithDijkstraTest) {
     BOOST_TEST_MESSAGE(s_before.str());
 
     uint64_t i = 100;
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(0)->find_interface("oRouter1"),
             [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);});

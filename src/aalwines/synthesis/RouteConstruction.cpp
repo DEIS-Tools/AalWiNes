@@ -18,7 +18,7 @@
  */
 
 /*
- * File:   FastRerouting.cpp
+ * File:   RouteConstruction.cpp
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 01-04-2020
@@ -26,7 +26,7 @@
 
 #include <queue>
 #include <cassert>
-#include "FastRerouting.h"
+#include "RouteConstruction.h"
 
 namespace aalwines {
 
@@ -75,8 +75,8 @@ namespace aalwines {
         return std::nullopt; // No path was found
     }
 
-    bool FastRerouting::make_reroute(const Interface* failed_inf, const std::function<label_t(void)>& next_label,
-                                     const std::function<uint32_t(const Interface*)>& cost_fn) {
+    bool RouteConstruction::make_reroute(const Interface* failed_inf, const std::function<label_t(void)>& next_label,
+                                         const std::function<uint32_t(const Interface*)>& cost_fn) {
         std::vector<std::unique_ptr<queue_elem<Interface*,uint32_t>>> pointers;
         auto val = dijkstra(pointers, failed_inf->source(),
             [](const Router* node) { // Get edges in node
@@ -137,8 +137,8 @@ namespace aalwines {
         }
         return nullptr;
     }
-    bool FastRerouting::make_data_flow(const Interface* from, const Interface* to,
-            const std::function<label_t(void)>& next_label, const std::vector<const Router*>& path) {
+    bool RouteConstruction::make_data_flow(const Interface* from, const Interface* to,
+                                           const std::function<label_t(void)>& next_label, const std::vector<const Router*>& path) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
@@ -157,8 +157,8 @@ namespace aalwines {
         return make_data_flow(in_interface, interface_path, next_label);
     }
 
-    bool FastRerouting::make_data_flow(Interface* from, const std::vector<Interface*>& path,
-            const std::function<label_t(void)>& next_label) {
+    bool RouteConstruction::make_data_flow(Interface* from, const std::vector<Interface*>& path,
+                                           const std::function<label_t(void)>& next_label) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
@@ -175,8 +175,8 @@ namespace aalwines {
         return true;
     }
 
-    bool FastRerouting::make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
-            const std::function<uint32_t(const Interface*)>& cost_fn) {
+    bool RouteConstruction::make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
+                                           const std::function<uint32_t(const Interface*)>& cost_fn) {
         if (from->source() == to->source()) {
             return make_data_flow(from, std::vector<Interface*>{to}, next_label);
         }
