@@ -60,29 +60,53 @@ namespace aalwines
     void RoutingTable::add_rule(label_t top_label, action_t op, Interface* via, size_t weight, type_t type) {
         add_rule(top_label, forward_t(type, {op}, via, weight));
     }
+    void RoutingTable::forward_t::add_action(action_t action) { // This function applies reductions to the operation list when adding new actions.
+        if (_ops.empty()) {
+            _ops.push_back(action);
+            return;
+        }
+        switch (action._op) {
+            case PUSH:
+                if (_ops.back()._op == POP) {
+                    _ops.pop_back();
+                    add_action(action_t{SWAP, action._op_label});
+                    return;
+                }
+                break;
+            case SWAP: // TODO: case SWAP and case POP doesn't seem happen, so do we want to keep it?
+                if (_ops.back()._op == SWAP || _ops.back()._op == PUSH) {
+                    _ops.back()._op_label = action._op_label;
+                    return;
+                }
+                break;
+            case POP:
+                if (_ops.back()._op == SWAP) {
+                    _ops.pop_back();
+                    add_action(action_t{POP, label_t{}});
+                    return;
+                }
+                break;
+            default:
+                break;
+        }
+        _ops.push_back(action);
+    }
     void RoutingTable::add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label) {
         for (auto& e : _entries) {
             std::vector<forward_t> new_rules;
             for (const auto& f : e._rules) {
                 if (f._via == failed_inf) {
                     new_rules.emplace_back(f._type, f._ops, backup_inf, f._weight + 1);
-                    new_rules.back()._ops.emplace_back(PUSH, failover_label);
+                    new_rules.back().add_action(action_t{PUSH, failover_label});
                 }
             }
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
         }
     }
-    void RoutingTable::entry_t::add_to_outgoing(const Interface *outgoing, RoutingTable::action_t action) {
+    void RoutingTable::entry_t::add_to_outgoing(const Interface *outgoing, action_t action) {
         for (auto&& f : _rules) {
             if (f._via == outgoing) {
-                f._ops.push_back(action);
-            }
-        }
-    }
-    void RoutingTable::add_to_outgoing(const Interface* outgoing, label_t top_label, action_t action) {
-        for (auto& e : _entries) {
-            if (e._top_label == top_label) {
-                e.add_to_outgoing(outgoing, action);
+                f.add_action(action);
             }
         }
     }
@@ -104,6 +128,21 @@ namespace aalwines
                 if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
                     e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
                     continue;
+                bool legal_merge = true;
+                for (auto&& rule: e._rules) { // TODO: Consider sorted rules for faster merge.
+                    // Already exists
+                    if (std::find(iit->_rules.begin(), iit->_rules.end(), rule) != iit->_rules.end()) continue;
+                    // Different traffic engineering group
+                    if (std::find_if(iit->_rules.begin(), iit->_rules.end(),
+                                     [w = rule._weight](const forward_t& r){ return r._weight == w; })
+                        == iit->_rules.end()) {
+                        iit->_rules.push_back(rule);
+                    } else {
+                        legal_merge = false;
+                        break;
+                    }
+                }
+                if (legal_merge) continue;
                 assert(false); // TODO: Figure out what to do here!
                 iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
             } else {
@@ -187,6 +226,19 @@ namespace aalwines
     }
     bool RoutingTable::entry_t::operator!=(const entry_t& other) const
     {
+        return !(*this == other);
+    }
+    bool RoutingTable::forward_t::operator==(const forward_t& other) const {
+        return _type == other._type && _via == other._via && _weight == other._weight
+               && _ops.size() == other._ops.size() && std::equal(_ops.begin(), _ops.end(), other._ops.begin());
+    }
+    bool RoutingTable::forward_t::operator!=(const forward_t& other) const {
+        return !(*this == other);
+    }
+    bool RoutingTable::action_t::operator==(const action_t& other) const {
+        return _op == other._op && _op_label == other._op_label;
+    }
+    bool RoutingTable::action_t::operator!=(const action_t& other) const {
         return !(*this == other);
     }
 

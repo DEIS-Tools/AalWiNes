@@ -45,8 +45,8 @@ namespace aalwines
 
     void Router::change_name(const std::string& name)
     {
-        _names.pop_back();
-        _names.emplace_back(name);
+        assert(_names.size() > 0);
+        _names.back() = name;
     }
 
     const std::string& Router::name() const
@@ -103,7 +103,6 @@ namespace aalwines
     Interface::Interface(size_t id, size_t global_id, Router* target, Router* parent) : _id(id), _global_id(global_id), _target(target), _parent(parent)
     {
     }
-
 
     void Interface::make_pairing(Interface* interface)
     {
