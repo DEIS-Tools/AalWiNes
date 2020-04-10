@@ -37,14 +37,12 @@ namespace aalwines
     Network::Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
     : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
     {
-
         ptrie::set<Query::label_t> all_labels;
         _total_labels = 0;
         for (auto& r : _routers) {
             for (auto& inf : r->interfaces()) {
                 for (auto& e : inf->table().entries()) {
                     if(all_labels.insert(e._top_label).first) ++_total_labels;
-                    if(e._top_label.value() > _max_label) _max_label = e._top_label.value();
                 }
             }
         }

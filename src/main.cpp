@@ -84,8 +84,6 @@ int main(int argc, const char** argv)
 
 
     std::string junos_config, prex_topo, prex_routing;
-    int start_router, end_router;
-    bool modify_network = false;
     bool skip_pfe = false;
     input.add_options()
             ("juniper", po::value<std::string>(&junos_config),
@@ -96,10 +94,6 @@ int main(int argc, const char** argv)
             "An xml-file defining the routing in the P-Rex format")
             ("skip-pfe", po::bool_switch(&skip_pfe),
             "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
-            //("start router, end router", po::value<std::vector<std::string>>() -> multitoken(), "Modify input network.")
-            ("modify", po::bool_switch(&modify_network), "Modify input network.")
-            ("start-router", po::value<int>(&start_router), "Start router edge modification.")
-            ("end-router", po::value<int>(&end_router), "End router edge modification.")
             ;
 
     std::string query_file;
@@ -183,10 +177,6 @@ int main(int argc, const char** argv)
         PRexBuilder::parse(prex_topo, prex_routing, warnings) :
         JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
-
-    if (modify_network) {
-        //network.manipulate(some network)
-    }
 
     if (print_dot) {
         network.print_dot(std::cout);
