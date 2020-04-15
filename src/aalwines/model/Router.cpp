@@ -264,6 +264,9 @@ namespace aalwines
     }
     void Router::print_json(std::ostream& s)
     {
+        if (!_latitude.empty() && !_longitude.empty()) {
+            s << "\t\t\t\"lat\": " << _latitude << ",\n\t\t\t\"lng\": " << _longitude << ",\n";
+        }
         std::set<std::string> targets;
         for(auto& i : _interfaces)
         {
@@ -296,5 +299,9 @@ namespace aalwines
             s << "\t\t\t\t\"" << tn << "\"";
         }
         s << "\n\t\t\t]\n";
+    }
+    void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
+        _latitude = latitude;
+        _longitude = longitude;
     }
 }

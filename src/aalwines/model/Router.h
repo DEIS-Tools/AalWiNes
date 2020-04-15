@@ -110,6 +110,10 @@ public:
     static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<char, Router*>& mapping);
     void print_simple(std::ostream& s);
     void print_json(std::ostream& s);
+
+    void set_latitude_longitude(const std::string& latitude, const std::string& longitude);
+    const std::string& latitude() const { return _latitude; }
+    const std::string& longitude() const { return _longitude; }
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;
@@ -118,6 +122,8 @@ private:
     size_t _inamelength = 0; // for printing
     bool _has_config = false;
     bool _is_null = false;
+    std::string _latitude;
+    std::string _longitude;
     friend class Interface;
 };
 }
