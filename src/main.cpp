@@ -66,6 +66,7 @@ int main(int argc, const char** argv)
     po::options_description verification("Verification Options");    
     
     bool print_dot = false;
+    bool print_net = false;
     bool no_parser_warnings = false;
     bool silent = false;
     bool dump_to_moped = false;
@@ -75,6 +76,7 @@ int main(int argc, const char** argv)
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
+            ("net", po::bool_switch(&print_net), "A json output of the network will be printed to cout when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
@@ -208,6 +210,18 @@ int main(int argc, const char** argv)
         }
     }
     
+    if (!dump_to_moped && (print_net || !query_file.empty()))
+    {
+        std::cout << "{\n";
+        if (print_net) {
+            network.print_json(std::cout);
+            if (!query_file.empty())
+            {
+                std::cout << ",\n";
+            }
+        }
+    }
+
     if(!query_file.empty())
     {
         stopwatch queryparsingwatch;
@@ -258,10 +272,11 @@ int main(int argc, const char** argv)
         }
 
         size_t query_no = 0;
-        if(!dump_to_moped) {
-            std::cout << "{\n";
-            if (!no_timing) {
-                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration())
+        if(!dump_to_moped)
+        {
+            if(!no_timing)
+            {
+                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration()) 
                           << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
             }
             std::cout << "\t\"answers\":{\n";
@@ -391,8 +406,12 @@ int main(int argc, const char** argv)
         }
         if(!dump_to_moped)
         {
-            std::cout << "\n}}" << std::endl;
+            std::cout << "\n}";
         }
+    }
+    if (!dump_to_moped && (print_net || !query_file.empty()))
+    {
+        std::cout << "\n}\n";
     }
     return 0;
 }
