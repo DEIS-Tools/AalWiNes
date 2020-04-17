@@ -49,6 +49,69 @@ namespace po = boost::program_options;
 using namespace aalwines;
 using namespace pdaaal;
 
+template<typename W_FN>
+bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, stopwatch& verification_time,
+        Query& q, Query::mode_t m, Network& network, bool no_ip_swap, std::pair<size_t,size_t>& reduction, size_t tos,
+        bool need_trace, size_t engine, Moped& moped, SolverAdapter& solver, utils::outcome_t& result,
+        std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t >& trace, std::stringstream& proof,
+        const W_FN& weight_fn) {
+    compilation_time.start();
+    q.set_approximation(m);
+    NetworkPDAFactory factory(q, network, no_ip_swap, weight_fn);
+    auto pda = factory.compile();
+    compilation_time.stop();
+
+    reduction_time.start();
+    reduction = Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
+    reduction_time.stop();
+
+    verification_time.start();
+    bool engine_outcome;
+    switch(engine) {
+        case 1:
+            engine_outcome = moped.verify(pda, need_trace);
+            verification_time.stop();
+            if(need_trace && engine_outcome) {
+                trace = moped.get_trace(pda);
+                if (factory.write_json_trace(proof, trace))
+                    result = utils::YES;
+            }
+            break;
+        case 2: {
+            using W = typename W_FN::result_type;
+            SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
+            if constexpr (pdaaal::is_weighted<typename W_FN::result_type>) {
+                solver_result = solver.post_star<pdaaal::Trace_Type::Shortest>(pda);
+            } else {
+                solver_result = solver.post_star<pdaaal::Trace_Type::Any>(pda);
+            }
+            engine_outcome = solver_result.first;
+            verification_time.stop();
+            if (need_trace && engine_outcome) {
+                trace = solver.get_trace(pda, std::move(solver_result.second));
+                if (factory.write_json_trace(proof, trace))
+                    result = utils::YES;
+            }
+            break;
+        }
+        case 3: {
+            auto solver_result = solver.pre_star(pda, need_trace);
+            engine_outcome = solver_result.first;
+            verification_time.stop();
+            if (need_trace && engine_outcome) {
+                trace = solver.get_trace(pda, std::move(solver_result.second));
+                if (factory.write_json_trace(proof, trace))
+                    result = utils::YES;
+            }
+            break;
+        }
+        default:
+            throw base_error("Unsupported --engine value given");
+    }
+    return engine_outcome;
+}
+
+
 /*
  TODO:
  * fix error-handling
@@ -246,7 +309,11 @@ int main(int argc, const char** argv)
 
         std::optional<NetworkWeight::weight_function> weight_fn;
         if (!weight_file.empty()) {
-            //stopwatch weightparsingwatch;
+            if (engine != 2) {
+                std::cerr << "Shortest trace using weights is only implemented for --engine 2 (post*). Not for --engine " << engine << std::endl;
+                exit(-1);
+            }
+            // TODO: Implement parsing of latency info here.
             NetworkWeight network_weight;
             {
                 std::ifstream wstream(weight_file);
@@ -265,13 +332,10 @@ int main(int argc, const char** argv)
                     exit(-1);
                 }
             }
-            // weightparsingwatch.stop();
         } else {
-            // TODO: Make the rest of main use unweighted version rather than creating a default weight function here.
-            weight_fn.emplace(NetworkWeight::default_weight_fn());
+            weight_fn = std::nullopt;
         }
 
-        size_t query_no = 0;
         if(!dump_to_moped)
         {
             if(!no_timing)
@@ -281,9 +345,10 @@ int main(int argc, const char** argv)
             }
             std::cout << "\t\"answers\":{\n";
         }
+
         Moped moped;
         SolverAdapter solver;
-        
+        size_t query_no = 0;
         for(auto& q : builder._result)
         {
             ++query_no;
@@ -307,56 +372,18 @@ int main(int argc, const char** argv)
             stopwatch verification_time(false);
             std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
             std::stringstream proof;
-            for(auto m : modes)
-            {
-                compilation_time.start();
-                q.set_approximation(m);
-                NetworkPDAFactory factory(q, network, no_ip_swap, weight_fn.value());
-                auto pda = factory.compile();
-                compilation_time.stop();
-                reduction_time.start();
-                reduction = Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
-                reduction_time.stop();
-                verification_time.start();
+            bool need_trace = was_dual || get_trace;
+            for(auto m : modes) {
                 bool engine_outcome;
-                bool need_trace = was_dual || get_trace;
-
-                switch(engine) {
-                case 1:
-                    engine_outcome = moped.verify(pda, need_trace);
-                    verification_time.stop();
-                    if(need_trace && engine_outcome) {
-                        trace = moped.get_trace(pda);
-                        if (factory.write_json_trace(proof, trace))
-                            result = utils::YES;
-                    }
-                    break;
-                case 2: {
-                    auto solver_result1 = solver.post_star(pda);
-                    engine_outcome = solver_result1.first;
-                    verification_time.stop();
-                    if (need_trace && engine_outcome) {
-                        trace = solver.get_trace(pda, std::move(solver_result1.second));
-                        if (factory.write_json_trace(proof, trace))
-                            result = utils::YES;
-                    }
-                    break;
+                if (weight_fn) {
+                    engine_outcome = do_verification(compilation_time, reduction_time,
+                            verification_time,q, m, network, no_ip_swap, reduction, tos, need_trace, engine,
+                            moped, solver,result, trace, proof, weight_fn.value());
+                } else {
+                    engine_outcome = do_verification<std::function<void(void)>>(compilation_time, reduction_time,
+                            verification_time,q, m,network, no_ip_swap, reduction, tos, need_trace, engine,
+                            moped, solver,result, trace, proof, [](){});
                 }
-                case 3: {
-                    auto solver_result2 = solver.pre_star(pda, need_trace);
-                    engine_outcome = solver_result2.first;
-                    verification_time.stop();
-                    if (need_trace && engine_outcome) {
-                        trace = solver.get_trace(pda, std::move(solver_result2.second));
-                        if (factory.write_json_trace(proof, trace))
-                            result = utils::YES;
-                    }
-                    break;
-                }
-                default:
-                    throw base_error("Unsupported --engine value given");
-                }
-
                 if(q.number_of_failures() == 0)
                     result = engine_outcome ? utils::YES : utils::NO;
 
@@ -404,6 +431,7 @@ int main(int argc, const char** argv)
             std::cout << "\n";
             }
         }
+
         if(!dump_to_moped)
         {
             std::cout << "\n}";

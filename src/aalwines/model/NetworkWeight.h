@@ -47,7 +47,7 @@ namespace aalwines {
      *   ], ...
      * ]
      * where
-     *  - ATOM = {"hops", "failures", "tunnels", "latency"}
+     *  - ATOM = {"hops", "failures", "tunnels", "latency", "zero"}
      *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
@@ -140,6 +140,8 @@ namespace aalwines {
                 p = AtomicProperty::tunnels;
             } else if (s == "latency") {
                 p = AtomicProperty::latency;
+            } else if (s == "zero") {
+                p = AtomicProperty::default_weight_function;
             } else {
                 throw base_error("Unknown atomic property: " + s);
             }
