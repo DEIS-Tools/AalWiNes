@@ -67,7 +67,7 @@ public:
     size_t global_id() const {
         return _global_id;
     }
-    void update_global_id(size_t global_id) {
+    void set_global_id(size_t global_id) {
         _global_id = global_id;
     }
 
@@ -92,7 +92,7 @@ public:
     size_t index() const {
         return _index;
     }
-    void update_index(size_t index) {
+    void set_index(size_t index) {
         _index = index;
     }
     
