@@ -564,6 +564,7 @@ namespace aalwines {
                                                      std::vector<const RoutingTable::entry_t *> &entries,
                                                      std::vector<const RoutingTable::forward_t *> &rules) {
         std::unordered_set<const Interface *> disabled, active;
+
         for (size_t sno = 0; sno < trace.size(); ++sno) {
             auto &step = trace[sno];
             if (step._pdastate > 1 && step._pdastate < this->_num_pda_states) {
@@ -584,10 +585,6 @@ namespace aalwines {
                             if (!add_interfaces(disabled, active, entry, entry._rules[next._rid])) {
                                 return false;
                             }
-                            /*if (entry._rules[next._rid]._weight > _query.number_of_failures()){
-                                return false;
-                            }
-                            _query.decrement_number_of_failures(entry._rules[next._rid]._weight);*/
                             rules.push_back(&entry._rules[next._rid]);
                             entries.push_back(&entry);
                         } else {
@@ -604,10 +601,10 @@ namespace aalwines {
                                     switch (_query.approximation()) {
                                         case Query::UNDER:
                                             assert(next._appmode >= s._appmode);
-                                            ok = ((ssize_t) (r._weight)) == (next._appmode - s._appmode);
+                                            ok = ((ssize_t) r._weight) == (next._appmode - s._appmode);
                                             break;
                                         case Query::OVER:
-                                            ok = ((ssize_t) (r._weight)) <= _query.number_of_failures();
+                                            ok = ((ssize_t) r._weight) <= _query.number_of_failures();
                                             break;
                                         case Query::DUAL:
                                             throw base_error("Tracing for DUAL not yet implemented");
