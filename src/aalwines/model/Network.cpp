@@ -219,7 +219,7 @@ namespace aalwines
 
             // Add interfaces to _all_interfaces and update their global id.
             for (auto&& inf: e->interfaces()) {
-                inf->update_global_id(_all_interfaces.size());
+                inf->set_global_id(_all_interfaces.size());
                 _all_interfaces.push_back(inf.get());
                 // Transfer links from old NULL router to new NULL router.
                 if (inf->target()->is_null()){
@@ -231,7 +231,7 @@ namespace aalwines
             }
 
             // Move router to new network
-            e->update_index(_routers.size());
+            e->set_index(_routers.size());
             _routers.emplace_back(std::move(e));
             _mapping.get_data(_mapping.insert(name.c_str(), name.length()).second) = _routers.back().get();
         }

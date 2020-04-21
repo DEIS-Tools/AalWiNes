@@ -50,10 +50,10 @@ namespace pdaaal {
 
         template<typename T, typename W, typename C>
         static void dump_pda(const PDAAdapter<T,W,C>& pda, std::ostream& s);
-        
-        template<typename T>
-        std::vector<typename TypedPDA<T>::tracestate_t> get_trace(TypedPDA<T>& pda) const;
 
+        template<typename T, typename W, typename C>
+        std::vector<typename TypedPDA<T>::tracestate_t> get_trace(TypedPDA<T,W,C>& pda) const;
+        
         [[nodiscard]] double verification_duration() const { return _verification_time.duration(); }
 
     private:
@@ -156,8 +156,8 @@ namespace pdaaal {
         }
     }
 
-    template<typename T>
-    std::vector<typename TypedPDA<T>::tracestate_t> Moped::get_trace(TypedPDA<T>& pda) const
+    template<typename T, typename W, typename C>
+    std::vector<typename TypedPDA<T>::tracestate_t> Moped::get_trace(TypedPDA<T,W,C>& pda) const
     {
         using tracestate_t = typename TypedPDA<T>::tracestate_t;
         std::vector<tracestate_t> trace;

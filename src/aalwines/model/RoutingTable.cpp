@@ -129,7 +129,7 @@ namespace aalwines
                     e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
                     continue;
                 bool legal_merge = true;
-                for (auto&& rule: e._rules) { // TODO: Consider sorted rules for faster merge.
+                for (const auto& rule : e._rules) { // TODO: Consider sorted rules for faster merge.
                     // Already exists
                     if (std::find(iit->_rules.begin(), iit->_rules.end(), rule) != iit->_rules.end()) continue;
                     // Different traffic engineering group

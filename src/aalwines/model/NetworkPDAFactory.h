@@ -30,7 +30,6 @@
 #include "Query.h"
 #include "Network.h"
 #include <pdaaal/PDAFactory.h>
-#include "NetworkWeight.h"
 
 
 namespace aalwines {
@@ -538,23 +537,17 @@ namespace aalwines {
         if (fwd._weight == 0)
             return true;
         std::unordered_set<const Interface *> tmp = disabled;
-        bool brk = false;
-        for (auto &alt_ent : inf->table().entries()) {
-            if (alt_ent._top_label.overlaps(entry._top_label)) {
-                for (auto &alt_rule : alt_ent._rules) {
-                    if (alt_rule._weight < fwd._weight) {
-                        if (active.count(alt_rule._via) > 0) return false;
-                        tmp.insert(alt_rule._via);
-                        if (tmp.size() > (uint32_t) _query.number_of_failures()) {
-                            return false;
-                        }
-                        brk = true;
-                        break;
-                    }
+
+        // find failing rule and disable _via interface
+        for(auto &rule : entry._rules){
+            if (rule._weight < fwd._weight) {
+                if (active.count(rule._via) > 0) return false;
+                tmp.insert(rule._via);
+                if (tmp.size() > (uint32_t) _query.number_of_failures()) {
+                    return false;
                 }
-            }
-            if (brk)
                 break;
+            }
         }
         if (tmp.size() > (uint32_t) _query.number_of_failures()) {
             return false;
