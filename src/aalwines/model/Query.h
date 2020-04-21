@@ -69,7 +69,7 @@ namespace aalwines {
             {
                 set_value(type, _value, _mask);
             }
-            
+
             void set_value(type_t type, uint64_t val, uint32_t mask)
             {
                 _type = type;

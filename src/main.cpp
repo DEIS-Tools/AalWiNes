@@ -160,7 +160,7 @@ int main(int argc, const char** argv)
             "An xml-file defining the routing in the P-Rex format")
             ("skip-pfe", po::bool_switch(&skip_pfe),
             "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
-            ;    
+            ;
 
     std::string query_file;
     std::string weight_file;
