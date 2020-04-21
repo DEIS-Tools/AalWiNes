@@ -29,6 +29,7 @@
 
 #include <pdaaal/PDAAdapter.h>
 #include "aalwines/utils/errors.h"
+#include "aalwines/utils/stopwatch.h"
 
 #include <cassert>
 #include <sstream>
@@ -52,12 +53,15 @@ namespace pdaaal {
         
         template<typename T>
         std::vector<typename TypedPDA<T>::tracestate_t> get_trace(TypedPDA<T>& pda) const;
-        
+
+        [[nodiscard]] double verification_duration() const { return _verification_time.duration(); }
+
     private:
         bool parse_result(const std::string&, bool build_trace);
         std::string _path;
         std::string _tmpfilepath;
         std::vector<std::string> _raw_trace;
+        stopwatch _verification_time;
         // trace?
     };
 
