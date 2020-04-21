@@ -28,6 +28,8 @@
 #include "filter.h"
 
 #include <cassert>
+#include <map>
+#include <sstream>
 
 namespace aalwines
 {
@@ -46,8 +48,7 @@ namespace aalwines
         }
     }
 
-    const Router* Network::get_router(size_t id) const
-    {
+    Router* Network::get_router(size_t id) {
         if (id < _routers.size()) {
             return _routers[id].get();
         }
@@ -196,6 +197,81 @@ namespace aalwines
             _label_cache = res;
         }
         return _label_cache;
+    }
+
+    void Network::move_network(Network&& nested_network){
+        // Find NULL router
+        auto res = _mapping.insert("NULL", 4);
+        assert(!res.first);
+        auto nullrouter = _mapping.get_data(res.second);
+
+        // Move old network into new network.
+        for (auto&& e : nested_network._routers) {
+            if (e->is_null()) {
+                continue;
+            }
+            // Find unique name for router
+            std::string name = e->name();
+            while(_mapping.exists(name.c_str(), name.length()).first){
+                name += "'";
+            }
+            e->change_name(name);
+
+            // Add interfaces to _all_interfaces and update their global id.
+            for (auto&& inf: e->interfaces()) {
+                inf->set_global_id(_all_interfaces.size());
+                _all_interfaces.push_back(inf.get());
+                // Transfer links from old NULL router to new NULL router.
+                if (inf->target()->is_null()){
+                    std::stringstream ss;
+                    ss << "i" << inf->global_id();
+                    auto interface = nullrouter->get_interface(_all_interfaces, ss.str(), e.get()); // will add the interface
+                    interface->make_pairing(inf.get());
+                }
+            }
+
+            // Move router to new network
+            e->set_index(_routers.size());
+            _routers.emplace_back(std::move(e));
+            _mapping.get_data(_mapping.insert(name.c_str(), name.length()).second) = _routers.back().get();
+        }
+    }
+
+    void Network::inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
+            Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label) {
+        assert(nested_ingoing->target()->is_null());
+        assert(nested_outgoing->target()->is_null());
+        assert(this->size());
+        assert(nested_network.size());
+
+        // Pair interfaces for injection and create virtual interface to filter post_label before POP.
+        auto link_end = link->match();
+        link->make_pairing(nested_ingoing);
+        auto virtual_guard = nested_outgoing->source()->get_interface(_all_interfaces, "__virtual_guard__"); // Assumes these names are unique for this router.
+        auto nested_end_link = nested_outgoing->source()->get_interface(_all_interfaces, "__end_link__");
+        nested_outgoing->make_pairing(virtual_guard);
+        link_end->make_pairing(nested_end_link);
+
+        move_network(std::move(nested_network));
+
+        // Add push and pop rules.
+        for (auto&& interface : link->source()->interfaces()) {
+            interface->table().add_to_outgoing(link,
+                    {RoutingTable::op_t::PUSH, pre_label});
+        }
+        virtual_guard->table().add_rule(post_label, {RoutingTable::op_t::POP, RoutingTable::label_t{}}, nested_end_link);
+    }
+
+    void Network::concat_network(Interface* link, Network&& nested_network, Interface* nested_ingoing, RoutingTable::label_t post_label) {
+        assert(nested_ingoing->target()->is_null());
+        assert(link->target()->is_null());
+        assert(this->size());
+        assert(nested_network.size());
+
+        move_network(std::move(nested_network));
+
+        // Pair interfaces for concatenation.
+        link->make_pairing(nested_ingoing);
     }
 
     void Network::print_dot(std::ostream& s)
@@ -413,4 +489,38 @@ namespace aalwines
         }
         s << "  </links>\n</network>\n";
     }
+
+    Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links){
+        std::vector<std::unique_ptr<Router>> routers;
+        std::vector<const Interface*> interfaces;
+        Network::routermap_t mapping;
+        for (size_t i = 0; i < names.size(); ++i) {
+            auto name = names[i];
+            size_t id = routers.size();
+            routers.emplace_back(std::make_unique<Router>(id));
+            Router& router = *routers.back().get();
+            router.add_name(name);
+            auto res = mapping.insert(name.c_str(), name.length());
+            assert(res.first);
+            mapping.get_data(res.second) = &router;
+            router.get_interface(interfaces, "i" + name);
+            for (const auto& other : links[i]) {
+                router.get_interface(interfaces, other);
+            }
+        }
+        for (size_t i = 0; i < names.size(); ++i) {
+            auto name = names[i];
+            for (const auto &other : links[i]) {
+                auto res1 = mapping.exists(name.c_str(), name.length());
+                assert(res1.first);
+                auto res2 = mapping.exists(other.c_str(), other.length());
+                if(!res2.first) continue;
+                mapping.get_data(res1.second)->find_interface(other)->make_pairing(mapping.get_data(res2.second)->find_interface(name));
+            }
+        }
+        Router::add_null_router(routers, interfaces, mapping);
+
+        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
+    }
+
 }

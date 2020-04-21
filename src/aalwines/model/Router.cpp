@@ -44,6 +44,13 @@ namespace aalwines
         _names.emplace_back(name);
     }
 
+    void Router::change_name(const std::string& name)
+    {
+        assert(_names.size() == 1);
+        _names.clear();
+        _names.emplace_back(name);
+    }
+
     const std::string& Router::name() const
     {
         assert(_names.size() > 0);

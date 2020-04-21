@@ -67,7 +67,10 @@ public:
     size_t global_id() const {
         return _global_id;
     }
-    
+    void set_global_id(size_t global_id) {
+        _global_id = global_id;
+    }
+
     void make_pairing(Interface* interface);
     void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
     Interface* match() const { return _matching; }
@@ -89,12 +92,16 @@ public:
     size_t index() const {
         return _index;
     }
+    void set_index(size_t index) {
+        _index = index;
+    }
     
     bool is_null() const {
         return _is_null;
     }
     
     void add_name(const std::string& name);
+    void change_name(const std::string& name);
     const std::string& name() const;
     const std::vector<std::string>& names() const { return _names; }
 
