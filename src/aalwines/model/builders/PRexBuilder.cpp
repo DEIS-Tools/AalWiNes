@@ -112,6 +112,14 @@ namespace aalwines {
                 throw base_error(es.str());
             }
             mapping.get_data(res.second) = &router;
+            auto latattr = rxml->first_attribute("latitude");
+            auto lonattr = rxml->first_attribute("longitude");
+            if(latattr != nullptr && lonattr != nullptr)
+            {
+                std::string latitude = latattr->value();
+                std::string longitude = lonattr->value();
+                router.set_latitude_longitude(latitude, longitude);
+            }
             auto interfaces = rxml->first_node("interfaces");
             if(interfaces)
             {
