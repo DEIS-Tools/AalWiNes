@@ -31,6 +31,7 @@
 #include <vector>
 #include <streambuf>
 #include <sstream>
+#include <set>
 namespace aalwines
 {
 
@@ -266,5 +267,47 @@ namespace aalwines
                 s << "\t\t}\n";
             }
         }
+    }
+    void Router::print_json(std::ostream& s)
+    {
+        if (!_latitude.empty() && !_longitude.empty()) {
+            s << "\t\t\t\"lat\": " << _latitude << ",\n\t\t\t\"lng\": " << _longitude << ",\n";
+        }
+        std::set<std::string> targets;
+        for(auto& i : _interfaces)
+        {
+            const RoutingTable& table = i->table();
+            for(auto& e : table.entries())
+            {
+                for(auto& fwd : e._rules)
+                {
+                    auto via = fwd._via;
+                    if (via)
+                    {
+                        auto tn = via->target()->name();
+                        targets.insert(tn);
+                    }
+                }
+            }
+        }
+        s << "\t\t\t\"targets\": [\n";
+        bool first = true;
+        for(auto& tn : targets)
+        {
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                s << ",\n";
+            }
+            s << "\t\t\t\t\"" << tn << "\"";
+        }
+        s << "\n\t\t\t]\n";
+    }
+    void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
+        _latitude = latitude;
+        _longitude = longitude;
     }
 }
