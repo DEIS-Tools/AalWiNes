@@ -58,6 +58,8 @@ namespace aalwines {
                         router_name = str.substr(pos+2, str.size() - pos - 3);
                         //Get_interface dont handle ' ' very well
                         std::replace(router_name.begin(), router_name.end(), ' ', '_');
+                        router_name.erase(std::remove_if(router_name.begin(), router_name.end(),
+                                [](auto const& c) -> bool { return !std::isalnum(c) && c != '_' && c != '-'; }), router_name.end());
                     }
                     else if(key == "Latitude"){
                         latitude = std::stod(str.substr(pos+1));

@@ -48,9 +48,11 @@ int main(int argc, const char** argv)
             ;
     std::string topology_destination;
     std::string routing_destination;
+    std::string query_destination;
     output.add_options()
             ("write-topology,t", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
             ("write-routing,r", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
+            ("write-query,q", po::value<std::string>(&query_destination), "Write a query with description to the given file.")
             ;
     opts.add(input);
     opts.add(output);
@@ -67,10 +69,11 @@ int main(int argc, const char** argv)
         exit(-1);
     }
     size_t dot_pos = topo_zoo.find_last_of('.');
-    if (topology_destination.empty() && routing_destination.empty() && dot_pos > 0 && topo_zoo.substr(dot_pos + 1) =="gml") {
+    if (topology_destination.empty() && routing_destination.empty() && query_destination.empty() && dot_pos > 0 && topo_zoo.substr(dot_pos + 1) =="gml") {
         const auto name = topo_zoo.substr(0, dot_pos);
         topology_destination = name + "-topo.xml";
         routing_destination = name + "-routing.xml";
+        query_destination = name + "-queries.json";
     } else if (topology_destination.empty() || routing_destination.empty()) {
         std::cerr << "Please provide routing and topology output file" << std::endl;
         exit(-1);
@@ -79,8 +82,7 @@ int main(int argc, const char** argv)
     //std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
     auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
     std::vector<std::pair<Router*, Router*>> unlinked_routers;
-
-    // TODO: Construct routes on network!
+    
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
     auto cost = [](const Interface* interface){ return interface->source()->coordinate() && interface->target()->coordinate() ?
@@ -105,14 +107,30 @@ int main(int argc, const char** argv)
     if(out_topo.is_open()) {
         network.write_prex_topology(out_topo);
     } else {
-        std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
+        std::cerr << "Could not open --write-topology \"" << topology_destination << "\" for writing" << std::endl;
         exit(-1);
     }
     std::ofstream out_route(routing_destination);
     if(out_route.is_open()) {
         network.write_prex_routing(out_route);
     } else {
-        std::cerr << "Could not open --write-routing\"" << routing_destination << "\" for writing" << std::endl;
+        std::cerr << "Could not open --write-routing \"" << routing_destination << "\" for writing" << std::endl;
         exit(-1);
+    }
+    if (!query_destination.empty()) {
+        std::ofstream out_query(query_destination);
+        if(out_query.is_open()) {
+            out_query << "[\n"
+                      << "    {\n"
+                      << R"(        "Description": "Find a trace from )" << network.get_router(0)->name() << " to " << network.get_router(1)->name() <<  " with 0 failed links.\",\n"
+                      << R"(        "Query": ")"
+                      << "<.> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <.> 0 DUAL\"\n"
+                      << "    }\n"
+                      << "]";
+
+        } else {
+            std::cerr << "Could not open --write-query \"" << query_destination << "\" for writing" << std::endl;
+            exit(-1);
+        }
     }
 }
