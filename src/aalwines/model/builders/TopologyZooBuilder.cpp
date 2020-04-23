@@ -56,6 +56,7 @@ namespace aalwines {
                     }
                     else if(key == "label"){
                         router_name = str.substr(pos+2, str.size() - pos - 3);
+                        trim(router_name);
                         //Get_interface dont handle ' ' very well
                         std::replace(router_name.begin(), router_name.end(), ' ', '_');
                         router_name.erase(std::remove_if(router_name.begin(), router_name.end(),

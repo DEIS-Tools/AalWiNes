@@ -82,7 +82,27 @@ int main(int argc, const char** argv)
     //std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
     auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
     std::vector<std::pair<Router*, Router*>> unlinked_routers;
-    
+
+    for (auto &r : network.get_all_routers()) {
+        if (r->is_null()) continue;
+        if (!r->coordinate() || (r->coordinate().value().latitude() == 0 && r->coordinate().value().longitude() == 0)) {
+            // Try to find a good coordinate.
+            std::vector<Coordinate> neighbours;
+            for (auto &i: r->interfaces()) {
+                if (!i->target()->is_null() && i->target()->coordinate()
+                && (i->target()->coordinate().value().latitude() != 0 || i->target()->coordinate().value().longitude() != 0)) {
+                    neighbours.push_back(i->target()->coordinate().value());
+                }
+            }
+            if (neighbours.empty()) {
+                std::cerr << "Warning: No neighbour with coordinate for router " << r->name() << "." << std::endl;
+            } else {
+                r->set_coordinate(Coordinate::mid_point(neighbours));
+            }
+        }
+    }
+
+
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
     auto cost = [](const Interface* interface){ return interface->source()->coordinate() && interface->target()->coordinate() ?

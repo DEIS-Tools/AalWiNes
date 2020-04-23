@@ -134,6 +134,7 @@ public:
     static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<char, Router*>& mapping);
     void print_simple(std::ostream& s);
     [[nodiscard]] std::optional<Coordinate> coordinate() const { return _coordinate; }
+    void set_coordinate(const Coordinate& coordinate) { _coordinate.emplace(coordinate); }
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;
