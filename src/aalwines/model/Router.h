@@ -33,6 +33,7 @@
 #include <memory>
 
 #include <ptrie/ptrie_map.h>
+#include <aalwines/utils/coordinate.h>
 
 #include "RoutingTable.h"
 
@@ -119,8 +120,9 @@ public:
     void print_json(std::ostream& s);
 
     void set_latitude_longitude(const std::string& latitude, const std::string& longitude);
-    const std::string& latitude() const { return _latitude; }
-    const std::string& longitude() const { return _longitude; }
+    [[nodiscard]] std::string latitude() const {return _coordinate ? std::to_string(_coordinate->latitude()) : ""; };
+    [[nodiscard]] std::string longitude() const {return _coordinate ? std::to_string(_coordinate->longitude()) : ""; };
+    [[nodiscard]] std::optional<Coordinate> coordinate() const { return _coordinate; }
 private:
     size_t _index = std::numeric_limits<size_t>::max();
     std::vector<std::string> _names;
@@ -129,8 +131,7 @@ private:
     size_t _inamelength = 0; // for printing
     bool _has_config = false;
     bool _is_null = false;
-    std::string _latitude;
-    std::string _longitude;
+    std::optional<Coordinate> _coordinate = std::nullopt;
     friend class Interface;
 };
 }

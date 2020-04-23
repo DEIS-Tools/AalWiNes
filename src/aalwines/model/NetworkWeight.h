@@ -47,7 +47,7 @@ namespace aalwines {
      *   ], ...
      * ]
      * where
-     *  - ATOM = {"hops", "failures", "tunnels", "latency", "zero"}
+     *  - ATOM = {"hops", "failures", "tunnels", "distance", "latency", "zero"}
      *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
@@ -62,6 +62,7 @@ namespace aalwines {
             link_failures,
             number_of_hops,
             tunnels,
+            distance,
             latency,
         };
 
@@ -81,6 +82,13 @@ namespace aalwines {
                 case AtomicProperty::tunnels:
                     return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
                         return std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
+                    };
+                case AtomicProperty::distance:
+                    return [](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
+                        if (!last_op) return 0;
+                        return r._via->source()->coordinate() && r._via->target()->coordinate()
+                               ? r._via->source()->coordinate()->distance_to(r._via->target()->coordinate().value())
+                               : 20038; //(km). If coordinates are missing, use half circumference of earth, i.e. worst case distance.
                     };
                 case AtomicProperty::latency:
                     return [this](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
@@ -138,6 +146,8 @@ namespace aalwines {
                 p = AtomicProperty::link_failures;
             } else if (s == "tunnels") {
                 p = AtomicProperty::tunnels;
+            } else if (s == "distance") {
+                p = AtomicProperty::distance;
             } else if (s == "latency") {
                 p = AtomicProperty::latency;
             } else if (s == "zero") {
