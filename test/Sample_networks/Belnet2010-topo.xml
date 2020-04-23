@@ -1,0 +1,316 @@
+<network>
+  <routers>
+    <router name="Liege1" latitude="50.7797" longitude="4.98954" >
+      <interfaces>
+        <interface name="iLiege1"/>
+        <interface name="Liege2"/>
+        <interface name="Vilvoorde"/>
+      </interfaces>
+    </router>
+    <router name="Brussels_Campus" latitude="50.8505" longitude="4.34878" >
+      <interfaces>
+        <interface name="iBrussels_Campus"/>
+        <interface name="Bruzav"/>
+        <interface name="Evere"/>
+      </interfaces>
+    </router>
+    <router name="Arlon" latitude="49.6833" longitude="5.81667" >
+      <interfaces>
+        <interface name="iArlon"/>
+        <interface name="Liege2"/>
+        <interface name="Namur"/>
+      </interfaces>
+    </router>
+    <router name="Liege2" latitude="50.6412" longitude="5.57178" >
+      <interfaces>
+        <interface name="iLiege2"/>
+        <interface name="Liege1"/>
+        <interface name="Arlon"/>
+      </interfaces>
+    </router>
+    <router name="Vilvoorde" latitude="50.9182" longitude="4.40731" >
+      <interfaces>
+        <interface name="iVilvoorde"/>
+        <interface name="Liege1"/>
+        <interface name="Brudie"/>
+        <interface name="Geel"/>
+        <interface name="Antwerpen2"/>
+        <interface name="Evere"/>
+      </interfaces>
+    </router>
+    <router name="Leuven1" latitude="50.8796" longitude="4.70093" >
+      <interfaces>
+        <interface name="iLeuven1"/>
+        <interface name="Leuven2"/>
+        <interface name="Evere"/>
+      </interfaces>
+    </router>
+    <router name="Bruzav" latitude="50.8505" longitude="4.34878" >
+      <interfaces>
+        <interface name="iBruzav"/>
+        <interface name="Brussels_Campus"/>
+        <interface name="Brudie"/>
+      </interfaces>
+    </router>
+    <router name="Evere" latitude="50.8667" longitude="4.4" >
+      <interfaces>
+        <interface name="iEvere"/>
+        <interface name="Brussels_Campus"/>
+        <interface name="Vilvoorde"/>
+        <interface name="Leuven1"/>
+        <interface name="Korthijk"/>
+        <interface name="Mons"/>
+      </interfaces>
+    </router>
+    <router name="Leuven2" latitude="50.8796" longitude="4.70093" >
+      <interfaces>
+        <interface name="iLeuven2"/>
+        <interface name="Leuven1"/>
+        <interface name="Hasselt"/>
+      </interfaces>
+    </router>
+    <router name="Hasselt" latitude="50.9333" longitude="5.33333" >
+      <interfaces>
+        <interface name="iHasselt"/>
+        <interface name="Leuven2"/>
+        <interface name="Geel"/>
+      </interfaces>
+    </router>
+    <router name="Brudie" latitude="50.8843" longitude="4.37805" >
+      <interfaces>
+        <interface name="iBrudie"/>
+        <interface name="Vilvoorde"/>
+        <interface name="Bruzav"/>
+      </interfaces>
+    </router>
+    <router name="Geel" latitude="51.1667" longitude="5" >
+      <interfaces>
+        <interface name="iGeel"/>
+        <interface name="Vilvoorde"/>
+        <interface name="Hasselt"/>
+      </interfaces>
+    </router>
+    <router name="Louvain-la-Neuve" latitude="50.6683" longitude="4.61443" >
+      <interfaces>
+        <interface name="iLouvain-la-Neuve"/>
+        <interface name="Namur"/>
+        <interface name="Charleroi"/>
+      </interfaces>
+    </router>
+    <router name="Namur" latitude="50.4699" longitude="4.82577" >
+      <interfaces>
+        <interface name="iNamur"/>
+        <interface name="Arlon"/>
+        <interface name="Louvain-la-Neuve"/>
+      </interfaces>
+    </router>
+    <router name="Brugge" latitude="51.2089" longitude="3.22424" >
+      <interfaces>
+        <interface name="iBrugge"/>
+        <interface name="Korthijk"/>
+        <interface name="Gent1"/>
+      </interfaces>
+    </router>
+    <router name="Gent1" latitude="51.05" longitude="3.71667" >
+      <interfaces>
+        <interface name="iGent1"/>
+        <interface name="Brugge"/>
+        <interface name="Gent2"/>
+      </interfaces>
+    </router>
+    <router name="Gent2" latitude="51.05" longitude="3.71667" >
+      <interfaces>
+        <interface name="iGent2"/>
+        <interface name="Gent1"/>
+        <interface name="Antwerpen1"/>
+      </interfaces>
+    </router>
+    <router name="Antwerpen1" latitude="51.2167" longitude="4.41667" >
+      <interfaces>
+        <interface name="iAntwerpen1"/>
+        <interface name="Gent2"/>
+        <interface name="Antwerpen2"/>
+      </interfaces>
+    </router>
+    <router name="Antwerpen2" latitude="51.2167" longitude="4.41667" >
+      <interfaces>
+        <interface name="iAntwerpen2"/>
+        <interface name="Vilvoorde"/>
+        <interface name="Antwerpen1"/>
+      </interfaces>
+    </router>
+    <router name="Korthijk" latitude="50.828" longitude="3.26487" >
+      <interfaces>
+        <interface name="iKorthijk"/>
+        <interface name="Evere"/>
+        <interface name="Brugge"/>
+      </interfaces>
+    </router>
+    <router name="Mons" latitude="50.4541" longitude="3.95229" >
+      <interfaces>
+        <interface name="iMons"/>
+        <interface name="Evere"/>
+        <interface name="Charleroi"/>
+      </interfaces>
+    </router>
+    <router name="Charleroi" latitude="50.4167" longitude="4.43333" >
+      <interfaces>
+        <interface name="iCharleroi"/>
+        <interface name="Louvain-la-Neuve"/>
+        <interface name="Mons"/>
+      </interfaces>
+    </router>
+  </routers>
+  <links>
+    <link>
+      <sides>
+        <shared_interface interface="Liege2" router="Liege1"/>
+        <shared_interface interface="Liege1" router="Liege2"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Vilvoorde" router="Liege1"/>
+        <shared_interface interface="Liege1" router="Vilvoorde"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Bruzav" router="Brussels_Campus"/>
+        <shared_interface interface="Brussels_Campus" router="Bruzav"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Evere" router="Brussels_Campus"/>
+        <shared_interface interface="Brussels_Campus" router="Evere"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Liege2" router="Arlon"/>
+        <shared_interface interface="Arlon" router="Liege2"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Namur" router="Arlon"/>
+        <shared_interface interface="Arlon" router="Namur"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Brudie" router="Vilvoorde"/>
+        <shared_interface interface="Vilvoorde" router="Brudie"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Geel" router="Vilvoorde"/>
+        <shared_interface interface="Vilvoorde" router="Geel"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Antwerpen2" router="Vilvoorde"/>
+        <shared_interface interface="Vilvoorde" router="Antwerpen2"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Evere" router="Vilvoorde"/>
+        <shared_interface interface="Vilvoorde" router="Evere"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Leuven2" router="Leuven1"/>
+        <shared_interface interface="Leuven1" router="Leuven2"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Evere" router="Leuven1"/>
+        <shared_interface interface="Leuven1" router="Evere"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Brudie" router="Bruzav"/>
+        <shared_interface interface="Bruzav" router="Brudie"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Korthijk" router="Evere"/>
+        <shared_interface interface="Evere" router="Korthijk"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Mons" router="Evere"/>
+        <shared_interface interface="Evere" router="Mons"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Hasselt" router="Leuven2"/>
+        <shared_interface interface="Leuven2" router="Hasselt"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Geel" router="Hasselt"/>
+        <shared_interface interface="Hasselt" router="Geel"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Namur" router="Louvain-la-Neuve"/>
+        <shared_interface interface="Louvain-la-Neuve" router="Namur"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Charleroi" router="Louvain-la-Neuve"/>
+        <shared_interface interface="Louvain-la-Neuve" router="Charleroi"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Korthijk" router="Brugge"/>
+        <shared_interface interface="Brugge" router="Korthijk"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Gent1" router="Brugge"/>
+        <shared_interface interface="Brugge" router="Gent1"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Gent2" router="Gent1"/>
+        <shared_interface interface="Gent1" router="Gent2"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Antwerpen1" router="Gent2"/>
+        <shared_interface interface="Gent2" router="Antwerpen1"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Antwerpen2" router="Antwerpen1"/>
+        <shared_interface interface="Antwerpen1" router="Antwerpen2"/>
+      </sides>
+    </link>
+    <link>
+      <sides>
+        <shared_interface interface="Charleroi" router="Mons"/>
+        <shared_interface interface="Mons" router="Charleroi"/>
+      </sides>
+    </link>
+  </links>
+</network>
