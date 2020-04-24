@@ -484,7 +484,7 @@ namespace aalwines {
             }
             //Also handle nr  (Routerhop(Latensy), Network Stack Size, traffic engineergroup failiures) (does the implementaion approache work?) (Define MPLS in report)
             if (s._opid + 2 == (int) r._ops.size()) {
-                auto res = add_state(s._nfastate, r._via->match());
+                auto res = add_state(s._nfastate, r._via->match(), s._appmode);
                 nr._dest = res.second;
                 if constexpr (is_weighted) {
                     nr._weight = _weight_f(r, true);
