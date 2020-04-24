@@ -107,7 +107,7 @@ namespace aalwines {
         void error(const std::string &m);
 
         Network& _network;
-	location _location;
+        location _location;
         std::vector<Query> _result;
         
         // filtering
