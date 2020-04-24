@@ -109,16 +109,22 @@ namespace aalwines
     Builder::labelset_t Builder::expand_labels(Query::label_t label)
     {
         if(!_expand) return {label};
-        
+        Builder::labelset_t res;
         if(label.type() == Query::ANYMPLS)
         {
-            return _network.get_labels(0, 255, _sticky ? Query::STICKY_MPLS : Query::MPLS);
+            res = _network.get_labels(0, 255, _sticky ? Query::STICKY_MPLS : Query::MPLS);
         }
         else if(label.type() == Query::ANYSTICKY)
         {
-            return _network.get_labels(0, 255, Query::STICKY_MPLS);
+            res = _network.get_labels(0, 255, Query::STICKY_MPLS);
         }
-        return _network.get_labels(label.value(), label.mask(), label.type());        
+        else
+        {
+            res = _network.get_labels(label.value(), label.mask(), label.type());
+        }
+        if(res.empty())
+            throw no_match_error(_location, "Empty match of labels");
+        return res;
     }
 
     Builder::labelset_t Builder::match_ip4(int i1, int i2, int i3, int i4, int mask)
@@ -168,7 +174,10 @@ namespace aalwines
         ptr[6] = i2;
         ptr[7] = i1;
         val = ((val << mask) >> mask); // canonize
-        return expand_labels(Query::label_t(Query::IP6, static_cast<uint8_t>(mask), val));
+        auto res = expand_labels(Query::label_t(Query::IP6, static_cast<uint8_t>(mask), val));
+        if(res.empty())
+            throw no_match_error(_location, "Empty match of IPv6");
+        return res;
     }
 
     filter_t Builder::match_exact(const std::string& str)
@@ -224,7 +233,10 @@ namespace aalwines
     
     Builder::labelset_t Builder::find_label(uint64_t label, uint64_t mask)
     {
-        return _network.get_labels(label, mask, _sticky ? Query::STICKY_MPLS : Query::MPLS, !_expand);
+        auto res = _network.get_labels(label, mask, _sticky ? Query::STICKY_MPLS : Query::MPLS, !_expand);
+        if(res.empty())
+            throw no_match_error(_location, "Empty match of labels");
+        return res;
     }
     
     filter_t Builder::discard_id()
@@ -251,12 +263,17 @@ namespace aalwines
 
     Builder::labelset_t Builder::filter(filter_t& f)
     {
-        return _network.interfaces(f);
+        auto res = _network.interfaces(f);
+        if(res.empty())
+            throw no_match_error(_location, "Empty match of labels");
+        return res;
     }
 
     Builder::labelset_t Builder::filter_and_merge(filter_t& f, labelset_t& r)
     {
         auto res = filter(f);
+        if(res.empty())
+            throw no_match_error(_location, "Empty match of labels");
         res.insert(r.begin(), r.end());
         return res;
     }

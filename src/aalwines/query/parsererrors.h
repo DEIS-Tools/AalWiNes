@@ -34,88 +34,63 @@
 namespace aalwines {
 
     struct base_parser_error : public base_error {
-
+        location _location;
         base_parser_error(const location &l, std::string m)
-        : base_error(m), _location() {
-            std::stringstream ss;
-            ss << "[" << l << "]";
-            _location = ss.str();
+        : base_error(m), _location(l) {
         }
 
         explicit base_parser_error(std::string m)
         : base_error(std::move(m)) {
         }
 
-        std::string _location;
 
         const char *what() const noexcept override {
             return _message.c_str();
         }
 
-        virtual std::string prefix() const {
-            return "base error ";
+        void print_json(std::ostream& os) const override
+        {
+            start(os);
+            if(_location.begin.filename)
+                os << R"(,"inputName":")" << _location.begin.filename;
+            os << R"(,"lineStart":")" << _location.begin.line;
+            os << R"(,"lineEnd":")" << _location.end.line;
+            os << R"(,"columnStart":")" << _location.begin.column;
+            os << R"(,"columnEnd":")" << _location.end.column;
+            finish(os);
         }
 
-        virtual void print(std::ostream &os) const {
-            os << prefix() << " " << _location << " : " << what() << std::endl;
-        }
-
-        friend std::ostream &operator<<(std::ostream &os, const base_parser_error &el) {
-            el.print(os);
-            return os;
-        }
-    };
-
-    struct file_not_found_error : public base_parser_error {
-        using base_parser_error::base_parser_error;
-
-        std::string prefix() const override {
-            return "file not found error";
+    protected:
+        [[nodiscard]] std::string type() const override {
+            return "parser_error";
         }
     };
+
 
     struct syntax_error : public base_parser_error {
         using base_parser_error::base_parser_error;
-
-        std::string prefix() const override {
-            return "syntax error";
+    protected:
+        [[nodiscard]] std::string type() const override {
+            return "syntax_error";
         }
     };
 
     struct type_error : public base_parser_error {
         using base_parser_error::base_parser_error;
-
-        std::string prefix() const override {
-            return "type error";
+    protected:
+        [[nodiscard]] std::string type() const override {
+            return "type_error";
         }
     };
 
-    struct undeclared_error : public base_parser_error {
-
-        undeclared_error(const location &l, const std::string &name, const std::string &m)
-        : base_parser_error("variable " + name + " " + m) {
-        }
-
-        std::string prefix() const override {
-            return "undeclared error";
+    struct no_match_error : public base_parser_error {
+        using base_parser_error::base_parser_error;
+    protected:
+        [[nodiscard]] std::string type() const override {
+            return "no_match_error";
         }
     };
 
-    struct redeclare_error : public base_parser_error {
-
-        redeclare_error(const location &l,
-                const std::string &name,
-                const std::string &message,
-                const location &ol)
-        : base_parser_error("redeclaration of " + name + " " + message), _other_location(ol) {
-        };
-
-        std::string prefix() const override {
-            return "redeclare error";
-        }
-
-        location _other_location;
-    };
 }
 
 #endif //PROJECT_ERRORS_H
