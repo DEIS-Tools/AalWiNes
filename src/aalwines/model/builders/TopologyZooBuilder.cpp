@@ -69,6 +69,18 @@ namespace aalwines {
                         longitude = std::stod(str.substr(pos+1));
                     }
                     else if(key == "]"){
+                        bool indexer_active = false;
+                        while (std::find_if( _all_routers.begin(), _all_routers.end(),
+                                [&]( std::pair<std::string,Coordinate> &item ) { return item.first == router_name; } )
+                                != _all_routers.end()) {
+                            if (indexer_active){
+                                if ((int) router_name[router_name.size()-1]++ - 48 > 5) assert(false);
+                            } else {
+                                router_name += "2";
+                                indexer_active = true;
+                            }
+                        }
+                        assert(latitude != 0 or longitude != 0);
                         _all_routers.emplace_back(router_name, Coordinate{latitude, longitude});
                         _router_map.insert({id, router_name});
                         _return_links.emplace_back();
