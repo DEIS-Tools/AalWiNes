@@ -39,5 +39,6 @@ src/aalwines/query/*.hh
 
 # Test
 test/results/
-
 test/Sample_networks/gml/
+test/Sample_networks/*.xml
+test/Sample_networks/*.json
