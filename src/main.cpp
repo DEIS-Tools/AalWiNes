@@ -136,6 +136,9 @@ int main(int argc, const char** argv)
     bool no_timing = false;
     std::string topology_destination;
     std::string routing_destination;
+    static const char *engineTypes[] = {"", "Moped", "Post*", "Pre*"};
+    static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
+    Query::mode_t mode;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -390,6 +393,7 @@ int main(int argc, const char** argv)
                 if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
                     result = utils::NO;
                 if(result != utils::MAYBE)
+                    mode = m;
                     break;
                 /*else
                     trace.clear();*/
@@ -412,6 +416,8 @@ int main(int argc, const char** argv)
                 break;
             }
             std::cout << ",\n";
+            std::cout << "\t\t\"engine\":" << engineTypes[engine] << ", " << std::endl;
+            std::cout << "\t\t\"mode\":" << modeTypes[mode] << ", " << std::endl;
             std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
             if(get_trace && result == utils::YES)
             {
