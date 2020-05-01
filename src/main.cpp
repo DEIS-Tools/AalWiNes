@@ -138,7 +138,6 @@ int main(int argc, const char** argv)
     std::string routing_destination;
     static const char *engineTypes[] = {"", "Moped", "Post*", "Pre*"};
     static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
-    Query::mode_t mode;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -366,6 +365,7 @@ int main(int argc, const char** argv)
             else
             {
             std::vector<Query::mode_t> modes{q.approximation()};
+            Query::mode_t mode = q.approximation();
             bool was_dual = q.approximation() == Query::DUAL;
             if(was_dual)
                 modes = std::vector<Query::mode_t>{Query::OVER, Query::UNDER};
