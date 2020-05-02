@@ -101,7 +101,7 @@ namespace pdaaal {
         s << "(I<_>)\n";
         // lets start by the initial transitions
         auto& is = pda.states()[pda.initial()];
-        for (auto& r : is._rules) {
+        for (const auto& [r,_] : is._rules) {
             if (r._to != 0) {
                 assert(r._operation == pdaaal::PUSH);
                 s << "I<_> --> S" << r._to << "<";
@@ -116,16 +116,16 @@ namespace pdaaal {
         for (size_t sid = 1; sid < pda.states().size(); ++sid) {
             if(sid == pda.initial()) continue;
             const state_t& state = pda.states()[sid];
-            for (auto& r : state._rules) {
+            for (const auto& [r,labels] : state._rules) {
                 if (r._to == 0) {
                     assert(r._operation == pdaaal::NOOP);
                     s << "S" << sid << "<_> --> DONE<_>\n";
                     continue;
                 }
-                if (r._labels.empty()) continue;
-                if(!r._labels.wildcard())
+                if (labels.empty()) continue;
+                if(!labels.wildcard())
                 {
-                    auto& symbols = r._labels.labels();
+                    auto& symbols = labels.labels();
                     for (auto& symbol : symbols) {
                         s << "S" << sid << "<l";
                         s << symbol;
