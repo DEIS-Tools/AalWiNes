@@ -44,7 +44,7 @@ namespace aalwines {
         };
 
         enum type_t {
-            ANYMPLS = 1, ANYIP = 2, IP4 = 4, IP6 = 8, MPLS = 16, STICKY = 32, INTERFACE = 64, NONE = 128, ANYSTICKY = ANYMPLS | STICKY, STICKY_MPLS = MPLS | STICKY
+           ANYIP=2, IP4 = 4, IP6 = 8, MPLS = 16, STICKY = 32, INTERFACE = 64, NONE = 128, STICKY_MPLS = MPLS | STICKY
         };
 
         struct label_t {
@@ -81,26 +81,18 @@ namespace aalwines {
                         _mask = 64;
                         _value = 0;
                         break;
-                    case ANYSTICKY:
-                    case ANYMPLS:
-                        _mask = 64;
-                        _value = 0;
-                        break;
                     case STICKY_MPLS:
                     case MPLS:
                         _mask = std::min<uint8_t>(64, _mask);
-                        _value = (_value >> _mask) << _mask;
                         if(_mask == 64)
-                        {
-                            if(_type == STICKY_MPLS)
-                                *this = any_sticky_mpls;
-                            else 
-                                *this = any_mpls;
-                        }
-                            
+                            _value = 0;
+                        _value = (_value >> _mask) << _mask;
                         break;
                     case IP4:
-                        _mask = std::min<uint8_t>(32, _mask);
+                        if(_mask >= 32) {
+                            _mask = 64;
+                            _value = 0;
+                        }
                         _value = std::min<uint64_t>(std::numeric_limits<uint32_t>::max(), _value);
                         _value = (_value >> _mask) << _mask;
                         if(_mask >= 32)
@@ -128,8 +120,9 @@ namespace aalwines {
             }
             
             bool uses_mask() const {
-                return _mask != 0 && _type != INTERFACE && _type != ANYIP && _type != ANYMPLS && _type != ANYSTICKY;
+                return _mask != 0 && _mask != 64 && _type != INTERFACE && _type != ANYIP;
             }
+
             bool operator<(const label_t& other) const {
                 if(_type != other._type)
                     return _type < other._type;
@@ -166,11 +159,14 @@ namespace aalwines {
                     case STICKY_MPLS:
                         stream << "$";
                     case MPLS:
-                        stream << ((label._value >> label._mask) << label._mask);
+                        if(label._mask >= 64 || label == Query::label_t::unused_mpls || label == Query::label_t::unused_sticky_mpls)
+                            stream << "mpls";
+                        else
+                            stream << ((label._value >> label._mask) << label._mask);
                         break;
                     case IP4:
                         mx = 32;
-                        if(label._mask < 32)
+                        if(label._mask < 32 && label != Query::label_t::unused_ip4)
                             write_ip4(stream, (label._value >> label._mask) << label._mask);
                         else
                         {
@@ -180,7 +176,7 @@ namespace aalwines {
                         break;
                     case IP6:
                         mx = 64;
-                        if(label._mask < 64)
+                        if(label._mask < 64 && label != Query::label_t::unused_ip6)
                             write_ip6(stream, (label._value >> label._mask) << label._mask);
                         else
                         {
@@ -193,11 +189,6 @@ namespace aalwines {
                         break;
                     case ANYIP:
                         stream << "ip";
-                        break;
-                    case ANYSTICKY:
-                        stream << "$";
-                    case ANYMPLS:
-                        stream << "mpls";
                         break;
                     case NONE:
                         stream << "NONE";
@@ -216,14 +207,11 @@ namespace aalwines {
                 if(_type == other._type)
                 {
                     auto m = std::max(other._mask, _mask);
+                    if(_mask >= 64) return true;
                     return (_value >> m) == (other._value >> m);
                 }
-                if(std::min(_type, other._type) == ANYIP && 
-                        (std::max(other._type, _type) == IP4 || std::max(other._type, _type) == IP6))
-                    return true;
-                if(std::min(_type, other._type) == ANYMPLS && std::max(_type, other._type) == MPLS)
-                    return true;
-                if(std::min(_type, other._type) == ANYSTICKY && std::max(_type, other._type) == STICKY_MPLS)
+                if(std::min(_type, other._type) == ANYIP &&
+                   (std::max(other._type, _type) == IP4 || std::max(other._type, _type) == IP6))
                     return true;
                 return false;
             }

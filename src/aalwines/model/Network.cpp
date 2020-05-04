@@ -89,34 +89,18 @@ namespace aalwines
 
     std::unordered_set<Query::label_t> Network::get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact)
     {
+        Query::label_t lbl(type, mask, label);
         std::unordered_set<Query::label_t> res;
         for (auto& pr : all_labels()) {
-            if (pr.type() != type) continue;
-            auto msk = std::max<uint8_t>(mask, pr.mask());
             if(pr == Query::label_t::unused_ip4 ||
                pr == Query::label_t::unused_ip6 ||
                pr == Query::label_t::unused_mpls ||
                pr == Query::label_t::unused_sticky_mpls ||
                pr == Query::label_t::any_ip ||
                pr == Query::label_t::any_ip4 ||
-               pr == Query::label_t::any_ip6 ||
-               pr == Query::label_t::any_mpls ||
-               pr == Query::label_t::any_sticky_mpls) continue;
-            switch (type) {
-            case Query::IP6:
-            case Query::IP4:
-            case Query::STICKY_MPLS:
-            case Query::MPLS:
-            {
-                if ((pr.value() << msk) == (label << msk) && 
-                     (pr.type() & Query::STICKY) == (type & Query::STICKY))
-                {
-                    res.insert(pr);
-                }
-            }
-            default:
-                break;
-            }
+               pr == Query::label_t::any_ip6) continue;
+            if (lbl.overlaps(pr))
+                res.insert(pr);
         }
         if(res.empty())
         {
@@ -146,15 +130,13 @@ namespace aalwines
             case Query::IP6:
                 res.emplace(Query::label_t::any_ip6);
                 break;
-            case Query::STICKY_MPLS:
-                res.emplace(Query::label_t::any_sticky_mpls);
-                break;
-            case Query::MPLS:
-                res.emplace(Query::label_t::any_mpls);
-                break;
             default:
-                throw base_error("Unknown expansion");
+                break;
             }        
+        }
+        for(auto& r : res)
+        {
+            assert(r.mask() == 0 || type == Query::IP6 || type == Query::IP4 || type == Query::ANYIP);
         }
         return res;
     }
@@ -172,8 +154,6 @@ namespace aalwines
             res.insert(Query::label_t::any_ip);
             res.insert(Query::label_t::any_ip4);
             res.insert(Query::label_t::any_ip6);
-            res.insert(Query::label_t::any_mpls);
-            res.insert(Query::label_t::any_sticky_mpls);
             _non_service_label = res;
             for (auto& r : _routers) {
                 for (auto& inf : r->interfaces()) {

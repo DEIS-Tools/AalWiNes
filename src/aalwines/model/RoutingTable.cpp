@@ -308,13 +308,12 @@ namespace aalwines
         case Query::STICKY_MPLS:
             s << "s"; // fall through on purpose
         case Query::MPLS:
-            s << 'l' << std::dec << label.value() << std::dec;
+            if(label == Query::label_t::any_mpls ||
+               label == Query::label_t::any_sticky_mpls)
+                s << "mpls";
+            else
+                s << 'l' << std::dec << label.value() << std::dec;
             assert(label.mask() == 0);
-            break;
-        case Query::ANYSTICKY:
-            s << "s"; // fall through on purpose
-        case Query::ANYMPLS:
-            s << "am";
             break;
         case Query::IP4:
             s << "ip4" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
