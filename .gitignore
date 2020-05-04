@@ -37,8 +37,7 @@ cmake-build-release/
 src/aalwines/query/*.cc
 src/aalwines/query/*.hh
 
+# Test
 cmake-build-profiler/
-
 cmake-build-static/
-
 test/results/
