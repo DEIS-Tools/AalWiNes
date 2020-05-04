@@ -154,8 +154,6 @@ The different priority groups, of linear combinations, represent the order of wh
 
 `distance` minimize the accumulated distance between routers estimated from router coordinates.
 
-NUM = {0,1,2,...}
-
 ## Regular Expression Syntax (regex)
 
 Every regular expression in the regex-list is built out of following components:
