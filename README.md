@@ -22,8 +22,8 @@ cd aalwines
 mkdir build
 cd build
 cmake ..
-make
-export MOPED_PATH=`pwd`/../bin/moped
+make 
+#export MOPED_PATH=`pwd`/../bin/moped
 # binary will be in build/bin
 ```
 
@@ -35,11 +35,11 @@ cmake -DAALWINES_BuildBundle=ON ..
 
 ## Usage Examples
 
-This will run queryfile `query.txt` over the network defined in the P-Rex data files, using moped as external engine and producing a trace:
+This will run queryfile `query.txt` and weightfile `weight.json` over the network defined in the P-Rex data files, using Post* implementation as engine and producing a trace:
     
 ```bash
 cd bin
-./aalwines --topology ../../../P-Rex/res/nestable/topo.xml --routing ../../../P-Rex/res/nestable/routing.xml -e 1 -q query.txt -t
+./aalwines --topology ../../example_net/Agis-topo.xml --routing ../../example_net/Agis-routing.xml -w ../../example_net/Agis-weight.json -q ../../example_net/Agis-query.q -t -e 2
 ```
 
 An example `query.txt` (syntax see below):
@@ -48,37 +48,62 @@ An example `query.txt` (syntax see below):
 <.> .* [s2#.] .* <.> 0 UNDER
 ```
 
+An example `weight.json` (syntax see below):
+```
+[
+        [
+                {"atom": "tunnels"}
+        ],
+        [
+                {"atom": "failures"},
+                {"atom": "hops", "factor": 2}
+        ]
+]
+```
+
 will produce following output:
 ```json
 {
-        "network-parsing-time":0.0192828, "query-parsing-time":0.0011643,
+        "network-parsing-time":0.591031, "query-parsing-time":0.0021856,
         "answers":{
         "Q1" : {
-                "result":true,
-                "reduction":[1179, 1179],
+                "result":    true,
+                "engine":    "Post*",
+                "mode":      "OVER",
+                "reduction": [75810, 75810],
                 "trace":[
-                        {"router":"s2","stack":["10"]},
-                        {"pre":"10","rule":{"weight":0, "via":"s4"}},
-                        {"router":"s4","stack":["10"]}
+                        {"router":"Stockton","stack":["1569^"]},
+                        {"ingoing":"iStockton","pre":"1569^","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"1570"}]}},
+                        {"router":"Santa_Clara","stack":["1570"]},
+                        {"ingoing":"Stockton","pre":"1570","rule":{"weight":0, "via":"Los_Angeles", "ops":[{"swap":"1571"}]}},
+                        {"router":"Los_Angeles","stack":["1571"]}
                 ],
-                "compilation-time":0.0387264,
-                "reduction-time":1.07e-05,
-                "verification-time":0.0340714
+                "compilation-time":0.330325,
+                "reduction-time":0.0010753,
+                "verification-time":0.618661
         },
         "Q2" : {
-                "result":true,
-                "reduction":[1179, 1179],
+                "result":    true,
+                "engine":    "Post*",
+                "mode":      "OVER",
+                "reduction": [134673, 134673],
                 "trace":[
-                        {"router":"s2","stack":["10"]},
-                        {"pre":"10","rule":{"weight":0, "via":"s4"}},
-                        {"router":"s4","stack":["10"]}
+                        {"router":"Chicago","stack":["2634^"]},
+                        {"ingoing":"iChicago","pre":"2634^","rule":{"weight":1, "via":"Seattle", "ops":[{"swap":"2635"}, {"push":"3452"}]}},
+                        {"router":"Seattle","stack":["3452","2635"]},
+                        {"ingoing":"Chicago","pre":"3452","rule":{"weight":0, "via":"San_Francisco", "ops":[{"swap":"3451"}]}},
+                        {"router":"San_Francisco","stack":["3451","2635"]},
+                        {"ingoing":"Seattle","pre":"3451","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"3450"}]}},
+                        {"router":"Santa_Clara","stack":["3450","2635"]},
+                        {"ingoing":"San_Francisco","pre":"3450","rule":{"weight":0, "via":"Los_Angeles", "ops":["pop"]}},
+                        {"router":"Los_Angeles","stack":["2635"]}
                 ],
-                "compilation-time":0.038969,
-                "reduction-time":8.4e-06,
-                "verification-time":0.0349733
+                "compilation-time":0.526041,
+                "reduction-time":0.0024805,
+                "verification-time":1.95766
         }
-
-}}
+        }
+}
 ```
 
 ## Query Syntax
@@ -100,6 +125,22 @@ The type regex-list is a space separated list of regular expressions (syntax see
 For `preCondition` and `postCondition` it defines the labels on the stack of the packet. Packets must have at least 1 label when entering or leaving the network. For `path` it defines the interfaces(routers) the packet must, can or must not follow.
 
 The `mode` can be OVER or UNDER. DUAL is a combination of OVER and UNDER. EXACT is not supported yet.
+
+## Weight Syntax
+ 
+A weight file contains a priority in the outer array. The inner array contains the linear combination of atoms. 
+
+```
+[
+        [
+                {"atom": ATOM, "factor": NUM},
+                ...
+        ], 
+        ...
+]
+```
+ATOM = {"hops", "failures", "tunnels", "distance" <!--- , "latency", "zero"---> }
+NUM = {0,1,2,...}
 
 ## Regular Expression Syntax (regex)
 
