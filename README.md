@@ -139,7 +139,21 @@ A weight file contains a priority in the outer array. The inner array contains t
         ...
 ]
 ```
-ATOM = {"hops", "failures", "tunnels", "distance" <!--- , "latency", "zero"---> }
+
+ATOM = {`hops`, `failures`, `tunnels`, `distance` <!-- , `latency`, `zero` --> }
+
+NUM = {0,1,2,...} factor is optional and NUM default is 1.
+
+The different priority groups, of linear combinations, represent the order of which the weights are compared. The second priority group will be considered if two similar weighted traces in the first linear combination are equal.
+
+`hops` minimize the amount of links in the trace.
+
+`failures` minimize the amount of failures in the trace.
+
+`tunnels` minimize the amount of push operations in the trace.
+
+`distance` minimize the accumulated distance between routers estimated from router coordinates.
+
 NUM = {0,1,2,...}
 
 ## Regular Expression Syntax (regex)
