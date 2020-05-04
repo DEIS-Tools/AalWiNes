@@ -44,8 +44,8 @@ cd bin
 
 An example `query.txt` (syntax see below):
 ```
-<.> .* [s2#.] .* <.> 0 OVER
-<.> .* [s2#.] .* <.> 0 UNDER
+<.> [.#Stockton] .* [Santa_Clara#.] <.> 0 DUAL
+<.> [.#Chicago] [^.#Los_Angeles]* [Santa_Clara#.] <.> 1 DUAL
 ```
 
 An example `weight.json` (syntax see below):
