@@ -1,9 +1,0 @@
-[
-        [
-                {"atom": "tunnels"}
-        ],
-        [
-                {"atom": "failures"},
-                {"atom": "hops", "factor": 2}
-        ]
-]
