@@ -134,10 +134,12 @@ namespace aalwines
                 break;
             }        
         }
+#ifndef NDEBUG
         for(auto& r : res)
         {
             assert(r.mask() == 0 || type == Query::IP6 || type == Query::IP4 || type == Query::ANYIP);
         }
+#endif
         return res;
     }
 
