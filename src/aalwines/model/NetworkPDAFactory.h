@@ -509,6 +509,16 @@ namespace aalwines {
         }
         stream << ",\"rule\":";
         rule.print_json(stream, false);
+
+        if constexpr (is_weighted) {
+            stream << ", \"priority-weight\": [";
+            auto weights = _weight_f(rule, true);
+            for (auto v : weights){
+                if (v != weights[0]) stream << ", ";
+                stream << "\"" << std::to_string(v) << "\"";
+            }
+            stream << "]";
+        }
         stream << "}";
     }
 
@@ -775,6 +785,21 @@ namespace aalwines {
 
         // Do the printing
         write_concrete_trace(stream, trace, entries, rules);
+
+        if constexpr (is_weighted){
+            auto weight = _weight_f(*rules[0], true);
+            for(size_t i = 1; i < rules.size(); i++){
+                for (size_t j = 0; j < weight.size(); j++){
+                    weight[j] += _weight_f(*rules[i], true)[j];
+                }
+            }
+            stream << "\n\t\t\t\"weight\": [";
+            for (size_t j = 0; j < weight.size(); j++){
+                if (j != 0) stream << ", ";
+                stream << weight[j];
+            }
+            stream << "]";
+        }
         return true;
     }
 
