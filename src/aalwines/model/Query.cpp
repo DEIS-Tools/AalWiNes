@@ -44,15 +44,19 @@ namespace aalwines {
         out << "// PATH\n";
         _path.to_dot(out);
     }
-    
+
+    // concrete labels for unused entry
     const Query::label_t Query::label_t::unused_mpls(MPLS, 0, std::numeric_limits<uint64_t>::max());
     const Query::label_t Query::label_t::unused_sticky_mpls(STICKY_MPLS, 0, std::numeric_limits<uint64_t>::max());
-    const Query::label_t Query::label_t::unused_ip4(IP4, 0, 0);
-    const Query::label_t Query::label_t::unused_ip6(IP6, 0, 0);
+    const Query::label_t Query::label_t::unused_ip4(IP4, 0, std::numeric_limits<uint64_t>::max());
+    const Query::label_t Query::label_t::unused_ip6(IP6, 0, std::numeric_limits<uint64_t>::max());
 
-    const Query::label_t Query::label_t::any_mpls(ANYMPLS, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max());
-    const Query::label_t Query::label_t::any_sticky_mpls(ANYSTICKY, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max());
-    const Query::label_t Query::label_t::any_ip(ANYIP, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max());
-    const Query::label_t Query::label_t::any_ip4(IP4, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max());
-    const Query::label_t Query::label_t::any_ip6(IP6, std::numeric_limits<uint8_t>::max(), std::numeric_limits<uint64_t>::max());
+    // any_mpls and any_sticky_mpls are META labels that MUST be unfolded
+    const Query::label_t Query::label_t::any_mpls(MPLS, std::numeric_limits<uint8_t>::max(), 0);
+    const Query::label_t Query::label_t::any_sticky_mpls(STICKY_MPLS, std::numeric_limits<uint8_t>::max(), 0);
+
+    // these are ordered labels
+    const Query::label_t Query::label_t::any_ip(ANYIP, std::numeric_limits<uint8_t>::max(), 0);
+    const Query::label_t Query::label_t::any_ip4(IP4, std::numeric_limits<uint8_t>::max(), 0);
+    const Query::label_t Query::label_t::any_ip6(IP6, std::numeric_limits<uint8_t>::max(), 0);
 }
