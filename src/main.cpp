@@ -88,9 +88,7 @@ bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, sto
             verification_time.stop();
             if (need_trace && engine_outcome) {
                 if constexpr (pdaaal::is_weighted<typename W_FN::result_type>) {
-                    auto temp = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
-                    trace = temp.first;
-                    trace_weight = temp.second;
+                    std::tie(trace, trace_weight) = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
                 } else {
                     trace = solver.get_trace<pdaaal::Trace_Type::Any>(pda, std::move(solver_result.second));
                 }

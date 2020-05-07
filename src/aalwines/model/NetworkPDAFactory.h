@@ -387,9 +387,6 @@ namespace aalwines {
                 auto eid = ((&entry) - s._inf->table().entries().data());
                 auto rid = ((&forward) - entry._rules.data());
                 res = add_state(n, s._inf, appmode, eid, rid, 0);
-                if constexpr (is_weighted) {
-                    ar._weight = _weight_f(forward, false);
-                }
             }
             ar._dest = res.second;
 
@@ -481,9 +478,6 @@ namespace aalwines {
             } else {
                 auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
                 nr._dest = res.second;
-                if constexpr (is_weighted) {
-                    nr._weight = _weight_f(r, false);
-                }
             }
             //or/andHere
         }
