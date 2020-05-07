@@ -475,15 +475,9 @@ namespace aalwines {
             if (s._opid + 2 == (int) r._ops.size()) {
                 auto res = add_state(s._nfastate, r._via->match(), s._appmode);
                 nr._dest = res.second;
-                if constexpr (is_weighted) {
-                    nr._weight = _weight_f(r, true);
-                }
             } else {
                 auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
                 nr._dest = res.second;
-                if constexpr (is_weighted) {
-                    nr._weight = _weight_f(r, false);
-                }
             }
             //or/andHere
         }
