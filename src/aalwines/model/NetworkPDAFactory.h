@@ -387,9 +387,6 @@ namespace aalwines {
                 auto eid = ((&entry) - s._inf->table().entries().data());
                 auto rid = ((&forward) - entry._rules.data());
                 res = add_state(n, s._inf, appmode, eid, rid, 0);
-                if constexpr (is_weighted) {
-                    ar._weight = _weight_f(forward, false);
-                }
             }
             ar._dest = res.second;
 
@@ -476,7 +473,7 @@ namespace aalwines {
                 auto res = add_state(s._nfastate, r._via->match(), s._appmode);
                 nr._dest = res.second;
                 if constexpr (is_weighted) {
-                    //nr._weight = _weight_f(r, true);
+                    nr._weight = _weight_f(r, true);
                 }
             } else {
                 auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
@@ -782,21 +779,6 @@ namespace aalwines {
 
         // Do the printing
         write_concrete_trace(stream, trace, entries, rules);
-
-        if constexpr (is_weighted){
-            auto weight = _weight_f(*rules[0], true);
-            for(size_t i = 1; i < rules.size(); i++){
-                for (size_t j = 0; j < weight.size(); j++){
-                    weight[j] += _weight_f(*rules[i], true)[j];
-                }
-            }
-            stream << "\n\t\t\t\"weight\": [";
-            for (size_t j = 0; j < weight.size(); j++){
-                if (j != 0) stream << ", ";
-                stream << weight[j];
-            }
-            stream << "]";
-        }
         return true;
     }
 
