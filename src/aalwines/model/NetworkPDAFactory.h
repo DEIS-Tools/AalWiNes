@@ -387,9 +387,6 @@ namespace aalwines {
                 auto eid = ((&entry) - s._inf->table().entries().data());
                 auto rid = ((&forward) - entry._rules.data());
                 res = add_state(n, s._inf, appmode, eid, rid, 0);
-                if constexpr (is_weighted) {
-                    ar._weight = _weight_f(forward, false);
-                }
             }
             ar._dest = res.second;
 
@@ -481,9 +478,6 @@ namespace aalwines {
             } else {
                 auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
                 nr._dest = res.second;
-                if constexpr (is_weighted) {
-                    nr._weight = _weight_f(r, false);
-                }
             }
             //or/andHere
         }
@@ -491,7 +485,7 @@ namespace aalwines {
     }
 
     template<typename W_FN, typename W>
-    void NetworkPDAFactory<W_FN, W>::print_trace_rule(std::ostream &stream, const Interface* inf, 
+    void NetworkPDAFactory<W_FN, W>::print_trace_rule(std::ostream &stream, const Interface* inf,
                                                   const RoutingTable::entry_t &entry,
                                                   const RoutingTable::forward_t &rule) const {
         stream << "{";
@@ -509,6 +503,16 @@ namespace aalwines {
         }
         stream << ",\"rule\":";
         rule.print_json(stream, false);
+
+        if constexpr (is_weighted) {
+            stream << ", \"priority-weight\": [";
+            auto weights = _weight_f(rule, true);
+            for (size_t v = 0; v < weights.size(); v++){
+                if (v != 0) stream << ", ";
+                stream << "\"" << std::to_string(weights[v]) << "\"";
+            }
+            stream << "]";
+        }
         stream << "}";
     }
 
