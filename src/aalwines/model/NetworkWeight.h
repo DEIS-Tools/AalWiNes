@@ -47,7 +47,7 @@ namespace aalwines {
      *   ], ...
      * ]
      * where
-     *  - ATOM = {"hops", "failures", "tunnels", "distance", "latency", "zero"}
+     *  - ATOM = {"hops", "failures", "tunnels", "distance", "custom", "latency", "zero"}
      *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
@@ -63,6 +63,7 @@ namespace aalwines {
             number_of_hops,
             tunnels,
             distance,
+            custom,
             latency,
         };
 
@@ -89,6 +90,10 @@ namespace aalwines {
                         return r._via->source()->coordinate() && r._via->target()->coordinate()
                                ? r._via->source()->coordinate()->distance_to(r._via->target()->coordinate().value())
                                : 20038; //(km). If coordinates are missing, use half circumference of earth, i.e. worst case distance.
+                    };
+                case AtomicProperty::custom:
+                    return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+                        return r._custom_weight;
                     };
                 case AtomicProperty::latency:
                     return [this](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
@@ -148,6 +153,8 @@ namespace aalwines {
                 p = AtomicProperty::tunnels;
             } else if (s == "distance") {
                 p = AtomicProperty::distance;
+            } else if (s == "custom") {
+                p = AtomicProperty::custom;
             } else if (s == "latency") {
                 p = AtomicProperty::latency;
             } else if (s == "zero") {
