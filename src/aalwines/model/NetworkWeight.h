@@ -52,10 +52,10 @@ namespace aalwines {
      */
     class NetworkWeight {
     private:
-        using atomic_property_function = std::function<uint32_t(const RoutingTable::forward_t&, bool)>;
-        using linear_weight_function = pdaaal::linear_weight_function<uint32_t, const RoutingTable::forward_t&, bool>;
+        using atomic_property_function = std::function<uint32_t(const RoutingTable::forward_t&)>;
+        using linear_weight_function = pdaaal::linear_weight_function<uint32_t, const RoutingTable::forward_t&>;
     public:
-        using weight_function = pdaaal::ordered_weight_function<uint32_t, const RoutingTable::forward_t&, bool>;
+        using weight_function = pdaaal::ordered_weight_function<uint32_t, const RoutingTable::forward_t&>;
 
         enum class AtomicProperty {
             default_weight_function,
@@ -73,38 +73,36 @@ namespace aalwines {
         [[nodiscard]] atomic_property_function get_atom(AtomicProperty atom) const {
             switch (atom) {
                 case AtomicProperty::link_failures:
-                    return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r) -> uint32_t {
                         return r._weight;
                     };
                 case AtomicProperty::number_of_hops:
-                    return [](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
-                        return last_op && !r._via->is_virtual() ? 1 : 0;
+                    return [](const RoutingTable::forward_t& r) -> uint32_t {
+                        return !r._via->is_virtual() ? 1 : 0;
                     };
                 case AtomicProperty::tunnels:
-                    return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r) -> uint32_t {
                         return std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
                     };
                 case AtomicProperty::distance:
-                    return [](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
-                        if (!last_op) return 0;
+                    return [](const RoutingTable::forward_t& r) -> uint32_t {
                         return r._via->source()->coordinate() && r._via->target()->coordinate()
                                ? r._via->source()->coordinate()->distance_to(r._via->target()->coordinate().value())
                                : 20038; //(km). If coordinates are missing, use half circumference of earth, i.e. worst case distance.
                     };
                 case AtomicProperty::custom:
-                    return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r) -> uint32_t {
                         return r._custom_weight;
                     };
                 case AtomicProperty::latency:
-                    return [this](const RoutingTable::forward_t& r, bool last_op) -> uint32_t {
-                        if (!last_op) return 0;
+                    return [this](const RoutingTable::forward_t& r) -> uint32_t {
                         auto it = this->_latency_map.find(r._via);
                         return it != this->_latency_map.end() ? it->second : 0;
                         // (r._via->source()->index(), r._via->target()->index())
                     };
                 case AtomicProperty::default_weight_function:
                 default:
-                    return [](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r) -> uint32_t {
                         return 0;
                     };
             }
@@ -129,7 +127,7 @@ namespace aalwines {
         }
 
         static auto default_weight_fn() {
-            return pdaaal::ordered_weight_function(std::vector<linear_weight_function>{linear_weight_function{[](const RoutingTable::forward_t& r, bool _) -> uint32_t {
+            return pdaaal::ordered_weight_function(std::vector<linear_weight_function>{linear_weight_function{[](const RoutingTable::forward_t& r) -> uint32_t {
                 return 0;
             }}});
         }
