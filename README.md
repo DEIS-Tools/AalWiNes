@@ -160,9 +160,9 @@ The different priority groups, of linear combinations, represent the order of wh
 
 Every regular expression in the regex-list is built out of following components:
 
+<!--| regex `&` regex | AND: both regex must be fulfilled |-->
 | syntax          | description |
 | --------------: | ----------- |
-<!--| regex `&` regex | AND: both regex must be fulfilled |-->
 | regex `\|` regex | OR: one or both regex must be fulfilled |
 | `.`             | matches everything |
 | regex`+`        | multiple: regex must match once or multiple times |
