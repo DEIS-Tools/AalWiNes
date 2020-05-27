@@ -64,45 +64,47 @@ An example `weight.json` (syntax see below):
 will produce following output:
 ```json
 {
-        "network-parsing-time":0.591031, "query-parsing-time":0.0021856,
+        "network-parsing-time":0.661911, "query-parsing-time":0.0021034,
         "answers":{
         "Q1" : {
-                "result":    true,
-                "engine":    "Post*",
-                "mode":      "OVER",
-                "reduction": [75810, 75810],
+                "result":   true,
+                "engine":   "Post*",
+                "mode":     "OVER",
+                "reduction":[70918, 70918],
+                "trace-weight": [0, 4],
                 "trace":[
-                        {"router":"Stockton","stack":["1569^"]},
-                        {"ingoing":"iStockton","pre":"1569^","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"1570"}]}},
-                        {"router":"Santa_Clara","stack":["1570"]},
-                        {"ingoing":"Stockton","pre":"1570","rule":{"weight":0, "via":"Los_Angeles", "ops":[{"swap":"1571"}]}},
-                        {"router":"Los_Angeles","stack":["1571"]}
+                        {"router":"Stockton","stack":["1599^"]},
+                        {"ingoing":"iStockton","pre":"1599^","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"1600"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"Santa_Clara","stack":["1600"]},
+                        {"ingoing":"Stockton","pre":"1600","rule":{"weight":0, "via":"Los_Angeles", "ops":[{"swap":"1601"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"Los_Angeles","stack":["1601"]}
                 ],
-                "compilation-time":0.330325,
-                "reduction-time":0.0010753,
-                "verification-time":0.618661
+                "compilation-time":0.303446,
+                "reduction-time":0.0012157,
+                "verification-time":1.24293
         },
         "Q2" : {
-                "result":    true,
-                "engine":    "Post*",
-                "mode":      "OVER",
-                "reduction": [134673, 134673],
+                "result": true,
+                "engine": "Post*",
+                "mode":   "OVER",
+                "reduction":[129519, 129519],
+                "trace-weight": [1, 9],
                 "trace":[
-                        {"router":"Chicago","stack":["2634^"]},
-                        {"ingoing":"iChicago","pre":"2634^","rule":{"weight":1, "via":"Seattle", "ops":[{"swap":"2635"}, {"push":"3452"}]}},
-                        {"router":"Seattle","stack":["3452","2635"]},
-                        {"ingoing":"Chicago","pre":"3452","rule":{"weight":0, "via":"San_Francisco", "ops":[{"swap":"3451"}]}},
-                        {"router":"San_Francisco","stack":["3451","2635"]},
-                        {"ingoing":"Seattle","pre":"3451","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"3450"}]}},
-                        {"router":"Santa_Clara","stack":["3450","2635"]},
-                        {"ingoing":"San_Francisco","pre":"3450","rule":{"weight":0, "via":"Los_Angeles", "ops":["pop"]}},
-                        {"router":"Los_Angeles","stack":["2635"]}
+                        {"router":"Chicago","stack":["2922"]},
+                        {"ingoing":"St_Louis","pre":"2922","rule":{"weight":1, "via":"Seattle", "ops":[{"swap":"2923"}, {"push":"3452"}]}, "priority-weight": ["1", "3"]},
+                        {"router":"Seattle","stack":["3452","2923"]},
+                        {"ingoing":"Chicago","pre":"3452","rule":{"weight":0, "via":"San_Francisco", "ops":[{"swap":"3451"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"San_Francisco","stack":["3451","2923"]},
+                        {"ingoing":"Seattle","pre":"3451","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"3450"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"Santa_Clara","stack":["3450","2923"]},
+                        {"ingoing":"San_Francisco","pre":"3450","rule":{"weight":0, "via":"Los_Angeles", "ops":["pop"]}, "priority-weight": ["0", "2"]},
+                        {"router":"Los_Angeles","stack":["2923"]}
                 ],
-                "compilation-time":0.526041,
-                "reduction-time":0.0024805,
-                "verification-time":1.95766
+                "compilation-time":0.484016,
+                "reduction-time":0.0026069,
+                "verification-time":2.01965
         }
-        }
+}
 }
 ```
 
@@ -160,7 +162,7 @@ Every regular expression in the regex-list is built out of following components:
 
 | syntax          | description |
 | --------------: | ----------- |
-| regex `&` regex | AND: both regex must be fulfilled |
+<!--| regex `&` regex | AND: both regex must be fulfilled |-->
 | regex `\|` regex | OR: one or both regex must be fulfilled |
 | `.`             | matches everything |
 | regex`+`        | multiple: regex must match once or multiple times |
