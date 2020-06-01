@@ -388,6 +388,11 @@ namespace aalwines {
                                     entry._rules.back()._type = RoutingTable::MPLS;
                                     entry._rules.back()._weight = weight;
 
+                                    auto custom_weight = route->first_attribute("weight");
+                                    if (custom_weight != nullptr) {
+                                        entry._rules.back()._custom_weight = std::stoul(custom_weight->value());
+                                    }
+
                                     if(entry._rules.back()._via == nullptr)
                                     {
                                         es << "Could not match find \"to\" with interface on " << router->name() << "attribute in <route>-tag : " << toattr->value();

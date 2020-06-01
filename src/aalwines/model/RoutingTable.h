@@ -68,6 +68,7 @@ namespace aalwines {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _weight = 0;
+            uint32_t _custom_weight = 0;
             forward_t() = default;
             forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t weight)
                 : _type(type), _ops(std::move(ops)), _via(via), _weight(weight) {};

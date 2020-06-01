@@ -381,7 +381,7 @@ namespace aalwines {
             if (forward._ops.size() <= 1) {
                 res = add_state(n, forward._via->match(), appmode);
                 if constexpr (is_weighted) {
-                    ar._weight = _weight_f(forward, true);
+                    ar._weight = _weight_f(forward);
                 }
             } else {
                 auto eid = ((&entry) - s._inf->table().entries().data());
@@ -473,7 +473,7 @@ namespace aalwines {
                 auto res = add_state(s._nfastate, r._via->match(), s._appmode);
                 nr._dest = res.second;
                 if constexpr (is_weighted) {
-                    nr._weight = _weight_f(r, true);
+                    nr._weight = _weight_f(r);
                 }
             } else {
                 auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
@@ -506,7 +506,7 @@ namespace aalwines {
 
         if constexpr (is_weighted) {
             stream << ", \"priority-weight\": [";
-            auto weights = _weight_f(rule, true);
+            auto weights = _weight_f(rule);
             for (size_t v = 0; v < weights.size(); v++){
                 if (v != 0) stream << ", ";
                 stream << "\"" << std::to_string(weights[v]) << "\"";
