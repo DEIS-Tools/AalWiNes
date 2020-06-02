@@ -55,7 +55,7 @@ An example `weight.json` (syntax see below):
                 {"atom": "tunnels"}
         ],
         [
-                {"atom": "failures"},
+                {"atom": "local_failures"},
                 {"atom": "hops", "factor": 2}
         ]
 ]
@@ -142,19 +142,21 @@ A weight file contains a priority in the outer array. The inner array contains t
 ]
 ```
 
-ATOM = {`hops`, `failures`, `tunnels`, `distance` <!-- , `latency`, `zero` --> }
+ATOM = {`links`, `hops`, `distance`, `local_failures`, `tunnels`,  <!-- , `latency`, `zero` --> }
 
 NUM = {0,1,2,...} factor is optional and NUM default is 1.
 
 The different priority groups, of linear combinations, represent the order of which the weights are compared. The second priority group will be considered if two similar weighted traces in the first linear combination are equal.
 
-`hops` minimize the amount of links in the trace.
+`links` minimize the number of links in the trace.
 
-`failures` minimize the amount of failures in the trace.
-
-`tunnels` minimize the amount of push operations in the trace.
+`hops` minimize the number of hops (not counting links that are self-loops) in the trace.
 
 `distance` minimize the accumulated distance between routers estimated from router coordinates.
+
+`local_failures` minimize the sum of locally counted failed links at each router on the trace. This number may be higher than the global number of failed links in the case of loops, since some links may be counted twice. 
+
+`tunnels` minimize the number of push operations in the trace.
 
 ## Regular Expression Syntax (regex)
 
