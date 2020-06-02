@@ -274,9 +274,15 @@ namespace aalwines
         if (_coordinate) {
             s << "\t\t\t\"lat\": " << _coordinate->latitude() << ",\n\t\t\t\"lng\": " << _coordinate->longitude() << ",\n";
         }
+        std::set<std::string> interfaces;
         std::set<std::string> targets;
+        auto if_name = std::make_unique<char[]>(_inamelength + 1);
         for(auto& i : _interfaces)
         {
+            auto res = _interface_map.unpack(i->id(), if_name.get());
+            if_name[res] = 0;
+            interfaces.insert(if_name.get());
+
             const RoutingTable& table = i->table();
             for(auto& e : table.entries())
             {
@@ -304,6 +310,22 @@ namespace aalwines
                 s << ",\n";
             }
             s << "\t\t\t\t\"" << tn << "\"";
+        }
+        s << "\n\t\t\t],\n";
+
+        s << "\t\t\t\"interfaces\": [\n";
+        first = true;
+        for(auto& in : interfaces)
+        {
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                s << ",\n";
+            }
+            s << "\t\t\t\t\"" << in << "\"";
         }
         s << "\n\t\t\t]\n";
     }
