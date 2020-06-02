@@ -47,7 +47,7 @@ namespace aalwines {
      *   ], ...
      * ]
      * where
-     *  - ATOM = {"hops", "links", "failures", "tunnels", "distance", "custom", "latency", "zero"}
+     *  - ATOM = {"links", "hops", "distance", "local_failures", "tunnels", "custom", "latency", "zero"}
      *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
@@ -59,12 +59,11 @@ namespace aalwines {
 
         enum class AtomicProperty {
             default_weight_function,
-            rule_priorities,
-            local_failures,
-            number_of_hops,
             number_of_links,
-            push_ops,
+            number_of_hops,
             distance,
+            local_failures,
+            push_ops,
             custom,
             latency,
         };
@@ -74,9 +73,19 @@ namespace aalwines {
 
         [[nodiscard]] atomic_property_function get_atom(AtomicProperty atom) const {
             switch (atom) {
-                case AtomicProperty::rule_priorities:
+                case AtomicProperty::number_of_links:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
-                        return r._weight;
+                        return 1;
+                    };
+                case AtomicProperty::number_of_hops: // Does not count links that are self-loops.
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                        return !r._via->is_virtual() ? 1 : 0;
+                    };
+                case AtomicProperty::distance:
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                        return r._via->source()->coordinate() && r._via->target()->coordinate()
+                               ? r._via->source()->coordinate()->distance_to(r._via->target()->coordinate().value())
+                               : 20038; //(km). If coordinates are missing, use half circumference of earth, i.e. worst case distance.
                     };
                 case AtomicProperty::local_failures:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& e) -> uint32_t {
@@ -88,23 +97,9 @@ namespace aalwines {
                         }
                         return edges.size();
                     };
-                case AtomicProperty::number_of_hops: // Does not count links that are self-loops.
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
-                        return !r._via->is_virtual() ? 1 : 0;
-                    };
-                case AtomicProperty::number_of_links:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
-                        return 1;
-                    };
                 case AtomicProperty::push_ops:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
                         return std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
-                    };
-                case AtomicProperty::distance:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
-                        return r._via->source()->coordinate() && r._via->target()->coordinate()
-                               ? r._via->source()->coordinate()->distance_to(r._via->target()->coordinate().value())
-                               : 20038; //(km). If coordinates are missing, use half circumference of earth, i.e. worst case distance.
                     };
                 case AtomicProperty::custom:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
@@ -159,16 +154,16 @@ namespace aalwines {
             }
             auto s = atom.get<std::string>();
             AtomicProperty p;
-            if (s == "hops") {
-                p = AtomicProperty::number_of_hops;
-            } else if (s == "links") {
+            if (s == "links") {
                 p = AtomicProperty::number_of_links;
-            } else if (s == "failures") {
+            } else if (s == "hops") {
+                p = AtomicProperty::number_of_hops;
+            } else if (s == "distance") {
+                p = AtomicProperty::distance;
+            } else if (s == "local_failures") {
                 p = AtomicProperty::local_failures;
             } else if (s == "tunnels") {
                 p = AtomicProperty::push_ops;
-            } else if (s == "distance") {
-                p = AtomicProperty::distance;
             } else if (s == "custom") {
                 p = AtomicProperty::custom;
             } else if (s == "latency") {
