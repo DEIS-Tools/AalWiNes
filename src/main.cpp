@@ -396,9 +396,10 @@ int main(int argc, const char** argv)
 
                 if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
                     result = utils::NO;
-                if(result != utils::MAYBE)
+                if(result != utils::MAYBE) {
                     mode = m;
                     break;
+                }
                 /*else
                     trace.clear();*/
             }
