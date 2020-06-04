@@ -684,11 +684,19 @@ namespace aalwines {
                 } else {
                     if (!first)
                         stream << ",\n";
-                    stream << "\t\t\t{\"router\":";
-                    if (s._inf)
-                        stream << "\"" << s._inf->source()->name() << "\"";
-                    else
-                        stream << "null";
+                    stream << "\t\t\t{";
+                    assert(s._inf != nullptr);
+                    auto from_inf = s._inf->match();
+                    auto from_router = s._inf->target();
+                    auto to_inf = s._inf;
+                    auto to_router = s._inf->source();
+                    assert(from_inf != nullptr);
+                    assert(from_router != nullptr);
+                    assert(to_router != nullptr);
+                    stream << R"("from_router":")" << from_router->name() << "\""
+                           << R"(,"from_interface":")" << from_router->interface_name(from_inf->id()).get() << "\""
+                           << R"(,"to_router":")" << to_router->name() << "\""
+                           << R"(,"to_interface":")" << to_router->interface_name(to_inf->id()).get() << "\"";
                     stream << ",\"stack\":[";
                     bool first_symbol = true;
                     for (auto &symbol : step._stack) {
