@@ -52,7 +52,7 @@ using namespace pdaaal;
 template<typename W_FN>
 bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, stopwatch& verification_time,
         Query& q, Query::mode_t m, Network& network, bool no_ip_swap, std::pair<size_t,size_t>& reduction, size_t tos,
-        bool need_trace, size_t engine, Moped& moped, SolverAdapter& solver, utils::outcome_t& result,
+        size_t engine, Moped& moped, SolverAdapter& solver, utils::outcome_t& result,
         std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t >& trace, std::stringstream& proof,
         std::vector<unsigned int>& trace_weight, const W_FN& weight_fn) {
     compilation_time.start();
@@ -68,9 +68,9 @@ bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, sto
     bool engine_outcome;
     switch(engine) {
         case 1:
-            engine_outcome = moped.verify(pda, need_trace);
+            engine_outcome = moped.verify(pda, true);
             verification_time.stop();
-            if(need_trace && engine_outcome) {
+            if(engine_outcome) {
                 trace = moped.get_trace(pda);
                 if (factory.write_json_trace(proof, trace))
                     result = utils::YES;
@@ -86,7 +86,7 @@ bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, sto
             }
             engine_outcome = solver_result.first;
             verification_time.stop();
-            if (need_trace && engine_outcome) {
+            if (engine_outcome) {
                 if constexpr (pdaaal::is_weighted<typename W_FN::result_type>) {
                     std::tie(trace, trace_weight) = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
                 } else {
@@ -98,10 +98,10 @@ bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, sto
             break;
         }
         case 3: {
-            auto solver_result = solver.pre_star(pda, need_trace);
+            auto solver_result = solver.pre_star(pda, true);
             engine_outcome = solver_result.first;
             verification_time.stop();
-            if (need_trace && engine_outcome) {
+            if (engine_outcome) {
                 trace = solver.get_trace(pda, std::move(solver_result.second));
                 if (factory.write_json_trace(proof, trace))
                     result = utils::YES;
@@ -379,16 +379,15 @@ int main(int argc, const char** argv)
             std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
             std::vector<unsigned int> trace_weight;
             std::stringstream proof;
-            bool need_trace = was_dual || get_trace;
             for(auto m : modes) {
                 bool engine_outcome;
                 if (weight_fn) {
                     engine_outcome = do_verification(compilation_time, reduction_time,
-                            verification_time,q, m, network, no_ip_swap, reduction, tos, need_trace, engine,
+                            verification_time,q, m, network, no_ip_swap, reduction, tos, engine,
                             moped, solver,result, trace, proof, trace_weight, weight_fn.value());
                 } else {
                     engine_outcome = do_verification<std::function<void(void)>>(compilation_time, reduction_time,
-                            verification_time,q, m,network, no_ip_swap, reduction, tos, need_trace, engine,
+                            verification_time,q, m,network, no_ip_swap, reduction, tos, engine,
                             moped, solver,result, trace, proof, trace_weight, [](){});
                 }
                 if(q.number_of_failures() == 0)
