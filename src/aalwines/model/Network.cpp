@@ -37,21 +37,18 @@ namespace aalwines
     Network::Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
     : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
     {
-
         ptrie::set<Query::label_t> all_labels;
         _total_labels = 0;
         for (auto& r : _routers) {
             for (auto& inf : r->interfaces()) {
                 for (auto& e : inf->table().entries()) {
                     if(all_labels.insert(e._top_label).first) ++_total_labels;
-                    if(e._top_label.value() > _max_label) _max_label = e._top_label.value();
                 }
             }
         }
     }
 
-    Router* Network::get_router(size_t id)
-    {
+    Router* Network::get_router(size_t id) {
         if (id < _routers.size()) {
             return _routers[id].get();
         }
@@ -92,34 +89,18 @@ namespace aalwines
 
     std::unordered_set<Query::label_t> Network::get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact)
     {
+        Query::label_t lbl(type, mask, label);
         std::unordered_set<Query::label_t> res;
         for (auto& pr : all_labels()) {
-            if (pr.type() != type) continue;
-            auto msk = std::max<uint8_t>(mask, pr.mask());
             if(pr == Query::label_t::unused_ip4 ||
                pr == Query::label_t::unused_ip6 ||
                pr == Query::label_t::unused_mpls ||
                pr == Query::label_t::unused_sticky_mpls ||
                pr == Query::label_t::any_ip ||
                pr == Query::label_t::any_ip4 ||
-               pr == Query::label_t::any_ip6 ||
-               pr == Query::label_t::any_mpls ||
-               pr == Query::label_t::any_sticky_mpls) continue;
-            switch (type) {
-            case Query::IP6:
-            case Query::IP4:
-            case Query::STICKY_MPLS:
-            case Query::MPLS:
-            {
-                if ((pr.value() << msk) == (label << msk) && 
-                     (pr.type() & Query::STICKY) == (type & Query::STICKY))
-                {
-                    res.insert(pr);
-                }
-            }
-            default:
-                break;
-            }
+               pr == Query::label_t::any_ip6) continue;
+            if (lbl.overlaps(pr))
+                res.insert(pr);
         }
         if(res.empty())
         {
@@ -149,16 +130,16 @@ namespace aalwines
             case Query::IP6:
                 res.emplace(Query::label_t::any_ip6);
                 break;
-            case Query::STICKY_MPLS:
-                res.emplace(Query::label_t::any_sticky_mpls);
-                break;
-            case Query::MPLS:
-                res.emplace(Query::label_t::any_mpls);
-                break;
             default:
-                throw base_error("Unknown expansion");
+                break;
             }        
         }
+#ifndef NDEBUG
+        for(auto& r : res)
+        {
+            assert(r.mask() == 0 || type == Query::IP6 || type == Query::IP4 || type == Query::ANYIP);
+        }
+#endif
         return res;
     }
 
@@ -175,8 +156,6 @@ namespace aalwines
             res.insert(Query::label_t::any_ip);
             res.insert(Query::label_t::any_ip4);
             res.insert(Query::label_t::any_ip6);
-            res.insert(Query::label_t::any_mpls);
-            res.insert(Query::label_t::any_sticky_mpls);
             _non_service_label = res;
             for (auto& r : _routers) {
                 for (auto& inf : r->interfaces()) {
@@ -222,7 +201,7 @@ namespace aalwines
 
             // Add interfaces to _all_interfaces and update their global id.
             for (auto&& inf: e->interfaces()) {
-                inf->update_global_id(_all_interfaces.size());
+                inf->set_global_id(_all_interfaces.size());
                 _all_interfaces.push_back(inf.get());
                 // Transfer links from old NULL router to new NULL router.
                 if (inf->target()->is_null()){
@@ -234,7 +213,7 @@ namespace aalwines
             }
 
             // Move router to new network
-            e->update_index(_routers.size());
+            e->set_index(_routers.size());
             _routers.emplace_back(std::move(e));
             _mapping.get_data(_mapping.insert(name.c_str(), name.length()).second) = _routers.back().get();
         }
@@ -292,6 +271,26 @@ namespace aalwines
             s << "router: \"" << r->name() << "\":\n";
             r->print_simple(s);
         }
+    }
+    void Network::print_json(std::ostream& s)
+    {
+        s << "\t\"routers\": {\n";
+        bool first = true;
+        for(auto& r : _routers)
+        {
+            if (r->is_null()) {
+                continue;
+            }
+            if (first) {
+                first = false;
+            } else {
+                s << ",\n";
+            }            
+            s << "\t\t\"" << r->name() << "\": {\n";
+            r->print_json(s);
+            s << "\t\t}";
+        }
+        s << "\n\t}";
     }
 
     bool Network::is_service_label(const Query::label_t& l) const

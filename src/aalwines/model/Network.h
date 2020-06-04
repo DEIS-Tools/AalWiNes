@@ -41,27 +41,21 @@ class Network {
 public:
     using routermap_t = ptrie::map<char, Router*>;
     Network(routermap_t&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
-    Network(const Network&) = default;
-    Network(Network&&) = default;
-    Network& operator=(const Network&) = default;
-    Network& operator=(Network&&) = default;
 
     Router *get_router(size_t id);
-    const std::vector<std::unique_ptr<Router>>& get_all_routers() const { return _routers; }
 
     void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
     void concat_network(Interface *link, Network &&nested_network, Interface *nested_ingoing, RoutingTable::label_t post_label);
     size_t size() const { return _routers.size(); }
-    const routermap_t& get_mapping() const { return _mapping; }
-    int get_max_label() const { return _max_label; }
 
     std::unordered_set<Query::label_t> interfaces(filter_t& filter);
     std::unordered_set<Query::label_t> get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact = false);
     std::unordered_set<Query::label_t> all_labels();
-    std::vector<const Interface*>& all_interfaces() { return _all_interfaces; }
+    const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
     void print_dot(std::ostream& s);
     void print_simple(std::ostream& s);
+    void print_json(std::ostream& s);
     bool is_service_label(const Query::label_t&) const;
     void write_prex_topology(std::ostream& s);
     void write_prex_routing(std::ostream& s);
@@ -76,7 +70,6 @@ private:
     std::vector<const Interface*> _all_interfaces;
     std::unordered_set<Query::label_t> _label_cache;
     std::unordered_set<Query::label_t> _non_service_label;
-    uint64_t _max_label = 0;
     void move_network(Network&& nested_network);
 };
 }

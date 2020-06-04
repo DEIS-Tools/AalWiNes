@@ -108,17 +108,7 @@ namespace aalwines
 
     Builder::labelset_t Builder::expand_labels(Query::label_t label)
     {
-        if(!_expand) return {label};
-        
-        if(label.type() == Query::ANYMPLS)
-        {
-            return _network.get_labels(0, 255, _sticky ? Query::STICKY_MPLS : Query::MPLS);
-        }
-        else if(label.type() == Query::ANYSTICKY)
-        {
-            return _network.get_labels(0, 255, Query::STICKY_MPLS);
-        }
-        return _network.get_labels(label.value(), label.mask(), label.type());        
+        return _network.get_labels(label.value(), label.mask(), label.type());
     }
 
     Builder::labelset_t Builder::match_ip4(int i1, int i2, int i3, int i4, int mask)
@@ -176,7 +166,7 @@ namespace aalwines
         filter_t res;
         if(!_post && !_link)
         {
-            res._from = [&](const char* name)
+            res._from = [str](const char* name)
             {
                 return (str.compare(name) == 0);
             };

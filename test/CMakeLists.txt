@@ -6,7 +6,9 @@ include_directories (${TEST_SOURCE_DIR}/src
 add_definitions (-DBOOST_TEST_DYN_LINK)
 
 add_executable (SyntacticNetwork SyntacticNetwork_test.cpp)
-add_executable (FastRerouting FastRerouting_test.cpp)
+add_executable (RouteConstruction RouteConstruction_test.cpp)
+add_executable (QueryTest Query_test.cpp)
 
 target_link_libraries(SyntacticNetwork ${Boost_LIBRARIES} aalwines)
-target_link_libraries(FastRerouting ${Boost_LIBRARIES} aalwines)
+target_link_libraries(RouteConstruction ${Boost_LIBRARIES} aalwines)
+target_link_libraries(QueryTest ${Boost_LIBRARIES} aalwines)

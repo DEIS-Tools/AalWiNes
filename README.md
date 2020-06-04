@@ -22,8 +22,8 @@ cd aalwines
 mkdir build
 cd build
 cmake ..
-make
-export MOPED_PATH=`pwd`/../bin/moped
+make 
+#export MOPED_PATH=`pwd`/../bin/moped
 # binary will be in build/bin
 ```
 
@@ -35,50 +35,77 @@ cmake -DAALWINES_BuildBundle=ON ..
 
 ## Usage Examples
 
-This will run queryfile `query.txt` over the network defined in the P-Rex data files, using moped as external engine and producing a trace:
+This will run queryfile `query.txt` and weightfile `weight.json` over the network defined in the P-Rex data files, using Post* implementation as engine and producing a trace:
     
 ```bash
 cd bin
-./aalwines --topology ../../../P-Rex/res/nestable/topo.xml --routing ../../../P-Rex/res/nestable/routing.xml -e 1 -q query.txt -t
+./aalwines --topology ../../example_net/Agis-topo.xml --routing ../../example_net/Agis-routing.xml -w ../../example_net/Agis-weight.json -q ../../example_net/Agis-query.q -t -e 2
 ```
 
 An example `query.txt` (syntax see below):
 ```
-<.> .* [s2#.] .* <.> 0 OVER
-<.> .* [s2#.] .* <.> 0 UNDER
+<.> [.#Stockton] .* [Santa_Clara#.] <.> 0 DUAL
+<.> [.#Chicago] [^.#Los_Angeles]* [Santa_Clara#.] <.> 1 DUAL
+```
+
+An example `weight.json` (syntax see below):
+```
+[
+        [
+                {"atom": "tunnels"}
+        ],
+        [
+                {"atom": "local_failures"},
+                {"atom": "hops", "factor": 2}
+        ]
+]
 ```
 
 will produce following output:
 ```json
 {
-        "network-parsing-time":0.0192828, "query-parsing-time":0.0011643,
+        "network-parsing-time":0.661911, "query-parsing-time":0.0021034,
         "answers":{
         "Q1" : {
-                "result":true,
-                "reduction":[1179, 1179],
+                "result":   true,
+                "engine":   "Post*",
+                "mode":     "OVER",
+                "reduction":[70918, 70918],
+                "trace-weight": [0, 4],
                 "trace":[
-                        {"router":"s2","stack":["10"]},
-                        {"pre":"10","rule":{"weight":0, "via":"s4"}},
-                        {"router":"s4","stack":["10"]}
+                        {"router":"Stockton","stack":["1599^"]},
+                        {"ingoing":"iStockton","pre":"1599^","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"1600"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"Santa_Clara","stack":["1600"]},
+                        {"ingoing":"Stockton","pre":"1600","rule":{"weight":0, "via":"Los_Angeles", "ops":[{"swap":"1601"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"Los_Angeles","stack":["1601"]}
                 ],
-                "compilation-time":0.0387264,
-                "reduction-time":1.07e-05,
-                "verification-time":0.0340714
+                "compilation-time":0.303446,
+                "reduction-time":0.0012157,
+                "verification-time":1.24293
         },
         "Q2" : {
-                "result":true,
-                "reduction":[1179, 1179],
+                "result": true,
+                "engine": "Post*",
+                "mode":   "OVER",
+                "reduction":[129519, 129519],
+                "trace-weight": [1, 9],
                 "trace":[
-                        {"router":"s2","stack":["10"]},
-                        {"pre":"10","rule":{"weight":0, "via":"s4"}},
-                        {"router":"s4","stack":["10"]}
+                        {"router":"Chicago","stack":["2922"]},
+                        {"ingoing":"St_Louis","pre":"2922","rule":{"weight":1, "via":"Seattle", "ops":[{"swap":"2923"}, {"push":"3452"}]}, "priority-weight": ["1", "3"]},
+                        {"router":"Seattle","stack":["3452","2923"]},
+                        {"ingoing":"Chicago","pre":"3452","rule":{"weight":0, "via":"San_Francisco", "ops":[{"swap":"3451"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"San_Francisco","stack":["3451","2923"]},
+                        {"ingoing":"Seattle","pre":"3451","rule":{"weight":0, "via":"Santa_Clara", "ops":[{"swap":"3450"}]}, "priority-weight": ["0", "2"]},
+                        {"router":"Santa_Clara","stack":["3450","2923"]},
+                        {"ingoing":"San_Francisco","pre":"3450","rule":{"weight":0, "via":"Los_Angeles", "ops":["pop"]}, "priority-weight": ["0", "2"]},
+                        {"router":"Los_Angeles","stack":["2923"]}
                 ],
-                "compilation-time":0.038969,
-                "reduction-time":8.4e-06,
-                "verification-time":0.0349733
+                "compilation-time":0.484016,
+                "reduction-time":0.0026069,
+                "verification-time":2.01965
         }
-
-}}
+}
+}
 ```
 
 ## Query Syntax
@@ -101,13 +128,43 @@ For `preCondition` and `postCondition` it defines the labels on the stack of the
 
 The `mode` can be OVER or UNDER. DUAL is a combination of OVER and UNDER. EXACT is not supported yet.
 
+## Weight Syntax
+ 
+A weight file contains a priority in the outer array. The inner array contains the linear combination of atoms. 
+
+```
+[
+        [
+                {"atom": ATOM, "factor": NUM},
+                ...
+        ], 
+        ...
+]
+```
+
+ATOM = {`links`, `hops`, `distance`, `local_failures`, `tunnels`,  <!-- , `latency`, `zero` --> }
+
+NUM = {0,1,2,...} factor is optional and NUM default is 1.
+
+The different priority groups, of linear combinations, represent the order of which the weights are compared. The second priority group will be considered if two similar weighted traces in the first linear combination are equal.
+
+`links` minimize the number of links in the trace.
+
+`hops` minimize the number of hops (not counting links that are self-loops) in the trace.
+
+`distance` minimize the accumulated distance between routers estimated from router coordinates.
+
+`local_failures` minimize the sum of locally counted failed links at each router on the trace. This number may be higher than the global number of failed links in the case of loops, since some links may be counted twice. 
+
+`tunnels` minimize the number of push operations in the trace.
+
 ## Regular Expression Syntax (regex)
 
 Every regular expression in the regex-list is built out of following components:
 
+<!--| regex `&` regex | AND: both regex must be fulfilled |-->
 | syntax          | description |
 | --------------: | ----------- |
-| regex `&` regex | AND: both regex must be fulfilled |
 | regex `\|` regex | OR: one or both regex must be fulfilled |
 | `.`             | matches everything |
 | regex`+`        | multiple: regex must match once or multiple times |

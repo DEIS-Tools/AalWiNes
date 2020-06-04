@@ -18,19 +18,19 @@
  */
 
 /*
- * File:   FastRerouting.h
+ * File:   RouteConstruction.h
  * Author: Morten K. Schou <morten@h-schou.dk>
  *
  * Created on 01-04-2020
  */
 
-#ifndef AALWINES_FASTREROUTING_H
-#define AALWINES_FASTREROUTING_H
+#ifndef AALWINES_ROUTECONSTRUCTION_H
+#define AALWINES_ROUTECONSTRUCTION_H
 
 #include <aalwines/model/Network.h>
 
 namespace aalwines {
-    class FastRerouting {
+    class RouteConstruction {
         using label_t = RoutingTable::label_t;
 
     public:
@@ -39,7 +39,7 @@ namespace aalwines {
 
         static bool make_reroute(const Interface* failed_inf, const std::function<label_t(void)>& next_label,
                                  const std::unordered_map<const Interface*,uint32_t>& cost_map) {
-            return FastRerouting::make_reroute(failed_inf, next_label, [&cost_map](const Interface* interface) {
+            return RouteConstruction::make_reroute(failed_inf, next_label, [&cost_map](const Interface* interface) {
                 return cost_map.at(interface);
             });
         }
@@ -52,7 +52,7 @@ namespace aalwines {
                 const std::function<uint32_t(const Interface*)>& cost_fn = [](const Interface* interface){return 1;});
         static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
                 const std::unordered_map<const Interface*,uint32_t>& cost_map) {
-            return FastRerouting::make_data_flow(from, to, next_label, [&cost_map](const Interface* interface) {
+            return RouteConstruction::make_data_flow(from, to, next_label, [&cost_map](const Interface* interface) {
                 return cost_map.at(interface);
             });
         }
@@ -60,4 +60,4 @@ namespace aalwines {
     };
 }
 
-#endif //AALWINES_FASTREROUTING_H
+#endif //AALWINES_ROUTECONSTRUCTION_H

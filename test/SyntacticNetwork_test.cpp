@@ -12,7 +12,7 @@
 #include <aalwines/utils/outcome.h>
 #include <aalwines/model/NetworkPDAFactory.h>
 #include <pdaaal/Reducer.h>
-#include <aalwines/synthesis/FastRerouting.h>
+#include <aalwines/synthesis/RouteConstruction.h>
 #include <aalwines/engine/Moped.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/model/builders/TopologyZooBuilder.h>
@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace) {
                                      synthetic_network.get_router(9)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(9)->find_interface("iRouter9"),
             next_label, path);
@@ -248,7 +248,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace) {
     path = {synthetic_network2.get_router(0),
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             next_label, path);
@@ -288,7 +288,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace1) {
                                      synthetic_network.get_router(4)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(4)->find_interface("iRouter4"),
             next_label, path);
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace1) {
     path = {synthetic_network2.get_router(0),
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             next_label, path);
@@ -344,7 +344,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace2) {
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
             next_label, path);
@@ -357,7 +357,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace2) {
             synthetic_network2.get_router(8),
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             next_label, path);
@@ -398,7 +398,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace) {
                                      synthetic_network.get_router(3)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(3)->find_interface("iRouter3"),
             next_label, path);
@@ -412,7 +412,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace) {
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
     i--;
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             next_label, path);
@@ -450,7 +450,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace1) {
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
             next_label, path);
@@ -464,7 +464,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace1) {
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
     i--;
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             next_label, path);
@@ -493,7 +493,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance) {
                                      synthetic_network.get_router(4)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(4)->find_interface("iRouter4"),
             next_label, path);
@@ -520,7 +520,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance1) {
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
             next_label, path);
@@ -547,7 +547,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
     auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
-    auto success = FastRerouting::make_data_flow(
+    auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
             next_label, path);
@@ -560,7 +560,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
             synthetic_network2.get_router(8),
             synthetic_network2.get_router(2),
             synthetic_network2.get_router(3)};
-    auto success1 = FastRerouting::make_data_flow(
+    auto success1 = RouteConstruction::make_data_flow(
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
             next_label, path);

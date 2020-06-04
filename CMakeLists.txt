@@ -32,9 +32,8 @@ if (AALWINES_GetDependencies)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
     
     ExternalProject_add(ptrie-ext
-        GIT_REPOSITORY git@github.com:petergjoel/ptrie.git
-        #GIT_TAG f2218918f6b2fba2ff6ecf51a977694c525c8229  # Working TAG
-        GIT_TAG 80afa1c7488a5961cd6f6d6a48bda6a212a390ae # Exploding TAG
+        URL https://github.com/petergjoel/ptrie/archive/v1.1.0.zip
+        URL_HASH SHA512=092a8f50ca21d1199b19a10c4e0273c93a717a9f6491998a16bf21d21d37e6537ffd8a06ac41a2b623241da6036546d44b754567441944565e2a16646378cf29
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     )
     file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/include)
@@ -45,11 +44,17 @@ if (AALWINES_GetDependencies)
         CONFIGURE_COMMAND ""
         INSTALL_COMMAND cd ../rapidxml-ext && ${CMAKE_COMMAND} -E copy rapidxml.hpp rapidxml_iterators.hpp rapidxml_print.hpp rapidxml_utils.hpp ${EXTERNAL_INSTALL_LOCATION}/include 
     )
-
+    file(DOWNLOAD
+            https://github.com/nlohmann/json/releases/download/v3.7.3/json.hpp
+            ${EXTERNAL_INSTALL_LOCATION}/include/json.hpp
+            EXPECTED_HASH SHA256=3b5d2b8f8282b80557091514d8ab97e27f9574336c804ee666fda673a9b59926
+    )
     ExternalProject_add(pdaaal-ext
-        URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.zip
-        URL_HASH SHA512=320b2b06206d471dfb416076f420dfa8a87667d59bc859a573d8120705f05035d113e6ca7906ea9951c2130a2a9c62391a3d498298c9a8d5416fec430b527e7e
-        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release
+        GIT_REPOSITORY git@github.com:DEIS-Tools/PDAAAL.git
+        GIT_TAG ed1e7fbb4cacd6ffb240a514cfe8472f83d91f60
+        #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.1.zip
+        #URL_HASH SHA512=f6f49a6d4cbb5fda1ac173fa77fe1eb1436ffe4112cc6f8fabdd8c879fad1aa90aa6be20804d5777bbfff902dd800f9f66dd1afb808d014653e21722dcb91b87
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include
     )
 
     # we can now include external libraries
@@ -72,5 +77,6 @@ if(BUILD_TESTING AND AALWINES_BuildTests)
     add_subdirectory(${CMAKE_SOURCE_DIR}/test/)
     enable_testing()
     add_test(NAME SyntacticNetwork    COMMAND SyntacticNetwork)
-    add_test(NAME FastRerouting       COMMAND FastRerouting)
+    add_test(NAME RouteConstruction   COMMAND RouteConstruction)
+    add_test(NAME QueryTest           COMMAND QueryTest)
 endif()

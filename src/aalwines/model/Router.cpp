@@ -31,6 +31,7 @@
 #include <vector>
 #include <streambuf>
 #include <sstream>
+#include <set>
 namespace aalwines
 {
 
@@ -44,7 +45,8 @@ namespace aalwines
 
     void Router::change_name(const std::string& name)
     {
-        _names.pop_back();
+        assert(_names.size() == 1);
+        _names.clear();
         _names.emplace_back(name);
     }
 
@@ -101,19 +103,6 @@ namespace aalwines
 
     Interface::Interface(size_t id, size_t global_id, Router* target, Router* parent) : _id(id), _global_id(global_id), _target(target), _parent(parent)
     {
-    }
-
-    void Router::remove_interface(Interface* interface){
-        auto lambda = [interface] (std::unique_ptr<aalwines::Interface>& a) { return a.get() == interface; };
-        auto rem = std::remove_if(_interfaces.begin(), _interfaces.end(), lambda);
-        _interfaces.erase(rem, _interfaces.end());
-    }
-
-    void Interface::remove_pairing(Interface* interface){
-        interface->_matching = nullptr;
-        _matching = nullptr;
-        interface->_target = nullptr;
-        _target = nullptr;
     }
 
     void Interface::make_pairing(Interface* interface)
@@ -278,5 +267,68 @@ namespace aalwines
                 s << "\t\t}\n";
             }
         }
+    }
+    void Router::print_json(std::ostream& s)
+    {
+        if (_coordinate) {
+            s << "\t\t\t\"lat\": " << _coordinate->latitude() << ",\n\t\t\t\"lng\": " << _coordinate->longitude() << ",\n";
+        }
+        std::set<std::string> interfaces;
+        std::set<std::string> targets;
+        auto if_name = std::make_unique<char[]>(_inamelength + 1);
+        for(auto& i : _interfaces)
+        {
+            auto res = _interface_map.unpack(i->id(), if_name.get());
+            if_name[res] = 0;
+            interfaces.insert(if_name.get());
+
+            const RoutingTable& table = i->table();
+            for(auto& e : table.entries())
+            {
+                for(auto& fwd : e._rules)
+                {
+                    auto via = fwd._via;
+                    if (via)
+                    {
+                        auto tn = via->target()->name();
+                        targets.insert(tn);
+                    }
+                }
+            }
+        }
+        s << "\t\t\t\"targets\": [\n";
+        bool first = true;
+        for(auto& tn : targets)
+        {
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                s << ",\n";
+            }
+            s << "\t\t\t\t\"" << tn << "\"";
+        }
+        s << "\n\t\t\t],\n";
+
+        s << "\t\t\t\"interfaces\": [\n";
+        first = true;
+        for(auto& in : interfaces)
+        {
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                s << ",\n";
+            }
+            s << "\t\t\t\t\"" << in << "\"";
+        }
+        s << "\n\t\t\t]\n";
+    }
+    void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
+        _coordinate.emplace(std::stod(latitude), std::stod(longitude));
     }
 }

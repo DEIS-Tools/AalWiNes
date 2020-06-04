@@ -68,6 +68,7 @@ namespace aalwines {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _weight = 0;
+            uint32_t _custom_weight = 0;
             forward_t() = default;
             forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t weight)
                 : _type(type), _ops(std::move(ops)), _via(via), _weight(weight) {};
@@ -89,8 +90,6 @@ namespace aalwines {
             void print_json(std::ostream&) const;
             static void print_label(label_t label, std::ostream& s, bool quote = true);
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
-            void clear() { _rules.clear(); }
-            void erase_rule(const forward_t& rule){ _rules.erase(std::remove(_rules.begin(), _rules.end(), rule), _rules.end()); }
             void add_to_outgoing(const Interface* outgoing, action_t action);
         };
 
@@ -100,15 +99,12 @@ namespace aalwines {
         bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
-        [[nodiscard]] const std::vector<entry_t>& entries() const;
+        const std::vector<entry_t>& entries() const;
         
         void sort();
         bool check_nondet(std::ostream& e);
         entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
         void pop_entry() { _entries.pop_back(); }
-        void clear() { _entries.clear(); }
-        void erase_entry(RoutingTable::entry_t& entry){ _entries.erase(std::remove(_entries.begin(), _entries.end(), entry), _entries.end()); }
-
 
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);
         void add_rule(label_t top_label, const forward_t& rule);
@@ -116,11 +112,11 @@ namespace aalwines {
         void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0, type_t = MPLS);
         void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
         void add_to_outgoing(const Interface* outgoing, action_t action);
-        void add_to_outgoing(const Interface* outgoing, label_t top_label, action_t action);
-        std::vector<entry_t>::iterator insert_entry(label_t top_label);
         void simple_merge(const RoutingTable& other);
         
     private:
+        std::vector<entry_t>::iterator insert_entry(label_t top_label);
+
         std::vector<entry_t> _entries;
     };
 }

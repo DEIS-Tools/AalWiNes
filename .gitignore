@@ -38,7 +38,6 @@ src/aalwines/query/*.cc
 src/aalwines/query/*.hh
 
 # Test
+cmake-build-profiler/
+cmake-build-static/
 test/results/
-test/Sample_networks/gml/
-test/Sample_networks/*.xml
-test/Sample_networks/*.json
