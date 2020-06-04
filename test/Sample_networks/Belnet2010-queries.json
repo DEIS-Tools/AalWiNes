@@ -1,6 +1,0 @@
-[
-    {
-        "Description": "Find a trace from Liege1 to Brussels_Campus with 0 failed links.",
-        "Query": "<.> [.#Liege1] .* [Brussels_Campus#.] <.> 0 DUAL"
-    }
-]

@@ -167,17 +167,23 @@ namespace aalwines {
         bool first = true;
         // Swap labels on hops.
         for (auto via : path) {
+            if (from->source() != via->source()) return false;
             if (first){
                 pre_label.set_type(Query::ANYIP);
-                from->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, next_label()}, via);
+                auto swap_label = next_label();
+                from->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, swap_label}, via);
+                pre_label = swap_label;
+                from = via->match();
                 first = false;
-                continue;
+            } else if (via == path.back()){
+                from->table().add_rule(pre_label, {RoutingTable::op_t::POP, label_t{}}, via);
+            } else {
+                auto swap_label = next_label();
+                pre_label.set_type(Query::STICKY_MPLS);
+                from->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, swap_label}, via);
+                from = via->match();
+                pre_label = swap_label;
             }
-            if (from->source() != via->source()) return false;
-            auto swap_label = next_label();
-            from->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, swap_label}, via);
-            from = via->match();
-            pre_label = swap_label;
         }
         return true;
     }

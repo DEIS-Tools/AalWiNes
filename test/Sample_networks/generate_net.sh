@@ -1,10 +1,10 @@
 #!/bin/bash
-for f in $(ls gml/*.gml)
-do
-    echo "Creating $f"
+
+for f in *.gml; do
+    echo 'Creating $f'
     NAME=${f%%.*}
     NAME=${NAME#*/}
-    if ./zoo-routing -z $f -t "$NAME-topo.xml" -r "$NAME-routing.xml" -q "$NAME-queries.json"; then
+    if ./zoo-routing -z $f -t "networks/$NAME-topo.xml" -r "networks/$NAME-routing.xml" -q "networks/$NAME-queries.json"; then
         rm $f
     fi
 done

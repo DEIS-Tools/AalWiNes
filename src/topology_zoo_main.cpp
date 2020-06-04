@@ -29,7 +29,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include <aalwines/synthesis/FastRerouting.h>
+#include <aalwines/synthesis/RouteConstruction.h>
 
 namespace po = boost::program_options;
 using namespace aalwines;
@@ -112,7 +112,7 @@ int main(int argc, const char** argv)
         if(r->is_null()) continue;
         for(auto &r_p : network.get_all_routers()){
             if (r == r_p || r_p->is_null()) continue;
-            auto success = FastRerouting::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
+            auto success = RouteConstruction::make_data_flow(r->get_null_interface(), r_p->get_null_interface(), next_label, cost);
             if(!success){
                 unlinked_routers.emplace_back(std::make_pair(r.get(), r_p.get()));
             }
@@ -120,7 +120,7 @@ int main(int argc, const char** argv)
     }
     for(auto& inf : network.all_interfaces()){
         if (inf->target()->is_null() || inf->source()->is_null()) continue;
-        FastRerouting::make_reroute(inf, next_label, cost);
+        RouteConstruction::make_reroute(inf, next_label, cost);
     }
 
     std::ofstream out_topo(topology_destination);
@@ -142,12 +142,16 @@ int main(int argc, const char** argv)
         if(out_query.is_open()) {
             out_query << "[\n"
                       << "    {\n"
-                      << R"(        "Description": "Find a trace from )" << network.get_router(0)->name() << " to " << network.get_router(1)->name() <<  " with 0 failed links.\",\n"
+                      << R"(        "Description": "Find a trace entering the network at )" << network.get_router(0)->name() << " and leaving the network at " << network.get_router(1)->name() <<  " with no failed links.\",\n"
                       << R"(        "Query": ")"
-                      << "<.> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <.> 0 DUAL\"\n"
+                      << "<ip> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <ip> 0 DUAL\"\n"
+                      << "    },\n"
+                      << "    {\n"
+                      << R"(        "Description": "Find a trace entering )" << network.get_router(0)->name() << " with one MPLS label and leaving " << network.get_router(1)->name() <<  " least one MPLS label, where at most 1 link is failed.\",\n"
+                      << R"(        "Query": ")"
+                      << "<smpls ip> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <mpls* smpls ip> 1 DUAL\"\n"
                       << "    }\n"
                       << "]";
-
         } else {
             std::cerr << "Could not open --write-query \"" << query_destination << "\" for writing" << std::endl;
             exit(-1);

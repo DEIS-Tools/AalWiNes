@@ -43,6 +43,7 @@ public:
     Network(routermap_t&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
 
     Router *get_router(size_t id);
+    const std::vector<std::unique_ptr<Router>>& get_all_routers() const { return _routers; }
 
     void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
