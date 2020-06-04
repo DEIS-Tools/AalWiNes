@@ -512,6 +512,7 @@ namespace aalwines
     Network Network::make_network(const std::vector<std::pair<std::string,Coordinate>>& names, const std::vector<std::vector<std::string>>& links) {
         std::vector<std::unique_ptr<Router>> routers;
         std::vector<const Interface*> interfaces;
+        std::map<std::string, size_t> _interface_map;
         Network::routermap_t mapping;
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i].first;
@@ -524,8 +525,11 @@ namespace aalwines
             assert(res.first);
             mapping.get_data(res.second) = &router;
             router.get_interface(interfaces, "i" + name);
+            size_t interface_count = 0;
             for (const auto& other : links[i]) {
-                router.get_interface(interfaces, other);
+                router.get_interface(interfaces, "eth" + std::to_string(interface_count));
+                _interface_map.insert({other, interface_count++});
+                //router.get_interface(interfaces, other);
             }
         }
         for (size_t i = 0; i < names.size(); ++i) {
@@ -535,7 +539,8 @@ namespace aalwines
                 assert(res1.first);
                 auto res2 = mapping.exists(other.c_str(), other.length());
                 if(!res2.first) continue;
-                mapping.get_data(res1.second)->find_interface(other)->make_pairing(mapping.get_data(res2.second)->find_interface(name));
+                mapping.get_data(res1.second)->find_interface(_interface_map[other])->make_pairing(mapping.get_data(res2.second)->find_interface(_interface_map[name]));
+                //mapping.get_data(res1.second)->find_interface(other)->make_pairing(mapping.get_data(res2.second)->find_interface(name));
             }
         }
         Router::add_null_router(routers, interfaces, mapping);

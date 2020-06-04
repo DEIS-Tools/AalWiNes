@@ -163,9 +163,16 @@ namespace aalwines {
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
         assert(path[path.size()-1]->target()->is_null());
-        auto pre_label = next_label();
+        auto pre_label = next_label();        
+        bool first = true;
         // Swap labels on hops.
         for (auto via : path) {
+            if (first){
+                pre_label.set_type(Query::ANYIP);
+                from->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, next_label()}, via);
+                first = false;
+                continue;
+            }
             if (from->source() != via->source()) return false;
             auto swap_label = next_label();
             from->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, swap_label}, via);
