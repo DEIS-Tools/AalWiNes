@@ -142,14 +142,14 @@ int main(int argc, const char** argv)
         if(out_query.is_open()) {
             out_query << "[\n"
                       << "    {\n"
-                      << R"(        "Description": "Find a trace entering the network at )" << network.get_router(0)->name() << " and leaving the network at " << network.get_router(1)->name() <<  " with no failed links.\",\n"
-                      << R"(        "Query": ")"
-                      << "<ip> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <ip> 0 DUAL\"\n"
+                      << R"(        "description": "Find a trace entering the network at )" << network.get_router(0)->name() << " and leaving the network at " << network.get_router(1)->name() <<  " with no failed links.\",\n"
+                      << R"(        "query": ")"
+                      << "<ip> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <ip> 0\"\n"
                       << "    },\n"
                       << "    {\n"
-                      << R"(        "Description": "Find a trace entering )" << network.get_router(0)->name() << " with one MPLS label and leaving " << network.get_router(1)->name() <<  " least one MPLS label, where at most 1 link is failed.\",\n"
-                      << R"(        "Query": ")"
-                      << "<smpls ip> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <mpls* smpls ip> 1 DUAL\"\n"
+                      << R"(        "description": "Find a trace entering )" << network.get_router(0)->name() << " with one MPLS label and leaving " << network.get_router(1)->name() <<  " least one MPLS label, where at most 1 link is failed.\",\n"
+                      << R"(        "query": ")"
+                      << "<smpls ip> [.#" << network.get_router(0)->name() << "] .* [" << network.get_router(1)->name() << "#.] <mpls* smpls ip> 1\"\n"
                       << "    }\n"
                       << "]";
         } else {
