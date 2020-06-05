@@ -703,8 +703,8 @@ namespace aalwines {
                         if (!first_symbol)
                             stream << ",";
                         stream << "\"" << symbol;
-                        if (_network.is_service_label(symbol))
-                            stream << "^";
+                        //if (_network.is_service_label(symbol))
+                        //    stream << "^";
                         stream << "\"";
                         first_symbol = false;
                     }
