@@ -104,7 +104,7 @@ int main(int argc, const char** argv)
 
 
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](Query::type_t type = Query::type_t::MPLS){return Query::label_t(type, 0, i++);};
     auto cost = [](const Interface* interface){ return interface->source()->coordinate() && interface->target()->coordinate() ?
                 interface->source()->coordinate()->distance_to(interface->target()->coordinate().value()) : 1 ; };
 

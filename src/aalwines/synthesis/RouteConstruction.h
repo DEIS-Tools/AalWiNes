@@ -45,18 +45,17 @@ namespace aalwines {
         }
 
         static bool make_data_flow(const Interface* from, const Interface* to,
-                const std::function<label_t(void)>& next_label, const std::vector<const Router*>& path);
+                const std::function<label_t(Query::type_t)>& next_label, const std::vector<const Router*>& path);
         static bool make_data_flow(Interface* from, const std::vector<Interface*>& path,
-                const std::function<label_t(void)>& next_label);
-        static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
+                const std::function<label_t(Query::type_t)>& next_label);
+        static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(Query::type_t)>& next_label,
                 const std::function<uint32_t(const Interface*)>& cost_fn = [](const Interface* interface){return 1;});
-        static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
+        static bool make_data_flow(Interface* from, Interface* to, const std::function<label_t(Query::type_t)>& next_label,
                 const std::unordered_map<const Interface*,uint32_t>& cost_map) {
             return RouteConstruction::make_data_flow(from, to, next_label, [&cost_map](const Interface* interface) {
                 return cost_map.at(interface);
             });
         }
-
     };
 }
 

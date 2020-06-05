@@ -138,7 +138,7 @@ namespace aalwines {
         return nullptr;
     }
     bool RouteConstruction::make_data_flow(const Interface* from, const Interface* to,
-                                           const std::function<label_t(void)>& next_label, const std::vector<const Router*>& path) {
+                                           const std::function<label_t(Query::type_t)>& next_label, const std::vector<const Router*>& path) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
@@ -158,19 +158,18 @@ namespace aalwines {
     }
 
     bool RouteConstruction::make_data_flow(Interface* from, const std::vector<Interface*>& path,
-                                           const std::function<label_t(void)>& next_label) {
+                                           const std::function<label_t(Query::type_t)>& next_label) {
         assert(!path.empty());
         // Check if the interfaces is 'outer' interfaces.
         assert(from->target()->is_null());
         assert(path[path.size()-1]->target()->is_null());
-        auto pre_label = next_label();        
+        auto pre_label = next_label(Query::ANYIP);        
         bool first = true;
         // Swap labels on hops.
         for (auto via : path) {
             if (from->source() != via->source()) return false;
             if (first){
-                pre_label.set_type(Query::ANYIP);
-                auto swap_label = next_label();
+                auto swap_label = next_label(Query::STICKY_MPLS);
                 from->table().add_rule(pre_label, {RoutingTable::op_t::PUSH, swap_label}, via);
                 pre_label = swap_label;
                 from = via->match();
@@ -178,8 +177,7 @@ namespace aalwines {
             } else if (via == path.back()){
                 from->table().add_rule(pre_label, {RoutingTable::op_t::POP, label_t{}}, via);
             } else {
-                auto swap_label = next_label();
-                pre_label.set_type(Query::STICKY_MPLS);
+                auto swap_label = next_label(Query::STICKY_MPLS);
                 from->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, swap_label}, via);
                 from = via->match();
                 pre_label = swap_label;
@@ -188,7 +186,7 @@ namespace aalwines {
         return true;
     }
 
-    bool RouteConstruction::make_data_flow(Interface* from, Interface* to, const std::function<label_t(void)>& next_label,
+    bool RouteConstruction::make_data_flow(Interface* from, Interface* to, const std::function<label_t(Query::type_t)>& next_label,
                                            const std::function<uint32_t(const Interface*)>& cost_fn) {
         if (from->source() == to->source()) {
             return make_data_flow(from, std::vector<Interface*>{to}, next_label);
