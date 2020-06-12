@@ -289,7 +289,7 @@ int main(int argc, const char** argv)
             }
         }
     }
-
+    std::vector<std::string> queries;
     if(!query_file.empty())
     {
         stopwatch queryparsingwatch;
@@ -301,9 +301,16 @@ int main(int argc, const char** argv)
                 exit(-1);
             }
             try {
+                std::string str;
+                while(getline(qstream, str)){
+                    str.erase(std::remove(str.begin(), str.end(), '\r'), str.end());
+                    queries.emplace_back(str);
+                }
+                qstream.close();
+                std::ifstream qstream(query_file);
                 builder.do_parse(qstream);
                 qstream.close();
-            } 
+            }
             catch(base_parser_error& error)
             {
                 std::cerr << "Error during parsing:\n" << error << std::endl;
@@ -406,7 +413,9 @@ int main(int argc, const char** argv)
             // move this into function that generalizes
             // and extracts trace at the same time.
 
-            std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"result\":";
+            std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"query\": \"";
+            std::cout << queries[query_no - 1];
+            std::cout << "\",\n\t\t\"result\":";
             switch(result)
             {
             case utils::MAYBE:
