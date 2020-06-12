@@ -89,7 +89,8 @@
         GT        ">"       
         
         IDENTIFIER  "identifier"
-        LITERAL     "literal"        
+        LITERAL     "literal"
+        STRINGLIT   "string literal"
         NUMBER     "number"
         HEX        "hex"
         
@@ -116,7 +117,7 @@
 %type  <Query::mode_t> mode;
 %type  <std::unordered_set<Query::label_t>> atom_list label slabel ip4 ip6;
 %type  <filter_t> atom identifier name;
-%type  <std::string> literal;
+%type  <std::string> literal stringlit;
 //%printer { yyoutput << $$; } <*>;
 %left AND
 %left OR
@@ -237,10 +238,16 @@ literal
     }
     ;
 
+stringlit
+    : STRINGLIT {
+        $$ = scanner.last_string.substr(1, scanner.last_string.length()-2) ;
+    }
+    ;
     
 name
     : IDENTIFIER { $$ = builder.match_exact(scanner.last_string); }
     | literal {  $$ = builder.match_re(std::move($1)); }
+    | stringlit {  $$ = builder.match_exact(std::move($1)); }
     ;
 
 slabel 

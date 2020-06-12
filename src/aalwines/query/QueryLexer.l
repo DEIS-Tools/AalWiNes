@@ -41,12 +41,13 @@ using token = aalwines::Parser::token;
 %option yyclass="aalwines::Scanner"
 %x comment
 
-id    [a-zA-Z\_\-][a-zA-Z0-9\_\-']*
+id    [a-zA-Z\_\-][a-zA-Z0-9\_\-]*
 hex   [0-9a-fA-F]
 int   [0-9]+
 float {int}*\.{int}+
 blank [ \t]
 literal  \"(\\.|[^\\"])*\"
+stringlit  '[^']*'
 
 %{
   // Code run each time a pattern is matched.
@@ -130,6 +131,10 @@ literal  \"(\\.|[^\\"])*\"
 {literal}   {
     last_string = yytext;
     return token::LITERAL;
+}
+{stringlit}   {
+    last_string = yytext;
+    return token::STRINGLIT;
 }
 {id} {
     last_string = yytext;
