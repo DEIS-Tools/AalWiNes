@@ -39,7 +39,7 @@ using token = aalwines::Parser::token;
 
 %option noyywrap nounput batch noinput c++
 %option yyclass="aalwines::Scanner"
-%x comment
+%x comment S_STRING
 
 id    [a-zA-Z\_\-][a-zA-Z0-9\_\-]*
 hex   [0-9a-fA-F]
@@ -47,7 +47,6 @@ int   [0-9]+
 float {int}*\.{int}+
 blank [ \t]
 literal  \"(\\.|[^\\"])*\"
-stringlit  '[^']*'
 
 %{
   // Code run each time a pattern is matched.
@@ -73,7 +72,6 @@ stringlit  '[^']*'
 <comment>"*"+[^*/\n]*   /* eat up '*'s not followed by '/'s */
 <comment>"*"+"/"        BEGIN(INITIAL);
 <comment><<EOF>>        {
-
                             aalwines::Parser::syntax_error
                                        (builder._location, "Unterminated multiline comment: " + std::string(yytext));
                         }
@@ -132,12 +130,16 @@ stringlit  '[^']*'
     last_string = yytext;
     return token::LITERAL;
 }
-{stringlit}   {
-    last_string = yytext;
-    return token::STRINGLIT;
-}
 {id} {
     last_string = yytext;
     return token::IDENTIFIER;
 }
 
+'[^'\\]*   { last_string = std::string(yytext + 1, yyleng - 1);
+             BEGIN(S_STRING);
+           }
+<S_STRING>{
+  [^'\\]+  { last_string.append(yytext, yyleng); }
+  \\('|\\) { last_string += yytext[1]; }
+  '        { BEGIN(INITIAL); return token::STRINGLIT; }
+}
