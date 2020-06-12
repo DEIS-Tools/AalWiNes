@@ -21,7 +21,7 @@ git clone git@github.com:DEIS-Tools/aalwines.git
 cd aalwines
 mkdir build
 cd build
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release ..
 make 
 #export MOPED_PATH=`pwd`/../bin/moped
 # binary will be in build/bin
@@ -30,7 +30,7 @@ make
 Option for static linkage -> binary will not need libboost and other libs installed on target system:
 
 ```bash
-cmake -DAALWINES_BuildBundle=ON ..
+cmake -DAALWINES_BuildBundle=ON -DCMAKE_BUILD_TYPE=Release ..
 ```
 
 ## Usage Examples

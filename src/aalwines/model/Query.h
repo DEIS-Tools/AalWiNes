@@ -157,7 +157,7 @@ namespace aalwines {
                 switch(label._type)
                 {
                     case STICKY_MPLS:
-                        stream << "$";
+                        stream << "s";
                     case MPLS:
                         if(label._mask >= 64 || label == Query::label_t::unused_mpls || label == Query::label_t::unused_sticky_mpls)
                             stream << "mpls";
