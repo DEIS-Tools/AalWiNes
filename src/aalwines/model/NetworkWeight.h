@@ -160,7 +160,7 @@ namespace aalwines {
                 p = AtomicProperty::number_of_hops;
             } else if (s == "distance") {
                 p = AtomicProperty::distance;
-            } else if (s == "local_failures") {
+            } else if (s == "local_failures" || s == "failures") { // Support both namings
                 p = AtomicProperty::local_failures;
             } else if (s == "tunnels") {
                 p = AtomicProperty::push_ops;
