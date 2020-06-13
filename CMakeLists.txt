@@ -50,10 +50,8 @@ if (AALWINES_GetDependencies)
             EXPECTED_HASH SHA256=3b5d2b8f8282b80557091514d8ab97e27f9574336c804ee666fda673a9b59926
     )
     ExternalProject_add(pdaaal-ext
-        GIT_REPOSITORY git@github.com:DEIS-Tools/PDAAAL.git
-        GIT_TAG ed1e7fbb4cacd6ffb240a514cfe8472f83d91f60
-        #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.1.zip
-        #URL_HASH SHA512=f6f49a6d4cbb5fda1ac173fa77fe1eb1436ffe4112cc6f8fabdd8c879fad1aa90aa6be20804d5777bbfff902dd800f9f66dd1afb808d014653e21722dcb91b87
+        URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.4.zip
+        URL_HASH SHA512=c3502be29632f910a92c7660d253c0bfd5db0b9c8685830fb0814a19219dae70ce41f8cf39ad8d7c38c099a145ec0aabeb6a081640e5a29e27b0d35e75d4039a
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include
     )
 
