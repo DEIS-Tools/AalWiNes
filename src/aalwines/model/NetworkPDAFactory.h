@@ -58,7 +58,7 @@ namespace aalwines {
         : NetworkPDAFactory(query, network, only_mpls_swap, [](){}) {};
 
         NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap, const W_FN& weight_f)
-        :PDAFactory(query.construction(), query.destruction(), network.all_labels()), _network(network),
+        :PDAFactory(query.construction(), query.destruction(), network.all_labels(), Query::label_t::unused_mpls), _network(network),
         _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap), _weight_f(weight_f){
             NFA::state_t *ns = nullptr;
             Interface *nr = nullptr;
