@@ -1,0 +1,1 @@
+<[s123456789123456789123456789] ip> .* <[s22] ip> 0 OVER /* Tests the error message for a too long s-label */
