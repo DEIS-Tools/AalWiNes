@@ -108,7 +108,7 @@ literal  \"(\\.|[^\\"])*\"
 "smpls" return token::ANYSTICKYMPLS;
 "$mpls" return token::ANYSTICKYMPLS;
 
-s[0-9]* {
+s[0-9]+ {
   long int n = strtol (yytext + 1, NULL, 10);
     if (! (INT_MIN <= n && n <= INT_MAX)) {
         last_string = yytext;
