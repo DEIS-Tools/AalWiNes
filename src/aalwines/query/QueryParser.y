@@ -89,7 +89,8 @@
         GT        ">"       
         
         IDENTIFIER  "identifier"
-        LITERAL     "literal"        
+        LITERAL     "literal"
+        STRINGLIT   "string literal"
         NUMBER     "number"
         HEX        "hex"
         
@@ -236,11 +237,11 @@ literal
         $$ = scanner.last_string.substr(1, scanner.last_string.length()-2) ;
     }
     ;
-
     
 name
     : IDENTIFIER { $$ = builder.match_exact(scanner.last_string); }
     | literal {  $$ = builder.match_re(std::move($1)); }
+    | STRINGLIT {  $$ = builder.match_exact(scanner.last_string); }
     ;
 
 slabel 
