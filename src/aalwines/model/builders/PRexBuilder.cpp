@@ -280,7 +280,7 @@ namespace aalwines {
                         }
                         else
                         {
-                            auto sticky = val[0] == '$';;
+                            auto sticky = val[0] == '$' || val[0] == 's';
                             Query::type_t type = Query::MPLS;
                             if(sticky)
                                 type = Query::STICKY_MPLS;
@@ -432,7 +432,7 @@ namespace aalwines {
                                                     es << type << " needs an \"arg\"";
                                                     throw base_error(es.str());
                                                 }
-                                                auto sticky = aattr->value()[0] == '$';
+                                                auto sticky = aattr->value()[0] == '$' || aattr->value()[0] == 's';
                                                 op._op_label.set_value(sticky ? Query::STICKY_MPLS : Query::MPLS, 
                                                                        std::atoi(aattr->value() + (sticky ? 1 : 0)), 0);
                                                 if(type == "push")
