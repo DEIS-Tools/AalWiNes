@@ -2,13 +2,13 @@
   <routings>
     <routing for="s123456789123456789123456789">
       <destinations>
-        <destination from="in0" label="$20">
+        <destination from="in0" label="s20">
           <te-groups>
             <te-group>
               <routes>
                 <route to="in2">
                   <actions>
-                    <action arg="$21" type="swap"/>
+                    <action arg="s21" type="swap"/>
                   </actions>
                 </route>
               </routes>
