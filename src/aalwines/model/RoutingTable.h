@@ -100,6 +100,7 @@ namespace aalwines {
         void print_json(std::ostream&) const;
 
         const std::vector<entry_t>& entries() const;
+        std::vector<entry_t>& entries() { return _entries; }
         
         void sort();
         bool check_nondet(std::ostream& e);

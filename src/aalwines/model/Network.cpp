@@ -390,7 +390,7 @@ namespace aalwines
                         {
                             assert(rule._via->source() == r.get());
                             auto tname = r->interface_name(rule._via->id());
-                            s << "                <route to=\"" << tname.get() << "\">\n";
+                            s << "                <route to=\"" << tname.get() << "\" weight=\"" << rule._custom_weight << "\">\n";
                             s << "                  <actions>\n";
                             for(auto& o : rule._ops)
                             {
