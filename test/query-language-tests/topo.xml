@@ -1,0 +1,25 @@
+<network>
+  <routers>
+    <router name="s123456789123456789123456789" latitude="57.011595" longitude="10.003951" >
+      <interfaces>
+        <interface name="eg0"/>
+        <interface name="in0"/>
+        <interface name="in2"/>
+      </interfaces>
+    </router>
+    <router name="s0" latitude="57.0100" longitude="10.0088" >
+      <interfaces>
+        <interface name="eg0"/>
+        <interface name="in1"/>
+      </interfaces>
+    </router>
+  </routers>
+  <links>
+    <link>
+      <sides>
+        <shared_interface interface="in2" router="s123456789123456789123456789"/>
+        <shared_interface interface="in1" router="s0"/>
+      </sides>
+    </link>
+  </links>
+</network>

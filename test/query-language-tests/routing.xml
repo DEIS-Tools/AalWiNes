@@ -1,0 +1,38 @@
+<routes>
+  <routings>
+    <routing for="s123456789123456789123456789">
+      <destinations>
+        <destination from="in0" label="s20">
+          <te-groups>
+            <te-group>
+              <routes>
+                <route to="in2">
+                  <actions>
+                    <action arg="s21" type="swap"/>
+                  </actions>
+                </route>
+              </routes>
+            </te-group>
+          </te-groups>
+        </destination>
+      </destinations>
+    </routing>
+    <routing for="s0">
+      <destinations>
+        <destination from="in1" label="$21">
+          <te-groups>
+            <te-group>
+              <routes>
+                <route to="eg0">
+                  <actions>
+                    <action arg="$22" type="swap"/>
+                  </actions>
+                </route>
+              </routes>
+            </te-group>
+          </te-groups>
+        </destination>
+      </destinations>
+    </routing>
+  </routings>
+</routes>

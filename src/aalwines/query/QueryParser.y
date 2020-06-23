@@ -107,6 +107,7 @@
         ANYIP     "ip"
         ANYMPLS   "mpls"
         ANYSTICKYMPLS "smpls"
+        SNUMBER   "Either sticky label or identifier"
 ;
 
 
@@ -242,6 +243,7 @@ name
     : IDENTIFIER { $$ = builder.match_exact(scanner.last_string); }
     | literal {  $$ = builder.match_re(std::move($1)); }
     | STRINGLIT {  $$ = builder.match_exact(scanner.last_string); }
+    | SNUMBER {  $$ = builder.match_exact(scanner.last_string); }
     ;
 
 slabel 
@@ -252,6 +254,8 @@ slabel
 label
     : number "/" number  { $$ = builder.find_label($1, $3); }
     | number  { $$ = builder.find_label($1, 0); }
+    | SNUMBER { builder.set_sticky(); $$ = builder.find_label(scanner.last_int, 0); builder.unset_sticky(); }
+    | SNUMBER "/" number  { builder.set_sticky(); $$ = builder.find_label(scanner.last_int, $3); builder.unset_sticky(); }
     | ip4
     | ip6
     ;
