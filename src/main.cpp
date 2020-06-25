@@ -133,6 +133,7 @@ int main(int argc, const char** argv)
     
     bool print_dot = false;
     bool print_net = false;
+    bool latency = false;
     bool no_parser_warnings = false;
     bool silent = false;
     bool dump_to_moped = false;
@@ -145,6 +146,7 @@ int main(int argc, const char** argv)
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
             ("net", po::bool_switch(&print_net), "A json output of the network will be printed to cout when set.")
+            ("latency", po::bool_switch(&latency), "Annotates the routing.xml file (as specified by --write-routing) with latency weight (estimate based on distance).")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
@@ -269,10 +271,12 @@ int main(int argc, const char** argv)
     if(!routing_destination.empty())
     {
         std::ofstream out(routing_destination);
-        if(out.is_open())
+        if(out.is_open()) {
+            if (latency) {
+                network.assign_latency();
+            }
             network.write_prex_routing(out);
-        else
-        {
+        } else {
             std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl,
             exit(-1);
         }

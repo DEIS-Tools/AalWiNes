@@ -61,6 +61,8 @@ public:
     void write_prex_topology(std::ostream& s);
     void write_prex_routing(std::ostream& s);
 
+    void assign_latency();
+
     static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
     static Network make_network(const std::vector<std::pair<std::string,Coordinate>>& names, const std::vector<std::vector<std::string>>& links);
 private:

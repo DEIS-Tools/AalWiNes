@@ -549,4 +549,21 @@ namespace aalwines
         return Network(std::move(mapping), std::move(routers), std::move(interfaces));
     }
 
+    void Network::assign_latency() {
+        for (auto& r : get_all_routers()) {
+            for (auto& inf : r->interfaces()) {
+                for (auto& entry : inf->table().entries()) {
+                    for (auto& fwd : entry._rules) {
+                        if (!fwd._via->target()->is_null()) {
+                            // We use the following formula as an estimate for latency.
+                            // It comes from interpolation of some ping commands for links of different length using: http://lg.nordu.net/lg.cgi
+                            // latency (ns) = 500 + 17.7 * distance (km)
+                            fwd._custom_weight = 500 + (uint32_t)(17.7 * fwd._via->source()->coordinate()->distance_to(fwd._via->target()->coordinate().value()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
