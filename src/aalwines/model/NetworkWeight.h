@@ -65,11 +65,11 @@ namespace aalwines {
             local_failures,
             push_ops,
             custom,
-            latency,
+            //latency,
         };
 
         NetworkWeight() = default;
-        explicit NetworkWeight(std::unordered_map<const Interface*, uint32_t>  latency_map) : _latency_map(std::move(latency_map)) {};
+        //explicit NetworkWeight(std::unordered_map<const Interface*, uint32_t>  latency_map) : _latency_map(std::move(latency_map)) {};
 
         [[nodiscard]] atomic_property_function get_atom(AtomicProperty atom) const {
             switch (atom) {
@@ -105,12 +105,12 @@ namespace aalwines {
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
                         return r._custom_weight;
                     };
-                case AtomicProperty::latency:
+/*                case AtomicProperty::latency:
                     return [this](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
                         auto it = this->_latency_map.find(r._via);
                         return it != this->_latency_map.end() ? it->second : 0;
                         // (r._via->source()->index(), r._via->target()->index())
-                    };
+                    };*/
                 case AtomicProperty::default_weight_function:
                 default:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
@@ -167,7 +167,7 @@ namespace aalwines {
             } else if (s == "custom") {
                 p = AtomicProperty::custom;
             } else if (s == "latency") {
-                p = AtomicProperty::latency;
+                p = AtomicProperty::custom; // Currently latency info is annotated as the custom weights.
             } else if (s == "zero") {
                 p = AtomicProperty::default_weight_function;
             } else {
@@ -191,7 +191,7 @@ namespace aalwines {
         }
 
     private:
-        std::unordered_map<const Interface*, uint32_t> _latency_map;
+        //std::unordered_map<const Interface*, uint32_t> _latency_map;
     };
 
 }
