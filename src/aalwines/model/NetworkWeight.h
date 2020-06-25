@@ -63,6 +63,7 @@ namespace aalwines {
             number_of_hops,
             distance,
             local_failures,
+            tunnels,
             push_ops,
             custom,
             //latency,
@@ -96,6 +97,12 @@ namespace aalwines {
                             }
                         }
                         return edges.size();
+                    };
+                case AtomicProperty::tunnels:
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                        auto push_ops = std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
+                        auto pop_ops = std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::POP; });
+                        return push_ops > pop_ops ? push_ops - pop_ops : 0;
                     };
                 case AtomicProperty::push_ops:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
@@ -163,7 +170,7 @@ namespace aalwines {
             } else if (s == "local_failures" || s == "failures") { // Support both namings
                 p = AtomicProperty::local_failures;
             } else if (s == "tunnels") {
-                p = AtomicProperty::push_ops;
+                p = AtomicProperty::tunnels;
             } else if (s == "custom") {
                 p = AtomicProperty::custom;
             } else if (s == "latency") {
