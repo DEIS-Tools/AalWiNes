@@ -40,12 +40,15 @@
 
 #include <boost/program_options.hpp>
 
+#include <json.hpp>
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <fstream>
 
 namespace po = boost::program_options;
+using json = nlohmann::json;
 using namespace aalwines;
 using namespace pdaaal;
 
@@ -156,7 +159,7 @@ int main(int argc, const char** argv)
     ;
 
 
-    std::string junos_config, prex_topo, prex_routing;
+    std::string junos_config, prex_topo, prex_routing, location;
     bool skip_pfe = false;
     input.add_options()
             ("juniper", po::value<std::string>(&junos_config),
@@ -165,6 +168,8 @@ int main(int argc, const char** argv)
             "An xml-file defining the topology in the P-Rex format")
             ("routing", po::value<std::string>(&prex_routing), 
             "An xml-file defining the routing in the P-Rex format")
+            ("location", po::value<std::string>(&location),
+             "A json-file defining the coordinates of the routers")
             ("skip-pfe", po::bool_switch(&skip_pfe),
             "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
             ;
@@ -252,6 +257,21 @@ int main(int argc, const char** argv)
         PRexBuilder::parse(prex_topo, prex_routing, warnings) :
         JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
+
+    if (!location.empty()){
+        std::ifstream lstream(location);
+        if (!lstream.is_open()) {
+            std::cerr << "Could not open location-file\"" << location << "\"" << std::endl;
+            exit(-1);
+        }
+        json j;
+        lstream >> j;
+        for (auto& router : network.get_all_routers()) {
+            if (router->is_null()) { continue; }
+            auto json_coordinate = j[router->name()];
+            router->set_coordinate(Coordinate(json_coordinate["lat"], json_coordinate["lng"]));
+        }
+    }
 
     if (print_dot) {
         network.print_dot(std::cout);

@@ -554,7 +554,7 @@ namespace aalwines
             for (auto& inf : r->interfaces()) {
                 for (auto& entry : inf->table().entries()) {
                     for (auto& fwd : entry._rules) {
-                        if (!fwd._via->target()->is_null()) {
+                        if (fwd._type == RoutingTable::type_t::MPLS && !fwd._via->target()->is_null()) {
                             // We use the following formula as an estimate for latency.
                             // It comes from interpolation of some ping commands for links of different length using: http://lg.nordu.net/lg.cgi
                             // latency (ns) = 500 + 17.7 * distance (km)
