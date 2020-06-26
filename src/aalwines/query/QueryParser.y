@@ -175,6 +175,7 @@ regex
     | regex QUESTION { $$ = std::move($1); $$.question_extend(); }    
     | LSQBRCKT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($2), false); }
     | LSQBRCKT HAT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($3), true); } // negated set
+    | slabel { $$ = NFA<Query::label_t>(std::move($1), false); } // Singleton labelset
     | ANYIP { $$ = builder.any_ip(); }
     | ANYMPLS { $$ = builder.any_mpls(); }
     | ANYSTICKYMPLS { $$ = builder.any_sticky(); }
