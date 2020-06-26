@@ -274,18 +274,19 @@ namespace aalwines
         if (_coordinate) {
             s << "\t\t\t\"lat\": " << _coordinate->latitude() << ",\n\t\t\t\"lng\": " << _coordinate->longitude() << ",\n";
         }
-        std::set<std::string> interfaces;
+        std::unordered_map<std::string,std::unordered_set<Query::label_t>> interfaces;
         std::set<std::string> targets;
         auto if_name = std::make_unique<char[]>(_inamelength + 1);
         for(auto& i : _interfaces)
         {
             auto res = _interface_map.unpack(i->id(), if_name.get());
             if_name[res] = 0;
-            interfaces.insert(if_name.get());
+            auto& label_set = interfaces.try_emplace(if_name.get()).first->second;
 
             const RoutingTable& table = i->table();
             for(auto& e : table.entries())
             {
+                label_set.emplace(e._top_label);
                 for(auto& fwd : e._rules)
                 {
                     auto via = fwd._via;
@@ -313,9 +314,9 @@ namespace aalwines
         }
         s << "\n\t\t\t],\n";
 
-        s << "\t\t\t\"interfaces\": [\n";
+        s << "\t\t\t\"interfaces\": {\n";
         first = true;
-        for(auto& in : interfaces)
+        for(const auto& in : interfaces)
         {
             if (first)
             {
@@ -325,9 +326,19 @@ namespace aalwines
             {
                 s << ",\n";
             }
-            s << "\t\t\t\t\"" << in << "\"";
+            s << "\t\t\t\t\"" << in.first << "\": [";
+            bool first_label = true;
+            for (const auto& label : in.second) {
+                if (first_label) {
+                    first_label = false;
+                } else {
+                    s << ",";
+                }
+                s << "\"" << label << "\"";
+            }
+            s << "]";
         }
-        s << "\n\t\t\t]\n";
+        s << "\n\t\t\t}\n";
     }
     void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
         _coordinate.emplace(std::stod(latitude), std::stod(longitude));
