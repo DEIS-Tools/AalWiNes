@@ -334,7 +334,7 @@ namespace aalwines
                 } else {
                     s << ",";
                 }
-                s << label;
+                s << "\"" << label << "\"";
             }
             s << "]";
         }
