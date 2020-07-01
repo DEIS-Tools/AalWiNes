@@ -35,6 +35,7 @@ jobs:
       with:
         cmakeListsOrSettingsJson: CMakeListsTxtBasic
         #cmakeListsTxtPath: "${{ github.workspace }}/CMakeLists.txt"
+        cmakeAppendedArgs: '-DAALWINES_BuildBundle=On -DAALWINES_GetDependencies=On -DAALWINES_BuildTests=On -DBUILD_TESTING=On'
         cmakeBuildType: Release
         cmakeGenerator: UnixMakefiles
         buildDirectory: '${{runner.workspace}}/build'
