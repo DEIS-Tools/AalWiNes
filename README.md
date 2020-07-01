@@ -13,7 +13,7 @@ For Ubuntu 19.10 (ssh keys must be already configured for github):
 # install prerequisites 
 sudo apt update
 sudo apt upgrade
-sudo apt install build-essential flex bison cmake libboost-all-dev
+sudo apt install build-essential flex bison cmake libboost-all-dev libfl-dev
 
 
 # get aalwines (P-Rex v2) and compile
@@ -27,7 +27,7 @@ make
 # binary will be in build/bin
 ```
 
-Option for static linkage -> binary will not need libboost and other libs installed on target system:
+Option for pseudo static linkage -> binary will not need libboost and other libs installed on target system:
 
 ```bash
 cmake -DAALWINES_BuildBundle=ON -DCMAKE_BUILD_TYPE=Release ..

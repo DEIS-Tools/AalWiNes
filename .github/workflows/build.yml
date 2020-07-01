@@ -29,12 +29,13 @@ jobs:
     - name: ubuntu install depends
       if: runner.os == 'Linux'
       run: |
-        sudo apt-get install -f build-essential flex bison cmake libboost-all-dev
+        sudo apt-get install -f build-essential flex bison cmake libboost-all-dev libfl-dev
     - name: Build 
       uses: lukka/run-cmake@v2.5
       with:
         cmakeListsOrSettingsJson: CMakeListsTxtBasic
         #cmakeListsTxtPath: "${{ github.workspace }}/CMakeLists.txt"
+        cmakeAppendedArgs: '-DAALWINES_BuildBundle=On -DAALWINES_GetDependencies=On -DAALWINES_BuildTests=On -DBUILD_TESTING=On'
         cmakeBuildType: Release
         cmakeGenerator: UnixMakefiles
         buildDirectory: '${{runner.workspace}}/build'
