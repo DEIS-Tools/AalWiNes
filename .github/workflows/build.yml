@@ -29,7 +29,7 @@ jobs:
     - name: ubuntu install depends
       if: runner.os == 'Linux'
       run: |
-        sudo apt-get install -f build-essential flex bison cmake libboost-all-dev
+        sudo apt-get install -f build-essential flex bison cmake libboost-all-dev libfl-dev
     - name: Build 
       uses: lukka/run-cmake@v2.5
       with:
