@@ -387,6 +387,7 @@ int main(int argc, const char** argv)
             std::vector<unsigned int> trace_weight;
             std::stringstream proof;
             for(auto m : modes) {
+                proof = std::stringstream(); // Clear stream from previous mode.
                 bool engine_outcome;
                 if (weight_fn) {
                     engine_outcome = do_verification(compilation_time, reduction_time,
