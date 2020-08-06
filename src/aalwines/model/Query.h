@@ -60,11 +60,43 @@ namespace aalwines {
                 _mask = 0;
                 _value = 0;
             }
+            explicit label_t(const std::string& s) {
+                set_value(s);
+            }
             
             type_t type() const { return _type; }
             uint8_t mask() const { return _mask; }
             uint64_t value() const { return _value; }
-        
+
+            void set_value(const std::string& s) {
+                if(s.empty()) {
+                    set_value(Query::ANYIP, 0, 0);
+                } else if(s == "ip4") {
+                    set_value(Query::IP6, 0, 32);
+                } else if(s == "ip6") {
+                    set_value(Query::IP6, 0, 64);
+                } else if(s == "ip") {
+                    set_value(Query::ANYIP, 0, 64);
+                } else {
+                    auto i = s.find_first_of(".:");
+                    if (i != std::string::npos) {
+                        if (s[i] == '.') {
+                            set_value(Query::IP4, parse_ip4(s.c_str()), 0); // TODO: Use std::string and exceptions to parse ip4 and ip6.
+                        } else { // s[i] == ':'
+                            set_value(Query::IP6, parse_ip6(s.c_str()), 0);
+                        }
+                        size_t i_mask = s.find('/');
+                        if (i_mask != std::string::npos && i_mask + 1 < s.size()){
+                            set_mask(std::stoi(s.substr(i_mask + 1)));
+                        }
+                    } else { // Parse as label
+                        bool sticky = s[0] == '$' || s[0] == 's';
+                        Query::type_t type = sticky ? Query::STICKY_MPLS : Query::MPLS;
+                        set_value(type, std::stoi(s.substr((sticky ? 1 : 0))), 0);
+                    }
+                }
+            }
+
             void set_type(type_t type)
             {
                 set_value(type, _value, _mask);

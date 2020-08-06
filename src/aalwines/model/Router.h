@@ -28,6 +28,7 @@
 #define ROUTER_H
 
 #include <limits>
+#include <utility>
 #include <vector>
 #include <string>
 #include <memory>
@@ -86,7 +87,8 @@ private:
 
 class Router {
 public:
-    Router(size_t id, bool is_null = false);
+    explicit Router(size_t id, bool is_null = false) : _index(id), _is_null(is_null) { };
+    Router(size_t id, std::vector<std::string>  names, std::optional<Coordinate> coordinate) : _index(id), _names(std::move(names)), _coordinate(std::move(coordinate)) { };
     Router(const Router& orig) = default;
     virtual ~Router() = default;
 
@@ -129,7 +131,6 @@ private:
     std::vector<std::unique_ptr<Interface>> _interfaces;
     ptrie::map<char, Interface*> _interface_map;
     size_t _inamelength = 0; // for printing
-    bool _has_config = false;
     bool _is_null = false;
     std::optional<Coordinate> _coordinate = std::nullopt;
     friend class Interface;

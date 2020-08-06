@@ -35,10 +35,6 @@
 namespace aalwines
 {
 
-    Router::Router(size_t id, bool is_null) : _index(id), _is_null(is_null)
-    {
-    }
-
     void Router::add_name(const std::string& name)
     {
         _names.emplace_back(name);

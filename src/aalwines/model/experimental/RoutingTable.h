@@ -33,19 +33,15 @@
 
 #include <ptrie/ptrie_map.h>
 
-#include "Query.h"
+#include <aalwines/model/Query.h>
 
-namespace aalwines {
+namespace aalwines { namespace experimental {
     class Router;
     class Interface;
     class Network;
     
     class RoutingTable {
     public:
-
-        enum type_t { // TODO: Deprecate (?)
-            DISCARD, RECEIVE, ROUTE, MPLS
-        };
 
         enum op_t {
             PUSH, POP, SWAP
@@ -64,14 +60,13 @@ namespace aalwines {
         };
 
         struct forward_t {
-            type_t _type = MPLS;
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _weight = 0; // TODO: Rename to _priority
             uint32_t _custom_weight = 0; // TODO: Rename to _weight
             forward_t() = default;
-            forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
-                : _type(type), _ops(std::move(ops)), _via(via), _weight(priority), _custom_weight(weight) {};
+            forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
+                : _ops(std::move(ops)), _via(via), _weight(priority), _custom_weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
@@ -113,7 +108,7 @@ namespace aalwines {
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);
         void add_rule(label_t top_label, const forward_t& rule);
         void add_rule(label_t top_label, forward_t&& rule);
-        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0, type_t = MPLS);
+        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0);
         void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
         void add_to_outgoing(const Interface* outgoing, action_t action);
         void simple_merge(const RoutingTable& other);
@@ -123,6 +118,6 @@ namespace aalwines {
 
         std::vector<entry_t> _entries;
     };
-}
+}}
 #endif /* ROUTINGTABLE_H */
 
