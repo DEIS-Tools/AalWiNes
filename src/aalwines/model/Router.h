@@ -72,7 +72,7 @@ public:
     void set_global_id(size_t global_id) {
         _global_id = global_id;
     }
-
+    [[nodiscard]] std::string get_name() const;
     void make_pairing(Interface* interface);
     void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
     Interface* match() const { return _matching; }

@@ -156,6 +156,14 @@ namespace aalwines
         }
     }
 
+    std::string Interface::get_name() const {
+        if (_parent == nullptr) {
+            return "";
+        }
+        std::unique_ptr<char[]> name = _parent->interface_name(_id);
+        return std::string(name.get());
+    }
+
     void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher)
     {
         for (auto& i : _interfaces)
