@@ -7,90 +7,6 @@
 
 namespace aalwines {
 
-    inline void from_json(const json & j, RoutingTable::action_t& action) {
-        if (!j.is_object()){
-            throw base_error("error: Operation is not an object");
-        }
-        int i = 0;
-        for (const auto& [op_string, label_string] : j.items()) {
-            if (i > 0){
-                throw base_error("error: Operation object must contain exactly one property");
-            }
-            i++;
-            if (op_string == "pop") {
-                action._op = RoutingTable::op_t::POP;
-            } else if (op_string == "swap") {
-                action._op = RoutingTable::op_t::SWAP;
-                action._op_label.set_value(label_string);
-            } else if (op_string == "push") {
-                action._op = RoutingTable::op_t::PUSH;
-                action._op_label.set_value(label_string);
-            } else {
-                std::stringstream es;
-                es << "error: Unknown operation: \"" << op_string << "\": \"" << label_string << "\"" << std::endl;
-                throw base_error(es.str());
-            }
-        }
-        if (i == 0) {
-            throw base_error("error: Operation object was empty");
-        }
-    }
-
-    inline void to_json(json & j, const RoutingTable::action_t& action) {
-        j = json::object();
-        switch (action._op) {
-            default: // TODO: Make RoutingTable::op_t enum class and remove this default:
-            case RoutingTable::op_t::POP:
-                j["pop"] = "";
-                break;
-            case RoutingTable::op_t::SWAP: {
-                std::stringstream label;
-                label << action._op_label; // TODO: Is this format correct?
-                j["swap"] = label.str();
-                break;
-            }
-            case RoutingTable::op_t::PUSH: {
-                std::stringstream label;
-                label << action._op_label; // TODO: Is this format correct?
-                j["push"] = label.str();
-                break;
-            }
-        }
-    }
-
-    inline void to_json(json & j, const RoutingTable::forward_t& rule) {
-        j = json::object();
-        j["out"] = rule._via->get_name();
-        j["priority"] = rule._weight;
-        j["ops"] = rule._ops;
-        if (rule._custom_weight != 0) {
-            j["weight"] = rule._custom_weight;
-        }
-    }
-
-    inline void to_json(json & j, const RoutingTable& table) {
-        j = json::object();
-        for (const auto& entry : table.entries()) {
-            std::stringstream label;
-            label << entry._top_label; // TODO: Is this correct format??
-            j[label.str()] = entry._rules;
-        }
-    }
-    inline void to_json(json & j, const Interface& interface) {
-        j = json::object();
-        j["name"] = interface.get_name();
-        j["routing_table"] = interface.table();
-    }
-
-    inline void to_json(json & j, const Router& router) {
-        j = json::object();
-        j["names"] = router.names();
-        j["interfaces"] = router.interfaces();
-        if (router.coordinate()) {
-            j["location"] = router.coordinate().value();
-        }
-    }
-
 
     Network AalWiNesBuilder::parse(const json& json_network, std::ostream& warnings) {
         std::vector<std::unique_ptr<Router>> routers;
@@ -148,7 +64,7 @@ namespace aalwines {
 
                 auto interface = router->find_interface(interface_name);
                 for (const auto& [label_string, json_routing_entries] : json_routing_table.items()) {
-                    auto entry = interface->table().emplace_entry(RoutingTable::label_t(label_string));
+                    auto& entry = interface->table().emplace_entry(RoutingTable::label_t(label_string));
 
                     if (!json_routing_entries.is_array()) {
                         es << "error: Value of routing table entry \"" << label_string << "\" is not an array. In interface \"" << interface_name << "\" of router \"" << names[0] << "\"." << std::endl;
@@ -162,7 +78,6 @@ namespace aalwines {
                         entry._rules.emplace_back(RoutingTable::type_t::MPLS, std::move(ops), via, priority, weight);
                     }
                 }
-
             }
         }
 
@@ -182,30 +97,31 @@ namespace aalwines {
             auto from_res = mapping.exists(from_router_name.c_str(), from_router_name.length());
             auto to_res = mapping.exists(to_router_name.c_str(), to_router_name.length());
             if(!from_res.first) {
-                es << "error: "; // error TODO
+                es << "error: No router with name \"" << from_router_name << "\" was defined." << std::endl;
                 throw base_error(es.str());
             }
             if(!to_res.first) {
-                es << "error: "; // error TODO
+                es << "error: No router with name \"" << to_router_name << "\" was defined." << std::endl;
                 throw base_error(es.str());
             }
             auto from_interface = mapping.get_data(from_res.second)->find_interface(from_interface_name);
             auto to_interface = mapping.get_data(to_res.second)->find_interface(to_interface_name);
             if (from_interface == nullptr) {
-                es << "error: "; // error TODO
+                es << "error: No interface with name \"" << from_interface_name << "\" was defined for router \"" << from_router_name << "\"." << std::endl;
                 throw base_error(es.str());
             }
             if (to_interface == nullptr) {
-                es << "error: "; // error TODO
+                es << "error: No interface with name \"" << to_interface_name << "\" was defined for router \"" << to_router_name << "\"." << std::endl;
                 throw base_error(es.str());
             }
             if ((from_interface->match() != nullptr && from_interface->match() != to_interface) || (to_interface->match() != nullptr && to_interface->match() != from_interface)) {
-                es << "error: "; // error TODO
+                es << "error: Conflicting link: " << json_link << std::endl;
                 throw base_error(es.str());
             }
             from_interface->make_pairing(to_interface);
         }
 
+        Router::add_null_router(routers, all_interfaces, mapping);
         Network network(std::move(mapping), std::move(routers), std::move(all_interfaces));
         network.name = network_name;
         return network;

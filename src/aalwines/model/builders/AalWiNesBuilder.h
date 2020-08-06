@@ -19,14 +19,25 @@
 #include <aalwines/model/Network.h>
 
 using json = nlohmann::json;
+
+namespace aalwines {
+    void from_json(const json& j, RoutingTable::action_t& action);
+    void to_json(json& j, const RoutingTable::action_t& action);
+    void to_json(json& j, const RoutingTable::forward_t& rule);
+    void to_json(json& j, const RoutingTable& table);
+    void to_json(json& j, const Interface& interface);
+    void to_json(json& j, const Router& router);
+}
+
 namespace nlohmann {
+
     template <typename T>
     struct adl_serializer<std::unique_ptr<T>> {
         static std::unique_ptr<T> from_json(const json& j) {
             return std::make_unique<T>(j.get<T>());
         }
         static void to_json(json& j, const std::unique_ptr<T>& p) {
-            j = *p.get();
+            nlohmann::to_json(j, *p);
         }
     };
 
@@ -46,13 +57,6 @@ namespace nlohmann {
 }
 
 namespace aalwines {
-    void from_json(const json & j, RoutingTable::action_t& action);
-    void to_json(json & j, const RoutingTable::action_t& action);
-    void to_json(json & j, const RoutingTable::forward_t& rule);
-    void to_json(json & j, const RoutingTable& table);
-    void to_json(json & j, const Interface& interface);
-    void to_json(json & j, const Router& router);
-
     class AalWiNesBuilder {
     public:
         static Network parse(const json &j, std::ostream &warnings);
@@ -60,7 +64,7 @@ namespace aalwines {
         static Network parse(std::istream &stream, std::ostream &warnings) {
             json j;
             stream >> j;
-            return parse(j, warnings);
+            return parse(j.at("network"), warnings);
         }
 
         static Network parse(const std::string &network_file, std::ostream &warnings) {
@@ -73,6 +77,93 @@ namespace aalwines {
             return parse(stream, warnings);
         }
     };
+
+    inline void from_json(const json & j, RoutingTable::action_t& action) {
+        if (!j.is_object()){
+            throw base_error("error: Operation is not an object");
+        }
+        int i = 0;
+        for (const auto& [op_string, label_string] : j.items()) {
+            if (i > 0){
+                throw base_error("error: Operation object must contain exactly one property");
+            }
+            i++;
+            if (op_string == "pop") {
+                action._op = RoutingTable::op_t::POP;
+            } else if (op_string == "swap") {
+                action._op = RoutingTable::op_t::SWAP;
+                action._op_label.set_value(label_string);
+            } else if (op_string == "push") {
+                action._op = RoutingTable::op_t::PUSH;
+                action._op_label.set_value(label_string);
+            } else {
+                std::stringstream es;
+                es << "error: Unknown operation: \"" << op_string << "\": \"" << label_string << "\"" << std::endl;
+                throw base_error(es.str());
+            }
+        }
+        if (i == 0) {
+            throw base_error("error: Operation object was empty");
+        }
+    }
+
+    inline void to_json(json & j, const RoutingTable::action_t& action) {
+        j = json::object();
+        switch (action._op) {
+            default: // TODO: Make RoutingTable::op_t enum class and remove this default:
+            case RoutingTable::op_t::POP:
+                j["pop"] = "";
+                break;
+            case RoutingTable::op_t::SWAP: {
+                std::stringstream label;
+                label << action._op_label; // TODO: Is this format correct?
+                j["swap"] = label.str();
+                break;
+            }
+            case RoutingTable::op_t::PUSH: {
+                std::stringstream label;
+                label << action._op_label; // TODO: Is this format correct?
+                j["push"] = label.str();
+                break;
+            }
+        }
+    }
+
+    inline void to_json(json & j, const RoutingTable::forward_t& rule) {
+        j = json::object();
+        j["out"] = rule._via->get_name();
+        j["priority"] = rule._weight;
+        j["ops"] = rule._ops;
+        if (rule._custom_weight != 0) {
+            j["weight"] = rule._custom_weight;
+        }
+    }
+
+    inline void to_json(json & j, const RoutingTable& table) {
+        j = json::object();
+        for (const auto& entry : table.entries()) {
+            std::stringstream label;
+            label << entry._top_label; // TODO: Is this correct format??
+            j[label.str()] = entry._rules;
+        }
+    }
+    inline void to_json(json & j, const Interface& interface) {
+        j = json::object();
+        j["name"] = interface.get_name();
+        j["routing_table"] = interface.table();
+    }
+
+    inline void to_json(json & j, const Router& router) {
+        j = json::object();
+        if (router.is_null()) {
+            return;
+        }
+        j["names"] = router.names();
+        j["interfaces"] = router.interfaces();
+        if (router.coordinate()) {
+            j["location"] = router.coordinate().value();
+        }
+    }
 }
 
 namespace nlohmann {
@@ -84,11 +175,16 @@ namespace nlohmann {
         static void to_json(json& j, const aalwines::Network& network) {
             j = json::object();
             j["name"] = network.name;
-            j["routers"] = network.routers();
+            j["routers"] = json::array();
+            for (const auto& router : network.routers()) {
+                if (router->is_null()) continue; // Waiting for C++20 ranges and view::filter.
+                j["routers"].push_back(router);
+            }
 
             auto links_j = json::array();
             for (const auto& interface : network.all_interfaces()){
                 if (interface->match() == nullptr) continue; // Not connected
+                if (interface->source()->is_null() || interface->target()->is_null()) continue; // Skip the NULL router
                 if (interface->match()->table().empty()) continue; // Not this direction
                 assert(interface->match()->match() == interface);
                 bool bidirectional = !interface->table().empty();
