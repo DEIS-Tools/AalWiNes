@@ -43,11 +43,11 @@ class Interface {
 public:
     Interface(size_t id, size_t global_id, Router* target, Router* parent);
 
-    Router* target() const {
+    [[nodiscard]] Router* target() const {
         return _target;
     }
     
-    Router* source() const {
+    [[nodiscard]] Router* source() const {
         return _parent;
     }
     
@@ -55,18 +55,18 @@ public:
         return _table;
     }
     
-    const RoutingTable& table() const {
+    [[nodiscard]] const RoutingTable& table() const {
         return _table;
     }
     
-    bool is_virtual() const {
+    [[nodiscard]] bool is_virtual() const {
         return _parent == _target;
     }
 
-    size_t id() const {
+    [[nodiscard]] size_t id() const {
         return _id;
     }
-    size_t global_id() const {
+    [[nodiscard]] size_t global_id() const {
         return _global_id;
     }
     void set_global_id(size_t global_id) {
@@ -75,7 +75,7 @@ public:
     [[nodiscard]] std::string get_name() const;
     void make_pairing(Interface* interface);
     void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
-    Interface* match() const { return _matching; }
+    [[nodiscard]] Interface* match() const { return _matching; }
 private:
     size_t _id = std::numeric_limits<size_t>::max();
     size_t _global_id = std::numeric_limits<size_t>::max();
@@ -92,29 +92,26 @@ public:
     Router(const Router& orig) = default;
     virtual ~Router() = default;
 
-    size_t index() const {
+    [[nodiscard]] size_t index() const {
         return _index;
     }
     void set_index(size_t index) {
         _index = index;
     }
     
-    bool is_null() const {
+    [[nodiscard]] bool is_null() const {
         return _is_null;
     }
     
     void add_name(const std::string& name);
     void change_name(const std::string& name);
-    const std::string& name() const;
-    const std::vector<std::string>& names() const { return _names; }
+    [[nodiscard]] const std::string& name() const;
+    [[nodiscard]] const std::vector<std::string>& names() const { return _names; }
 
     void print_dot(std::ostream& out);
-    const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
+    [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
     Interface* find_interface(std::string iface);
     Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr);
-    Interface* interface_no(size_t i) const {
-        return _interfaces[i].get();
-    }
     std::unique_ptr<char[] > interface_name(size_t i);
     void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
     static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<char, Router*>& mapping);

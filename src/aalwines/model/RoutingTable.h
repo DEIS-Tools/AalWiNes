@@ -102,7 +102,7 @@ namespace aalwines {
         bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
-        const std::vector<entry_t>& entries() const;
+        [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
         bool check_nondet(std::ostream& e);
