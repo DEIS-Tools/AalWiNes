@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE(QueryTest1) {
 
         for (auto m : modes) {
             q.set_approximation(m);
-            NetworkPDAFactory factory(q, network, no_ip_swap);
+            NetworkPDAFactory factory(q, network, builder.all_labels(), no_ip_swap);
             auto pda = factory.compile();
             reduction = pdaaal::Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
             bool need_trace = was_dual || get_trace;

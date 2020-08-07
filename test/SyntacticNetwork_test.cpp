@@ -129,7 +129,7 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     std::pair<size_t, size_t> reduction;
     std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> trace;
     builder._result[0].set_approximation(modes[0]);
-    NetworkPDAFactory factory(builder._result[0], synthetic_network, false);
+    NetworkPDAFactory factory(builder._result[0], synthetic_network, builder.all_labels(), false);
     auto pda = factory.compile();
     reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
 
@@ -181,7 +181,7 @@ void build_query(const std::string& query, Network& synthetic_network, Builder b
 
         for (auto m : modes) {
             q.set_approximation(m);
-            NetworkPDAFactory factory(q, synthetic_network, no_ip_swap);
+            NetworkPDAFactory factory(q, synthetic_network, builder.all_labels(), no_ip_swap);
             auto pda = factory.compile();
             reduction = pdaaal::Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
             bool need_trace = was_dual || get_trace;

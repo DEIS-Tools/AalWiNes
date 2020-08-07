@@ -54,11 +54,11 @@ namespace aalwines {
             const Interface *_inf = nullptr;
         } __attribute__((packed)); // packed is needed to make this work fast with ptries
     public:
-        NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap)
-        : NetworkPDAFactory(query, network, only_mpls_swap, [](){}) {};
+        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap)
+        : NetworkPDAFactory(query, network, std::move(all_labels), only_mpls_swap, [](){}) {};
 
-        NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap, const W_FN& weight_f)
-        :PDAFactory(query.construction(), query.destruction(), network.all_labels(), Query::label_t::unused_mpls), _network(network),
+        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap, const W_FN& weight_f)
+        :PDAFactory(query.construction(), query.destruction(), std::move(all_labels), Query::label_t::unused_mpls), _network(network),
         _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap), _weight_f(weight_f){
             NFA::state_t *ns = nullptr;
             Interface *nr = nullptr;
@@ -126,7 +126,7 @@ namespace aalwines {
     };
 
     template<typename W_FN>
-    NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
+    NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
 
     template<typename W_FN, typename W>
     void NetworkPDAFactory<W_FN, W>::construct_initial() {
@@ -266,7 +266,7 @@ namespace aalwines {
                     rules.back()._pre = pre;
                     assert(rules.back()._pre.mask() == 0);
                 } else {
-                    for (auto &l : _network.get_labels(val, mask,
+                    for (auto &l : Builder::get_labels(this->_all_labels, val, mask,
                                                        (Query::type_t) (Query::MPLS | (pre.type() & Query::STICKY)))) {
                         rules.push_back(cpy);
                         rules.back()._pre = l;
@@ -280,7 +280,7 @@ namespace aalwines {
                 val = 0;
                 // fall through to IP
             case Query::IP4:
-                for (auto &l : _network.get_labels(val, mask, Query::IP4)) {
+                for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP4)) {
                     rules.push_back(cpy);
                     rules.back()._pre = l;
                     assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP4 ||
@@ -288,7 +288,7 @@ namespace aalwines {
                 }
                 if (pre.type() != Query::ANYIP) break; // fall through to IP6 if any
             case Query::IP6:
-                for (auto &l : _network.get_labels(val, mask, Query::IP6)) {
+                for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP6)) {
                     rules.push_back(cpy);
                     rules.back()._pre = l;
                     assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP6 ||
@@ -497,8 +497,6 @@ namespace aalwines {
             assert(false);
         } else {
             stream << "\"" << entry._top_label;
-            if (_network.is_service_label(entry._top_label))
-                stream << "^";
             stream << "\"";
         }
         stream << ",\"rule\":";

@@ -34,20 +34,6 @@
 namespace aalwines
 {
 
-    Network::Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
-    : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces))
-    {
-        ptrie::set<Query::label_t> all_labels;
-        _total_labels = 0;
-        for (auto& r : _routers) {
-            for (auto& inf : r->interfaces()) {
-                for (auto& e : inf->table().entries()) {
-                    if(all_labels.insert(e._top_label).first) ++_total_labels;
-                }
-            }
-        }
-    }
-
     Router* Network::get_router(size_t id) {
         if (id < _routers.size()) {
             return _routers[id].get();
@@ -85,100 +71,6 @@ namespace aalwines
             }
         }
         return res;
-    }
-
-    std::unordered_set<Query::label_t> Network::get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact)
-    {
-        Query::label_t lbl(type, mask, label);
-        std::unordered_set<Query::label_t> res;
-        for (auto& pr : all_labels()) {
-            if(pr == Query::label_t::unused_ip4 ||
-               pr == Query::label_t::unused_ip6 ||
-               pr == Query::label_t::unused_mpls ||
-               pr == Query::label_t::unused_sticky_mpls ||
-               pr == Query::label_t::any_ip ||
-               pr == Query::label_t::any_ip4 ||
-               pr == Query::label_t::any_ip6) continue;
-            if (lbl.overlaps(pr))
-                res.insert(pr);
-        }
-        if(res.empty())
-        {
-            switch (type) {
-            case Query::IP4:
-                res.emplace(Query::label_t::unused_ip4);
-                break;
-            case Query::IP6:
-                res.emplace(Query::label_t::unused_ip6);
-                break;
-            case Query::STICKY_MPLS:
-                res.emplace(Query::label_t::unused_sticky_mpls);
-                break;
-            case Query::MPLS:
-                res.emplace(Query::label_t::unused_mpls);
-                break;
-            default:
-                throw base_error("Unknown expansion");
-            }
-        }
-        if(!exact)
-        {
-            switch (type) {
-            case Query::IP4:
-                res.emplace(Query::label_t::any_ip4);
-                break;
-            case Query::IP6:
-                res.emplace(Query::label_t::any_ip6);
-                break;
-            default:
-                break;
-            }        
-        }
-#ifndef NDEBUG
-        for(auto& r : res)
-        {
-            assert(r.mask() == 0 || type == Query::IP6 || type == Query::IP4 || type == Query::ANYIP);
-        }
-#endif
-        return res;
-    }
-
-    std::unordered_set<Query::label_t> Network::all_labels()
-    {
-        if(_label_cache.size() == 0)
-        {
-            std::unordered_set<Query::label_t> res;
-            res.reserve(_total_labels + 7);
-            res.insert(Query::label_t::unused_ip4);
-            res.insert(Query::label_t::unused_ip6);
-            res.insert(Query::label_t::unused_mpls);
-            res.insert(Query::label_t::unused_sticky_mpls);
-            res.insert(Query::label_t::any_ip);
-            res.insert(Query::label_t::any_ip4);
-            res.insert(Query::label_t::any_ip6);
-            _non_service_label = res;
-            for (auto& r : _routers) {
-                for (auto& inf : r->interfaces()) {
-                    for (auto& e : inf->table().entries()) {
-                        res.insert(e._top_label);
-                        for (auto& f : e._rules) {
-                            for (auto& o : f._ops) {
-                                switch (o._op) {
-                                case RoutingTable::op_t::SWAP:
-                                case RoutingTable::op_t::PUSH:
-                                    res.insert(o._op_label);
-                                    _non_service_label.insert(o._op_label);
-                                default:
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _label_cache = res;
-        }
-        return _label_cache;
     }
 
     void Network::move_network(Network&& nested_network){
@@ -291,11 +183,6 @@ namespace aalwines
             s << "\t\t}";
         }
         s << "\n\t}";
-    }
-
-    bool Network::is_service_label(const Query::label_t& l) const
-    {
-        return _non_service_label.count(l) == 0;
     }
 
     void Network::write_prex_routing(std::ostream& s)

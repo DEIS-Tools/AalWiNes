@@ -254,8 +254,6 @@ namespace aalwines
             else
             {
                 s << (quote ? "\"" : "") << _op_label;
-                if(network && network->is_service_label(_op_label))
-                    s << "^";
                 s << (quote ? "\"" : "");
             }
             s << "}";
@@ -271,8 +269,6 @@ namespace aalwines
             else
             {
                 s << (quote ? "\"" : "") << _op_label;
-                if(network && network->is_service_label(_op_label))
-                    s << "^";
                 s << (quote ? "\"" : "");
             }
             s << "}";

@@ -63,14 +63,20 @@ namespace aalwines {
 
     class Builder {
     public:
-        Builder(Network& network);
+        explicit Builder(Network& network);
         // Return 0 on success.
         int do_parse(std::istream &stream);
 
-	// Building
-	void path_mode();
-	void label_mode();
         using labelset_t = std::unordered_set<Query::label_t>;
+        labelset_t all_labels();
+        static labelset_t get_labels(const labelset_t& all_labels, uint64_t label, uint64_t mask, Query::type_t type, bool exact = false);
+        labelset_t get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact = false) {
+            return Builder::get_labels(all_labels(), label, mask, type, exact);
+        }
+
+	    // Building
+	    void path_mode();
+	    void label_mode();
         
         // matching on atomics 
         labelset_t filter_and_merge(filter_t&, labelset_t&);
@@ -81,8 +87,8 @@ namespace aalwines {
         void clear_link() { _link = false; }
         
         
-        filter_t match_re(std::string&& re);
-        filter_t match_exact(const std::string& str);
+        filter_t match_re(std::string&& re) const;
+        filter_t match_exact(const std::string& str) const;
         filter_t routing_id();
         filter_t discard_id();
         labelset_t find_label(uint64_t label, uint64_t mask);
@@ -107,9 +113,9 @@ namespace aalwines {
         void error(const std::string &m);
 
         Network& _network;
-	location _location;
+	    location _location;
         std::vector<Query> _result;
-        
+
         // filtering
         labelset_t _links;
         // if we are parsing a path or a stack-type regex
@@ -119,6 +125,9 @@ namespace aalwines {
         bool _inverted = false;
         bool _expand = false;
         bool _sticky = false;
+
+    private:
+        labelset_t _label_cache;
     };
 }
 

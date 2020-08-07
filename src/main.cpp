@@ -52,13 +52,13 @@ using namespace pdaaal;
 
 template<typename W_FN>
 bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, stopwatch& verification_time,
-        Query& q, Query::mode_t m, Network& network, bool no_ip_swap, std::pair<size_t,size_t>& reduction, size_t tos,
+        Query& q, Query::mode_t m, Network& network, Builder& builder, bool no_ip_swap, std::pair<size_t,size_t>& reduction, size_t tos,
         size_t engine, Moped& moped, SolverAdapter& solver, utils::outcome_t& result,
         std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t >& trace, std::stringstream& proof,
         std::vector<unsigned int>& trace_weight, const W_FN& weight_fn) {
     compilation_time.start();
     q.set_approximation(m);
-    NetworkPDAFactory factory(q, network, no_ip_swap, weight_fn);
+    NetworkPDAFactory factory(q, network, builder.all_labels(), no_ip_swap, weight_fn);
     auto pda = factory.compile();
     compilation_time.stop();
     reduction_time.start();
@@ -401,7 +401,7 @@ int main(int argc, const char** argv)
             if(dump_to_moped)
             {
                 compilation_time.start();
-                NetworkPDAFactory factory(q, network, no_ip_swap);
+                NetworkPDAFactory factory(q, network, builder.all_labels(), no_ip_swap);
                 auto pda = factory.compile();
                 Moped::dump_pda(pda, std::cout);
             }
@@ -424,12 +424,12 @@ int main(int argc, const char** argv)
                 bool engine_outcome;
                 if (weight_fn) {
                     engine_outcome = do_verification(compilation_time, reduction_time,
-                            verification_time,q, m, network, no_ip_swap, reduction, tos, engine,
-                            moped, solver,result, trace, proof, trace_weight, weight_fn.value());
+                            verification_time, q, m, network, builder, no_ip_swap, reduction, tos, engine,
+                            moped, solver, result, trace, proof, trace_weight, weight_fn.value());
                 } else {
                     engine_outcome = do_verification<std::function<void(void)>>(compilation_time, reduction_time,
-                            verification_time,q, m,network, no_ip_swap, reduction, tos, engine,
-                            moped, solver,result, trace, proof, trace_weight, [](){});
+                            verification_time, q, m, network, builder, no_ip_swap, reduction, tos, engine,
+                            moped, solver, result, trace, proof, trace_weight, [](){});
                 }
                 if(q.number_of_failures() == 0)
                     result = engine_outcome ? utils::YES : utils::NO;
