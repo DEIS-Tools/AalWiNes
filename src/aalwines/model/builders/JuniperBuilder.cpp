@@ -519,7 +519,7 @@ namespace aalwines
             do {
                 entry._rules.emplace_back();
                 auto& r = entry._rules.back();
-                r._weight = parse_weight(nh);
+                r._priority = parse_weight(nh);
                 auto ops = nh->first_node("nh-type");
                 bool skipvia = true;
                 rapidxml::xml_node<>* nhid = nullptr;
@@ -613,7 +613,7 @@ namespace aalwines
                     throw base_error(e.str());                    
                 }
                 assert(r._via || r._type != RoutingTable::MPLS);
-                weights[r._weight] = 0;
+                weights[r._priority] = 0;
             }
             while ((nh = nh->next_sibling("nh")));
             
@@ -626,7 +626,7 @@ namespace aalwines
             }
             for(auto& r : entry._rules)
             {
-                r._weight = weights[r._weight];
+                r._priority = weights[r._priority];
             }
             
             rule = rule->next_sibling("rt-entry");

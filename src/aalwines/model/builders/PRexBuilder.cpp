@@ -355,7 +355,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = nullptr;
                                     entry._rules.back()._type = RoutingTable::DISCARD;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = weight;
                                 }
                                 el = routes->first_node("reroute");
                                 if(el)
@@ -363,7 +363,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = nullptr;
                                     entry._rules.back()._type = RoutingTable::ROUTE;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = weight;
                                 }
                                 el = routes->first_node("receive");
                                 if(el)
@@ -371,7 +371,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = nullptr;
                                     entry._rules.back()._type = RoutingTable::RECEIVE;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = weight;
                                 }
                                 auto route = routes->first_node("route");
                                 while(route)
@@ -386,7 +386,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = router->find_interface(toattr->value());
                                     entry._rules.back()._type = RoutingTable::MPLS;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = weight;
 
                                     auto custom_weight = route->first_attribute("weight");
                                     if (custom_weight != nullptr) {

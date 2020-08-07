@@ -131,13 +131,13 @@ namespace aalwines {
                 break;
             case RoutingTable::op_t::SWAP: {
                 std::stringstream label;
-                label << action._op_label; // TODO: Is this format correct?
+                label << action._op_label;
                 j["swap"] = label.str();
                 break;
             }
             case RoutingTable::op_t::PUSH: {
                 std::stringstream label;
-                label << action._op_label; // TODO: Is this format correct?
+                label << action._op_label;
                 j["push"] = label.str();
                 break;
             }
@@ -147,7 +147,7 @@ namespace aalwines {
     inline void to_json(json & j, const RoutingTable::forward_t& rule) {
         j = json::object();
         j["out"] = rule._via->get_name();
-        j["priority"] = rule._weight;
+        j["priority"] = rule._priority;
         j["ops"] = rule._ops;
         if (rule._custom_weight != 0) {
             j["weight"] = rule._custom_weight;
@@ -158,10 +158,11 @@ namespace aalwines {
         j = json::object();
         for (const auto& entry : table.entries()) {
             std::stringstream label;
-            label << entry._top_label; // TODO: Is this correct format??
+            label << entry._top_label;
             j[label.str()] = entry._rules;
         }
     }
+
     inline void to_json(json & j, const Interface& interface) {
         j = json::object();
         j["name"] = interface.get_name();
@@ -170,9 +171,6 @@ namespace aalwines {
 
     inline void to_json(json & j, const Router& router) {
         j = json::object();
-        if (router.is_null()) {
-            return;
-        }
         j["names"] = router.names();
         j["interfaces"] = router.interfaces();
         if (router.coordinate()) {
@@ -192,7 +190,7 @@ namespace nlohmann {
             j["name"] = network.name;
             j["routers"] = json::array();
             for (const auto& router : network.routers()) {
-                if (router->is_null()) continue; // Waiting for C++20 ranges and view::filter.
+                if (router->is_null()) continue;
                 j["routers"].push_back(router);
             }
 

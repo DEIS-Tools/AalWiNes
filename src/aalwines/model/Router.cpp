@@ -251,7 +251,7 @@ namespace aalwines
                 s << "\t\t[" << e._top_label << "] {\n";
                 for(auto& fwd : e._rules)
                 {
-                    s << "\t\t\t" << fwd._weight << " |-[";
+                    s << "\t\t\t" << fwd._priority << " |-[";
                     for(auto& o : fwd._ops)
                     {
                         o.print_json(s, false, false);

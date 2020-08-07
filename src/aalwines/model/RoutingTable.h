@@ -67,11 +67,11 @@ namespace aalwines {
             type_t _type = MPLS;
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
-            size_t _weight = 0; // TODO: Rename to _priority
+            size_t _priority = 0;
             uint32_t _custom_weight = 0; // TODO: Rename to _weight
             forward_t() = default;
             forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
-                : _type(type), _ops(std::move(ops)), _via(via), _weight(priority), _custom_weight(weight) {};
+                : _type(type), _ops(std::move(ops)), _via(via), _priority(priority), _custom_weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;

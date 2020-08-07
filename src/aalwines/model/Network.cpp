@@ -354,20 +354,20 @@ namespace aalwines
                     s << "              <routes>\n";
                     auto cpy = e._rules;
                     std::sort(cpy.begin(), cpy.end(), [](auto& a, auto& b) {
-                        return a._weight < b._weight;
+                        return a._priority < b._priority;
                     });
-                    auto ow = cpy.empty() ? 0 : cpy.front()._weight;                    
+                    auto ow = cpy.empty() ? 0 : cpy.front()._priority;
                     for(auto& rule : cpy)
                     {
-                        if(rule._weight > ow)
+                        if(rule._priority > ow)
                         {
                             s << "              </routes>\n";
                             s << "            </te-group>\n";
                             s << "            <te-group>\n";
                             s << "              <routes>\n";
-                            ow = rule._weight;
+                            ow = rule._priority;
                         }
-                        assert(ow == rule._weight);
+                        assert(ow == rule._priority);
                         bool handled = false;
                         switch(rule._type)
                         {
