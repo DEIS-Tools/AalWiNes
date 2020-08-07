@@ -149,8 +149,8 @@ namespace aalwines {
         j["out"] = rule._via->get_name();
         j["priority"] = rule._priority;
         j["ops"] = rule._ops;
-        if (rule._custom_weight != 0) {
-            j["weight"] = rule._custom_weight;
+        if (rule._weight != 0) {
+            j["weight"] = rule._weight;
         }
     }
 

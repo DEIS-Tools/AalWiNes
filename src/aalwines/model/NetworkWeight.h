@@ -110,7 +110,7 @@ namespace aalwines {
                     };
                 case AtomicProperty::custom:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
-                        return r._custom_weight;
+                        return r._weight;
                     };
 /*                case AtomicProperty::latency:
                     return [this](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
