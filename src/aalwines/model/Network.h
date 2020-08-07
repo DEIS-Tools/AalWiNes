@@ -37,6 +37,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <sstream>
 
 namespace aalwines {
     class Network {
@@ -47,12 +48,28 @@ namespace aalwines {
         : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces)) {};
 
         Network() = default;
-        Network(std::string name) : name(std::move(name)) {};
+        explicit Network(std::string name) : name(std::move(name)) {};
 
-        Router* add_router(const std::string& router_name, std::optional<Coordinate> coordinate = std::nullopt) {
-            return add_router(std::vector<std::string>{router_name}, coordinate);
+        template<typename... Args >
+        Router* add_router(std::string name, Args&&... args) {
+            return add_router(std::vector<std::string>{std::move(name)}, std::forward<Args>(args)...);
         }
-        Router* add_router(const std::vector<std::string>& names, std::optional<Coordinate> coordinate = std::nullopt);
+        template<typename... Args >
+        Router* add_router(std::vector<std::string> names, Args&&... args) {
+            auto id = _routers.size();
+            _routers.emplace_back(std::make_unique<Router>(id, names, std::forward<Args>(args)...));
+            auto router = _routers.back().get();;
+            for (const auto& router_name : names) {
+                auto res = _mapping.insert(router_name);
+                if (!res.first) {
+                    std::stringstream es;
+                    es << "error: Duplicate definition of \"" << router_name << "\", previously found in entry " << _mapping.get_data(res.second)->index() << std::endl;
+                    throw base_error(es.str());
+                }
+                _mapping.get_data(res.second) = router;
+            }
+            return router;
+        }
         Router* get_router(size_t id);
         Router* find_router(const std::string& router_name);
         [[nodiscard]] const std::vector<std::unique_ptr<Router>>& routers() const { return _routers; }
@@ -63,7 +80,7 @@ namespace aalwines {
         [[nodiscard]] const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
         std::unordered_set<Query::label_t> interfaces(filter_t& filter);
 
-        void add_null_router() { Router::add_null_router(_routers, _all_interfaces, _mapping); }
+        void add_null_router();
 
         void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
                             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);

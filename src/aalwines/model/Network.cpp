@@ -29,27 +29,8 @@
 
 #include <cassert>
 #include <map>
-#include <sstream>
 
-namespace aalwines
-{
-
-    Router* Network::add_router(const std::vector<std::string>& names, std::optional<Coordinate> coordinate) {
-        auto id = _routers.size();
-        _routers.emplace_back(std::make_unique<Router>(id, names, coordinate));
-        auto router = _routers.back().get();;
-        for (const auto& router_name : names) {
-            auto res = _mapping.insert(router_name);
-            if(!res.first)
-            {
-                std::stringstream es;
-                es << "error: Duplicate definition of \"" << router_name << "\", previously found in entry " << _mapping.get_data(res.second)->index() << std::endl;
-                throw base_error(es.str());
-            }
-            _mapping.get_data(res.second) = router;
-        }
-        return router;
-    }
+namespace aalwines {
 
     Router* Network::find_router(const std::string& router_name) {
         auto from_res = _mapping.exists(router_name);
@@ -66,6 +47,19 @@ namespace aalwines
     Interface* Network::add_interface_to(const std::string& interface_name, const std::string& router_name) {
         auto router = find_router(router_name);
         return router == nullptr ? nullptr : add_interface_to(interface_name, router);
+    }
+
+    void Network::add_null_router() {
+        auto null_router = add_router("NULL", true);
+        for(const auto& r : routers()) {
+            for(const auto& inf : r->interfaces()) {
+                if(inf->match() == nullptr) {
+                    std::stringstream interface_name;
+                    interface_name << "i" << inf->global_id();
+                    add_interface_to(interface_name.str(), null_router)->make_pairing(inf.get());
+                }
+            }
+        }
     }
 
     const char* empty_string = "";
@@ -99,7 +93,7 @@ namespace aalwines
 
     void Network::move_network(Network&& nested_network){
         // Find NULL router
-        auto nullrouter = _mapping["NULL"];
+        auto null_router = _mapping["NULL"];
 
         // Move old network into new network.
         for (auto&& e : nested_network._routers) {
@@ -121,8 +115,7 @@ namespace aalwines
                 if (inf->target()->is_null()){
                     std::stringstream ss;
                     ss << "i" << inf->global_id();
-                    auto interface = nullrouter->get_interface(_all_interfaces, ss.str(), e.get()); // will add the interface
-                    interface->make_pairing(inf.get());
+                    add_interface_to(ss.str(), null_router)->make_pairing(inf.get());
                 }
             }
 

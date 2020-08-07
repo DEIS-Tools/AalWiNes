@@ -92,7 +92,10 @@ namespace aalwines {
     class Router {
     public:
         explicit Router(size_t id, bool is_null = false) : _index(id), _is_null(is_null) { };
-        Router(size_t id, std::vector<std::string> names, std::optional<Coordinate> coordinate) : _index(id), _names(std::move(names)), _coordinate(std::move(coordinate)) { };
+        Router(size_t id, std::vector<std::string> names, std::optional<Coordinate> coordinate = std::nullopt)
+        : _index(id), _names(std::move(names)), _coordinate(std::move(coordinate)) { };
+        Router(size_t id, std::vector<std::string> names, bool is_null)
+        : _index(id), _names(std::move(names)), _is_null(is_null) { };
 
         [[nodiscard]] size_t index() const {
             return _index;
@@ -117,7 +120,7 @@ namespace aalwines {
         Interface* get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected = nullptr);
         std::string interface_name(size_t i);
         void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
-        static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, string_map<Router*>& mapping);
+
         void print_simple(std::ostream& s);
         void print_json(std::ostream& s);
 
@@ -128,10 +131,10 @@ namespace aalwines {
     private:
         size_t _index = std::numeric_limits<size_t>::max();
         std::vector<std::string> _names;
+        std::optional<Coordinate> _coordinate = std::nullopt;
+        bool _is_null = false;
         std::vector<std::unique_ptr<Interface>> _interfaces;
         string_map<Interface*> _interface_map;
-        bool _is_null = false;
-        std::optional<Coordinate> _coordinate = std::nullopt;
         friend class Interface;
     };
 }

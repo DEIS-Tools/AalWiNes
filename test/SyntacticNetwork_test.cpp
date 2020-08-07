@@ -113,8 +113,9 @@ Network construct_synthetic_network(size_t nesting = 1){
             _mapping.get_data(res1.second)->find_interface(other)->make_pairing(_mapping.get_data(res2.second)->find_interface(router_names[i]));
         }
     }
-    Router::add_null_router(_routers, _all_interfaces, _mapping); //Last router
-    return Network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
+    Network network(std::move(_mapping), std::move(_routers), std::move(_all_interfaces));
+    network.add_null_router(); //Last router
+    return network;
 }
 
 void performance_query(const std::string& query, Network& synthetic_network, Builder builder, std::ostream& trace_stream){

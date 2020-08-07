@@ -32,8 +32,8 @@
 #include <streambuf>
 #include <sstream>
 #include <set>
-namespace aalwines
-{
+
+namespace aalwines {
 
     void Router::add_name(const std::string& name) {
         _names.emplace_back(name);
@@ -50,7 +50,7 @@ namespace aalwines
         return _names.back();
     }
 
-    // TODO: Merge this with get_interface
+
     Interface* Router::add_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
         auto res = _interface_map.insert(interface_name);
         if (!res.first) {
@@ -70,6 +70,7 @@ namespace aalwines
         return res.first ? _interface_map.get_data(res.second) : nullptr;
     }
 
+    // TODO: Merge this with add_interface
     Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected) {
         auto res = _interface_map.insert(interface_name);
         if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {
@@ -145,10 +146,7 @@ namespace aalwines
     }
 
     std::string Interface::get_name() const {
-        if (_parent == nullptr) {
-            return "";
-        }
-        return _parent->interface_name(_id);
+        return _parent == nullptr ? "" : _parent->interface_name(_id);
     }
 
     std::string Router::interface_name(size_t i) {
@@ -159,44 +157,6 @@ namespace aalwines
         for (auto& i : _interfaces)
             i->make_pairing(interfaces, matcher);
     }
-
-    void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, Network::routermap_t& mapping) {
-        std::stringstream es;
-        Router* nullrouter = nullptr;
-        {
-            size_t id = routers.size();
-            routers.emplace_back(std::make_unique<Router>(id, true));
-            Router& router = *routers.back().get();
-            router.add_name("NULL");
-            auto res = mapping.insert("NULL");
-            if(!res.first)
-            {
-                es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
-                throw base_error(es.str());
-            }
-            mapping.get_data(res.second) = &router;
-            nullrouter = routers.back().get();           
-        }
-        for(auto& r : routers)
-        {
-            for(auto& inf : r->interfaces())
-            {
-                if(inf->match() == nullptr)
-                {
-                    std::stringstream ss;
-                    ss << "i" << inf->global_id();
-                    auto interface = nullrouter->get_interface(all_interfaces, ss.str(), r.get()); // will add the interface
-                    if(interface == nullptr)
-                    {
-                        es << "Could not find interface " << ss.str() << " for matching of links in router " << nullrouter->name();
-                        throw base_error(es.str());                    
-                    }
-                    interface->make_pairing(inf.get());
-                }
-            }
-        }
-    }
-
 
     void Router::print_dot(std::ostream& out) {
         if (_interfaces.empty())

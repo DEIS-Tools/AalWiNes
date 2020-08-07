@@ -185,10 +185,10 @@ namespace aalwines
                 return diff == 1 && i1->target() == i2->source() && i2->target() == i1->source();
             });
         }
-        
-        Router::add_null_router(routers, interfaces, mapping);
-   
-        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
+
+        Network network(std::move(mapping), std::move(routers), std::move(interfaces));
+        network.add_null_router();
+        return network;
     }
 
     void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, Network::routermap_t& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap)
