@@ -105,7 +105,7 @@ namespace aalwines {
             routers.emplace_back(std::make_unique<Router>(id));
             Router& router = *routers.back().get();
             router.add_name(name);
-            auto res = mapping.insert(name.c_str(), name.length());
+            auto res = mapping.insert(name);
             if(!res.first)
             {
                 es << "error: Duplicate definition of \"" << name << "\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
@@ -187,7 +187,7 @@ namespace aalwines {
                 }
                 std::string rn = rattr->value();
                 std::string in = iattr->value();
-                auto res = mapping.exists(rn.c_str(), rn.length());
+                auto res = mapping.exists(rn);
                 if(!res.first)
                 {
                     es << "Could not find router " << rn << " for matching of links.";
@@ -236,7 +236,7 @@ namespace aalwines {
                 throw base_error(es.str());
             }
             std::string rn = for_attr->value();
-            auto res = mapping.exists(rn.c_str(), rn.length());
+            auto res = mapping.exists(rn);
             if(!res.first)
             {
                 es << "Could not find router " << rn << " for building routing-tables.";

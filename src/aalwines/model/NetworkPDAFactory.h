@@ -491,7 +491,7 @@ namespace aalwines {
         stream << "{";
 
         auto name = inf->source()->interface_name(inf->id());
-        stream << "\"ingoing\":\"" << name.get() << "\"";
+        stream << "\"ingoing\":\"" << name << "\"";
         stream << ",\"pre\":";
         if (entry._top_label.type() == Query::INTERFACE) {
             assert(false);
@@ -692,9 +692,9 @@ namespace aalwines {
                     assert(from_router != nullptr);
                     assert(to_router != nullptr);
                     stream << R"("from_router":")" << from_router->name() << "\""
-                           << R"(,"from_interface":")" << from_router->interface_name(from_inf->id()).get() << "\""
+                           << R"(,"from_interface":")" << from_router->interface_name(from_inf->id()) << "\""
                            << R"(,"to_router":")" << to_router->name() << "\""
-                           << R"(,"to_interface":")" << to_router->interface_name(to_inf->id()).get() << "\"";
+                           << R"(,"to_interface":")" << to_router->interface_name(to_inf->id()) << "\"";
                     stream << ",\"stack\":[";
                     bool first_symbol = true;
                     for (auto &symbol : step._stack) {

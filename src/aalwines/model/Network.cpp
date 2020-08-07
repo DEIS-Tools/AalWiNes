@@ -34,6 +34,28 @@
 namespace aalwines
 {
 
+    Router* Network::add_router(const std::vector<std::string>& names, std::optional<Coordinate> coordinate) {
+        auto id = _routers.size();
+        _routers.emplace_back(std::make_unique<Router>(id, names, coordinate));
+        auto router = _routers.back().get();;
+        for (const auto& router_name : names) {
+            auto res = _mapping.insert(router_name);
+            if(!res.first)
+            {
+                std::stringstream es;
+                es << "error: Duplicate definition of \"" << router_name << "\", previously found in entry " << _mapping.get_data(res.second)->index() << std::endl;
+                throw base_error(es.str());
+            }
+            _mapping.get_data(res.second) = router;
+        }
+        return router;
+    }
+
+    Router* Network::find_router(const std::string& router_name) {
+        auto from_res = _mapping.exists(router_name);
+        return from_res.first ? _mapping.get_data(from_res.second) : nullptr;
+    }
+
     Router* Network::get_router(size_t id) {
         if (id < _routers.size()) {
             return _routers[id].get();
@@ -41,6 +63,14 @@ namespace aalwines
         else {
             return nullptr;
         }
+    }
+
+    Interface* Network::add_interface_to(const std::string& interface_name, Router* router) {
+        return router->get_interface(_all_interfaces, interface_name);
+    }
+    Interface* Network::add_interface_to(const std::string& interface_name, const std::string& router_name) {
+        auto router = find_router(router_name);
+        return router == nullptr ? nullptr : add_interface_to(interface_name, router);
     }
 
     const char* empty_string = "";
@@ -55,8 +85,7 @@ namespace aalwines
                     // can we have empty interfaces??
                     assert(i);
                     auto fname = r->interface_name(i->id());
-                    std::unique_ptr<char[] > tname = std::make_unique<char[]>(1);
-                    tname.get()[0] = '\0';
+                    std::string tname;
                     const char* tr = empty_string;
                     if (i->target() != nullptr) {
                         if (i->match() != nullptr) {
@@ -64,7 +93,7 @@ namespace aalwines
                         }
                         tr = i->target()->name().c_str();
                     }
-                    if (filter._link(fname.get(), tname.get(), tr)) {
+                    if (filter._link(fname.c_str(), tname.c_str(), tr)) {
                         res.insert(Query::label_t{Query::INTERFACE, 0, i->global_id()}); // TODO: little hacksy, but we have uniform types in the parser
                     }
                 }
@@ -75,7 +104,7 @@ namespace aalwines
 
     void Network::move_network(Network&& nested_network){
         // Find NULL router
-        auto res = _mapping.insert("NULL", 4);
+        auto res = _mapping.insert("NULL");
         assert(!res.first);
         auto nullrouter = _mapping.get_data(res.second);
 
@@ -86,7 +115,7 @@ namespace aalwines
             }
             // Find unique name for router
             std::string name = e->name();
-            while(_mapping.exists(name.c_str(), name.length()).first){
+            while(_mapping.exists(name).first){
                 name += "'";
             }
             e->change_name(name);
@@ -107,7 +136,7 @@ namespace aalwines
             // Move router to new network
             e->set_index(_routers.size());
             _routers.emplace_back(std::move(e));
-            _mapping.get_data(_mapping.insert(name.c_str(), name.length()).second) = _routers.back().get();
+            _mapping.get_data(_mapping.insert(name).second) = _routers.back().get();
         }
     }
 
@@ -209,7 +238,7 @@ namespace aalwines
             for(auto& inf : r->interfaces())
             {
                 auto fname = r->interface_name(inf->id());
-                sinfs.emplace_back(fname.get(), inf.get());
+                sinfs.emplace_back(fname, inf.get());
             }
             std::sort(sinfs.begin(), sinfs.end(), [](auto& a, auto& b){
                 return strcmp(a.first.c_str(), b.first.c_str()) < 0;
@@ -277,7 +306,7 @@ namespace aalwines
                         {
                             assert(rule._via->source() == r.get());
                             auto tname = r->interface_name(rule._via->id());
-                            s << "                <route to=\"" << tname.get() << "\">\n";
+                            s << "                <route to=\"" << tname << "\">\n";
                             s << "                  <actions>\n";
                             for(auto& o : rule._ops)
                             {
@@ -327,7 +356,7 @@ namespace aalwines
             for(auto& inf : r->interfaces())
             {
                 auto fname = r->interface_name(inf->id());
-                s << "        <interface name=\"" << fname.get() << "\"/>\n";
+                s << "        <interface name=\"" << fname << "\"/>\n";
             }
             s << "      </interfaces>\n";
             s << "    </router>\n";
@@ -347,9 +376,9 @@ namespace aalwines
                 auto fname = r->interface_name(inf->id());
                 auto oname = inf->target()->interface_name(inf->match()->id());
                 s << "    <link>\n      <sides>\n" <<
-                     "        <shared_interface interface=\"" << fname.get() <<
+                     "        <shared_interface interface=\"" << fname <<
                      "\" router=\"" << inf->source()->name() << "\"/>\n" <<
-                     "        <shared_interface interface=\"" << oname.get() <<
+                     "        <shared_interface interface=\"" << oname <<
                      "\" router=\"" << inf->target()->name() << "\"/>\n" <<
                      "      </sides>\n    </link>\n";
             }
@@ -367,7 +396,7 @@ namespace aalwines
             routers.emplace_back(std::make_unique<Router>(id));
             Router& router = *routers.back().get();
             router.add_name(name);
-            auto res = mapping.insert(name.c_str(), name.length());
+            auto res = mapping.insert(name);
             assert(res.first);
             mapping.get_data(res.second) = &router;
             router.get_interface(interfaces, "i" + name);
@@ -378,9 +407,9 @@ namespace aalwines
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i];
             for (const auto &other : links[i]) {
-                auto res1 = mapping.exists(name.c_str(), name.length());
+                auto res1 = mapping.exists(name);
                 assert(res1.first);
-                auto res2 = mapping.exists(other.c_str(), other.length());
+                auto res2 = mapping.exists(other);
                 if(!res2.first) continue;
                 mapping.get_data(res1.second)->find_interface(other)->make_pairing(mapping.get_data(res2.second)->find_interface(name));
             }

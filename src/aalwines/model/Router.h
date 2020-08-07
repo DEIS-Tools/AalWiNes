@@ -35,13 +35,17 @@
 
 #include <ptrie/ptrie_map.h>
 #include <aalwines/utils/coordinate.h>
+#include <aalwines/utils/string_map.h>
 
 #include "RoutingTable.h"
 
 namespace aalwines {
     class Interface {
     public:
-        Interface(size_t id, size_t global_id, Router* target, Router* parent);
+        Interface(size_t id, size_t global_id, Router* target, Router* parent)
+        : _id(id), _global_id(global_id), _target(target), _parent(parent) {};
+        Interface(size_t id, size_t global_id, Router* parent)
+        : _id(id), _global_id(global_id), _parent(parent) {};
 
         [[nodiscard]] Router* target() const {
             return _target;
@@ -80,15 +84,15 @@ namespace aalwines {
         size_t _id = std::numeric_limits<size_t>::max();
         size_t _global_id = std::numeric_limits<size_t>::max();
         Router* _target = nullptr;
-        Interface* _matching = nullptr;
         Router* _parent = nullptr;
+        Interface* _matching = nullptr;
         RoutingTable _table;
     };
 
     class Router {
     public:
         explicit Router(size_t id, bool is_null = false) : _index(id), _is_null(is_null) { };
-        Router(size_t id, std::vector<std::string>  names, std::optional<Coordinate> coordinate) : _index(id), _names(std::move(names)), _coordinate(std::move(coordinate)) { };
+        Router(size_t id, std::vector<std::string> names, std::optional<Coordinate> coordinate) : _index(id), _names(std::move(names)), _coordinate(std::move(coordinate)) { };
 
         [[nodiscard]] size_t index() const {
             return _index;
@@ -108,11 +112,12 @@ namespace aalwines {
 
         void print_dot(std::ostream& out);
         [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
-        Interface* find_interface(std::string iface);
-        Interface* get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected = nullptr);
-        std::unique_ptr<char[] > interface_name(size_t i);
+        Interface* add_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
+        Interface* find_interface(const std::string& interface_name);
+        Interface* get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected = nullptr);
+        std::string interface_name(size_t i);
         void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
-        static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, ptrie::map<char, Router*>& mapping);
+        static void add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, string_map<Router*>& mapping);
         void print_simple(std::ostream& s);
         void print_json(std::ostream& s);
 
@@ -124,8 +129,7 @@ namespace aalwines {
         size_t _index = std::numeric_limits<size_t>::max();
         std::vector<std::string> _names;
         std::vector<std::unique_ptr<Interface>> _interfaces;
-        ptrie::map<char, Interface*> _interface_map;
-        size_t _inamelength = 0; // for printing
+        string_map<Interface*> _interface_map;
         bool _is_null = false;
         std::optional<Coordinate> _coordinate = std::nullopt;
         friend class Interface;

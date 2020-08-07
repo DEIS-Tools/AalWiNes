@@ -55,7 +55,7 @@ namespace aalwines {
             routers.emplace_back(std::make_unique<Router>(id, names, coordinate));
             auto router = routers.back().get();
             for (const auto& name : names) {
-                auto res = mapping.insert(name.c_str(), name.length());
+                auto res = mapping.insert(name);
                 if(!res.first)
                 {
                     es << "error: Duplicate definition of \"" << name << "\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
@@ -116,8 +116,8 @@ namespace aalwines {
             auto to_interface_name = json_link.at("to_interface").get<std::string>();
             auto to_router_name = json_link.at("to_router").get<std::string>();
 
-            auto from_res = mapping.exists(from_router_name.c_str(), from_router_name.length());
-            auto to_res = mapping.exists(to_router_name.c_str(), to_router_name.length());
+            auto from_res = mapping.exists(from_router_name);
+            auto to_res = mapping.exists(to_router_name);
             if(!from_res.first) {
                 es << "error: No router with name \"" << from_router_name << "\" was defined." << std::endl;
                 throw base_error(es.str());

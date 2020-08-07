@@ -40,22 +40,31 @@
 namespace aalwines {
     class Network {
     public:
-        using routermap_t = ptrie::map<char, Router*>;
+        using routermap_t = string_map<Router*>;
+
         Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
         : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces)) {}
 
-        //void add_router();
 
-        Router *get_router(size_t id);
+        Router* add_router(const std::string& router_name, std::optional<Coordinate> coordinate = std::nullopt) {
+            return add_router(std::vector<std::string>{router_name}, coordinate);
+        }
+        Router* add_router(const std::vector<std::string>& names, std::optional<Coordinate> coordinate = std::nullopt);
+        Router* get_router(size_t id);
+        Router* find_router(const std::string& router_name);
         [[nodiscard]] const std::vector<std::unique_ptr<Router>>& routers() const { return _routers; }
-
-        void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
-                Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
-        void concat_network(Interface *link, Network &&nested_network, Interface *nested_ingoing, RoutingTable::label_t post_label);
         [[nodiscard]] size_t size() const { return _routers.size(); }
 
-        std::unordered_set<Query::label_t> interfaces(filter_t& filter);
+        Interface* add_interface_to(const std::string& interface_name, Router* router);
+        Interface* add_interface_to(const std::string& interface_name, const std::string& router_name);
         [[nodiscard]] const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
+        std::unordered_set<Query::label_t> interfaces(filter_t& filter);
+
+        void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
+                            Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
+        void concat_network(Interface *link, Network &&nested_network, Interface *nested_ingoing, RoutingTable::label_t post_label);
+
+        static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
 
         void print_dot(std::ostream& s);
         void print_simple(std::ostream& s);
@@ -66,8 +75,6 @@ namespace aalwines {
         void write_prex_routing(std::ostream& s);
 
 
-        static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
-
         std::string name;
 
     private:
@@ -75,6 +82,7 @@ namespace aalwines {
         routermap_t _mapping;
         std::vector<std::unique_ptr<Router>> _routers;
         std::vector<const Interface*> _all_interfaces;
+
         void move_network(Network&& nested_network);
     };
 }

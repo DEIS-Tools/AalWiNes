@@ -43,7 +43,7 @@ Network construct_synthetic_network(size_t nesting = 1){
         Router &router = *_routers.back().get();
         router.add_name(router_name);
         router.get_interface(_all_interfaces, "i" + router_names[i]);
-        auto res = _mapping.insert(router_name.c_str(), router_name.length());
+        auto res = _mapping.insert(router_name);
         _mapping.get_data(res.second) = &router;
         switch (network_node) {
             case 1:
@@ -106,9 +106,9 @@ Network construct_synthetic_network(size_t nesting = 1){
     }
     for (size_t i = 0; i < router_size; ++i) {
         for (const auto &other : links[i]) {
-            auto res1 = _mapping.exists(router_names[i].c_str(), router_names[i].length());
+            auto res1 = _mapping.exists(router_names[i]);
             assert(res1.first);
-            auto res2 = _mapping.exists(other.c_str(), other.length());
+            auto res2 = _mapping.exists(other);
             if(!res2.first) continue;
             _mapping.get_data(res1.second)->find_interface(other)->make_pairing(_mapping.get_data(res2.second)->find_interface(router_names[i]));
         }

@@ -336,7 +336,7 @@ namespace aalwines
             }
             else {
                 auto iname = _via->source()->interface_name(_via->id());
-                s << "\"" << iname.get() << "\"";
+                s << "\"" << iname << "\"";
             }
         }
         else
