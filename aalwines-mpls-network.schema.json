@@ -1,0 +1,189 @@
+{
+    "$schema": "http://json-schema.org/2019-09/schema#",
+    "$id": "https://aalwines.cs.aau.dk/aalwines-mpls-network.schema.json",
+    "title": "AalWiNes MPLS Network Format",
+    "description": "An intermediate representation format for MPLS networks used as input for the AalWiNes tool.",
+    "$ref": "#/definitions/Network",
+    "definitions": {
+        "Network": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "routers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Router"
+                    }
+                },
+                "links": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Link"
+                    }
+                }
+            },
+            "required": [
+                "links",
+                "name",
+                "routers"
+            ],
+            "title": "Network"
+        },
+        "Link": {
+            "type": "object",
+            "properties": {
+                "from_router": {
+                    "type": "string"
+                },
+                "from_interface": {
+                    "type": "string"
+                },
+                "to_router": {
+                    "type": "string"
+                },
+                "to_interface": {
+                    "type": "string"
+                },
+                "bidirectional": {
+                    "description": "If the bidirectional flag is set, then this link object also encodes the link in the opposite direction.",
+                    "const": true
+                }
+            },
+            "required": [
+                "from_interface",
+                "from_router",
+                "to_interface",
+                "to_router"
+            ],
+            "title": "Link"
+        },
+        "Router": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "description": "Router names. Can contain multiple alternative names.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1
+                },
+                "location": {
+                    "$ref": "#/definitions/Location"
+                },
+                "interfaces": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Interface"
+                    }
+                }
+            },
+            "required": [
+                "interfaces",
+                "names"
+            ],
+            "title": "Router"
+        },
+        "Location": {
+            "type": "object",
+            "description": "Coordinate for location",
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "latitude",
+                "longitude"
+            ],
+            "title": "Location"
+        },
+        "Interface": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "routing_table": {
+                    "$ref": "#/definitions/RoutingTable"
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "names",
+                "routing_table"
+            ],
+            "title": "Interface"
+        },
+        "RoutingTable": {
+            "type": "object",
+            "description": "The routing table maps top-of-stack label strings (the keys) to arrays of routing table entries.",
+            "additionalProperties": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/definitions/RoutingEntry"
+                }
+            },
+            "title": "RoutingTable"
+        },
+        "RoutingEntry": {
+            "type": "object",
+            "properties": {
+                "out": {
+                    "description": "Name of outgoing interface for this routing entry",
+                    "type": "string"
+                },
+                "priority": {
+                    "description": "Higher priority entries is only used in case of link failures for the lower priority entries.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "ops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Operation"
+                    }
+                },
+                "weight": {
+                    "description": "Optional weight assignment of the routing entry.",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "ops",
+                "out",
+                "priority"
+            ],
+            "title": "RoutingEntry"
+        },
+        "Operation": {
+            "type": "object",
+            "description": "Operation to perform on the label header.",
+            "properties": {
+                "pop": {
+                    "type": "string",
+                    "maxLength": 0
+                },
+                "swap": {
+                    "type": "string",
+                    "description": "Label for the swap operation."
+                },
+                "push": {
+                    "type": "string",
+                    "description": "Label for the push operation."
+                }
+            },
+            "additionalProperties": false,
+            "minProperties": 1,
+            "maxProperties": 1,
+            "title": "Operation"
+        }
+    }
+}
