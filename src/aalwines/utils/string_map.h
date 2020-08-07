@@ -44,7 +44,7 @@ public:
     }
 
     T& operator[](const std::string& key) {
-        return get_data(pt::insert(key.data(), key.length()).second);
+        return pt::get_data(pt::insert(key.data(), key.length()).second);
     }
 
     [[nodiscard]] std::pair<bool, size_t> exists(const std::string& key) const {

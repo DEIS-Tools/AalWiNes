@@ -33,6 +33,7 @@
 #include "filter.h"
 
 #include <ptrie/ptrie_map.h>
+#include <utility>
 #include <vector>
 #include <memory>
 #include <functional>
@@ -43,8 +44,10 @@ namespace aalwines {
         using routermap_t = string_map<Router*>;
 
         Network(routermap_t&& mapping, std::vector<std::unique_ptr<Router> >&& routers, std::vector<const Interface*>&& all_interfaces)
-        : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces)) {}
+        : _mapping(std::move(mapping)), _routers(std::move(routers)), _all_interfaces(std::move(all_interfaces)) {};
 
+        Network() = default;
+        Network(std::string name) : name(std::move(name)) {};
 
         Router* add_router(const std::string& router_name, std::optional<Coordinate> coordinate = std::nullopt) {
             return add_router(std::vector<std::string>{router_name}, coordinate);
@@ -59,6 +62,8 @@ namespace aalwines {
         Interface* add_interface_to(const std::string& interface_name, const std::string& router_name);
         [[nodiscard]] const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
         std::unordered_set<Query::label_t> interfaces(filter_t& filter);
+
+        void add_null_router() { Router::add_null_router(_routers, _all_interfaces, _mapping); }
 
         void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
                             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);

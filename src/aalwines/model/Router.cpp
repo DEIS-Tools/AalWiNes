@@ -50,6 +50,7 @@ namespace aalwines
         return _names.back();
     }
 
+    // TODO: Merge this with get_interface
     Interface* Router::add_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
         auto res = _interface_map.insert(interface_name);
         if (!res.first) {

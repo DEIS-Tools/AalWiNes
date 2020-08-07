@@ -31,14 +31,10 @@ namespace aalwines {
 
 
     Network AalWiNesBuilder::parse(const json& json_network, std::ostream& warnings) {
-        std::vector<std::unique_ptr<Router>> routers;
-        std::vector<const Interface*> all_interfaces;
-        Network::routermap_t mapping;
+        auto network_name = json_network.at("name").get<std::string>();
+        Network network(network_name);
 
         std::stringstream es;
-
-        auto network_name = json_network.at("name").get<std::string>();
-
         auto json_routers = json_network.at("routers");
         if (!json_routers.is_array()) {
             throw base_error("error: routers field is not an array.");
@@ -48,21 +44,10 @@ namespace aalwines {
             if (names.empty()) {
                 throw base_error("error: Router must have at least one name.");
             }
-            size_t id = routers.size();
-
             auto loc_it = json_router.find("location");
             auto coordinate = loc_it != json_router.end() ? std::optional<Coordinate>(loc_it->get<Coordinate>()) : std::nullopt;
-            routers.emplace_back(std::make_unique<Router>(id, names, coordinate));
-            auto router = routers.back().get();
-            for (const auto& name : names) {
-                auto res = mapping.insert(name);
-                if(!res.first)
-                {
-                    es << "error: Duplicate definition of \"" << name << "\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
-                    throw base_error(es.str());
-                }
-                mapping.get_data(res.second) = router;
-            }
+
+            auto router = network.add_router(names, coordinate);
 
             auto json_interfaces = json_router.at("interfaces");
             if (!json_interfaces.is_array()) {
@@ -72,7 +57,7 @@ namespace aalwines {
             // First create all interfaces.
             for (const auto& json_interface : json_interfaces) {
                 auto interface_name = json_interface.at("name").get<std::string>();
-                router->get_interface(all_interfaces, interface_name);
+                network.add_interface_to(interface_name, router);
             }
             // Then create routing tables for the interfaces.
             for (const auto& json_interface : json_interfaces) {
@@ -116,18 +101,18 @@ namespace aalwines {
             auto to_interface_name = json_link.at("to_interface").get<std::string>();
             auto to_router_name = json_link.at("to_router").get<std::string>();
 
-            auto from_res = mapping.exists(from_router_name);
-            auto to_res = mapping.exists(to_router_name);
-            if(!from_res.first) {
+            auto from_router = network.find_router(from_router_name);
+            auto to_router = network.find_router(to_router_name);
+            if(from_router == nullptr) {
                 es << "error: No router with name \"" << from_router_name << "\" was defined." << std::endl;
                 throw base_error(es.str());
             }
-            if(!to_res.first) {
+            if(to_router == nullptr) {
                 es << "error: No router with name \"" << to_router_name << "\" was defined." << std::endl;
                 throw base_error(es.str());
             }
-            auto from_interface = mapping.get_data(from_res.second)->find_interface(from_interface_name);
-            auto to_interface = mapping.get_data(to_res.second)->find_interface(to_interface_name);
+            auto from_interface = from_router->find_interface(from_interface_name);
+            auto to_interface = to_router->find_interface(to_interface_name);
             if (from_interface == nullptr) {
                 es << "error: No interface with name \"" << from_interface_name << "\" was defined for router \"" << from_router_name << "\"." << std::endl;
                 throw base_error(es.str());
@@ -143,9 +128,8 @@ namespace aalwines {
             from_interface->make_pairing(to_interface);
         }
 
-        Router::add_null_router(routers, all_interfaces, mapping);
-        Network network(std::move(mapping), std::move(routers), std::move(all_interfaces));
-        network.name = network_name;
+        network.add_null_router();
+
         return network;
     }
 
