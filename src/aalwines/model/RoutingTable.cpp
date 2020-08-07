@@ -66,27 +66,25 @@ namespace aalwines
             return;
         }
         switch (action._op) {
-            case PUSH:
-                if (_ops.back()._op == POP) {
+            case op_t::PUSH:
+                if (_ops.back()._op == op_t::POP) {
                     _ops.pop_back();
-                    add_action(action_t{SWAP, action._op_label});
+                    add_action(action_t{op_t::SWAP, action._op_label});
                     return;
                 }
                 break;
-            case SWAP: // TODO: case SWAP and case POP doesn't seem happen, so do we want to keep it?
-                if (_ops.back()._op == SWAP || _ops.back()._op == PUSH) {
+            case op_t::SWAP: // TODO: case SWAP and case POP doesn't seem happen, so do we want to keep it?
+                if (_ops.back()._op == op_t::SWAP || _ops.back()._op == op_t::PUSH) {
                     _ops.back()._op_label = action._op_label;
                     return;
                 }
                 break;
-            case POP:
-                if (_ops.back()._op == SWAP) {
+            case op_t::POP:
+                if (_ops.back()._op == op_t::SWAP) {
                     _ops.pop_back();
-                    add_action(action_t{POP, label_t{}});
+                    add_action(action_t{op_t::POP, label_t{}});
                     return;
                 }
-                break;
-            default:
                 break;
         }
         _ops.push_back(action);
@@ -97,7 +95,7 @@ namespace aalwines
             for (const auto& f : e._rules) {
                 if (f._via == failed_inf) {
                     new_rules.emplace_back(f._type, f._ops, backup_inf, f._priority + 1);
-                    new_rules.back().add_action(action_t{PUSH, failover_label});
+                    new_rules.back().add_action(action_t{op_t::PUSH, failover_label});
                 }
             }
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
@@ -245,7 +243,7 @@ namespace aalwines
     void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex, const Network* network) const
     {
         switch (_op) {
-        case SWAP:
+        case op_t::SWAP:
             s << "{";
             if (quote) s << "\"";
             s << "swap";
@@ -262,7 +260,7 @@ namespace aalwines
             }
             s << "}";
             break;
-        case PUSH:
+        case op_t::PUSH:
             s << "{";
             if (quote) s << "\"";
             s << "push";
@@ -279,7 +277,7 @@ namespace aalwines
             }
             s << "}";
             break;
-        case POP:
+        case op_t::POP:
             if (quote) s << "\"";
             s << "pop";
             if (quote) s << "\"";

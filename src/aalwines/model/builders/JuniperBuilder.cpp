@@ -654,18 +654,18 @@ namespace aalwines
             if (ostr[i] == ',') continue;
             if (!parse_label) {
                 if (ostr[i] == 'S') {
-                    f._ops.back()._op = RoutingTable::SWAP;
+                    f._ops.back()._op = RoutingTable::op_t::SWAP;
                     i += 4;
                     parse_label = true;
                 }
                 else if (ostr[i] == 'P') {
                     if (ostr[i + 1] == 'u') {
-                        f._ops.back()._op = RoutingTable::PUSH;
+                        f._ops.back()._op = RoutingTable::op_t::PUSH;
                         parse_label = true;
                         i += 4;
                     }
                     else if (ostr[i + 1] == 'o') {
-                        f._ops.back()._op = RoutingTable::POP;
+                        f._ops.back()._op = RoutingTable::op_t::POP;
                         i += 2;
                         f._ops.emplace_back();
                         continue;
@@ -705,12 +705,12 @@ namespace aalwines
             {
                 switch(op._op)
                 {
-                case RoutingTable::PUSH:
+                case RoutingTable::op_t::PUSH:
                     if(depth == 0)
                         op._op_label.set_type(Query::STICKY_MPLS);
                     ++depth;
                     break;
-                case RoutingTable::POP:
+                case RoutingTable::op_t::POP:
                     --depth;
                     if(depth < 0) 
                     {
@@ -719,7 +719,7 @@ namespace aalwines
                         throw base_error(e.str());                            
                     }
                     break;
-                case RoutingTable::SWAP:
+                case RoutingTable::op_t::SWAP:
                     if(depth == 1)
                         op._op_label.set_type(Query::STICKY_MPLS);
                     break;

@@ -47,14 +47,14 @@ namespace aalwines {
             DISCARD, RECEIVE, ROUTE, MPLS
         };
 
-        enum op_t {
+        enum class op_t {
             PUSH, POP, SWAP
         };
         
         using label_t = Query::label_t;
 
         struct action_t {
-            op_t _op = POP;
+            op_t _op = op_t::POP;
             label_t _op_label;
             action_t() = default;
             action_t(op_t op, label_t op_label) : _op(op), _op_label(op_label) {};

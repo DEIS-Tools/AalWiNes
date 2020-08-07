@@ -423,7 +423,7 @@ namespace aalwines {
                                                     throw base_error(es.str());
                                                 }
                                                 ok = true;
-                                                op._op = RoutingTable::POP;
+                                                op._op = RoutingTable::op_t::POP;
                                             }
                                             else
                                             {
@@ -437,12 +437,12 @@ namespace aalwines {
                                                                        std::atoi(aattr->value() + (sticky ? 1 : 0)), 0);
                                                 if(type == "push")
                                                 {
-                                                    op._op = RoutingTable::PUSH;
+                                                    op._op = RoutingTable::op_t::PUSH;
                                                     ok = true;
                                                 }
                                                 else if(type == "swap")
                                                 {
-                                                    op._op = RoutingTable::SWAP;
+                                                    op._op = RoutingTable::op_t::SWAP;
                                                     ok = true;
                                                 }
                                                 else

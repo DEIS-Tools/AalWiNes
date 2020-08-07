@@ -164,8 +164,8 @@ namespace aalwines
                         for (auto& f : e._rules) {
                             for (auto& o : f._ops) {
                                 switch (o._op) {
-                                case RoutingTable::SWAP:
-                                case RoutingTable::PUSH:
+                                case RoutingTable::op_t::SWAP:
+                                case RoutingTable::op_t::PUSH:
                                     res.insert(o._op_label);
                                     _non_service_label.insert(o._op_label);
                                 default:
@@ -396,17 +396,15 @@ namespace aalwines
                             {
                                 switch(o._op)
                                 {
-                                case RoutingTable::PUSH:
+                                case RoutingTable::op_t::PUSH:
                                     s << "                    <action arg=\"" << o._op_label << "\" type=\"push\"/>\n";
                                     break;
-                                case RoutingTable::POP:
+                                case RoutingTable::op_t::POP:
                                     s << "                    <action type=\"pop\"/>\n";
                                     break;
-                                case RoutingTable::SWAP:
+                                case RoutingTable::op_t::SWAP:
                                     s << "                    <action arg=\"" << o._op_label << "\" type=\"swap\"/>\n";
                                     break;
-                                default:
-                                    throw base_error("Unknown op-type");
                                 }
                             }
                             s << "                  </actions>\n";

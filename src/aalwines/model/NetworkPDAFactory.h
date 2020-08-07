@@ -334,18 +334,18 @@ namespace aalwines {
             }
 
             switch (forward._ops[0]._op) {
-                case RoutingTable::POP:
+                case RoutingTable::op_t::POP:
                     nr._op = pdaaal::POP;
                     assert(entry._top_label.type() == Query::MPLS ||
                            entry._top_label.type() == Query::STICKY_MPLS);
                     break;
-                case RoutingTable::PUSH:
+                case RoutingTable::op_t::PUSH:
                     nr._op = pdaaal::PUSH;
                     assert(forward._ops[0]._op_label.type() == Query::MPLS ||
                            forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
                     nr._op_label = forward._ops[0]._op_label;
                     break;
-                case RoutingTable::SWAP:
+                case RoutingTable::op_t::SWAP:
                     nr._op = pdaaal::SWAP;
                     nr._op_label = forward._ops[0]._op_label;
                     break;
@@ -443,27 +443,27 @@ namespace aalwines {
             nr._pre = s._inf->table().entries()[s._eid]._top_label;
             for (auto pid = 0; pid <= s._opid; ++pid) {
                 switch (r._ops[pid]._op) {
-                    case RoutingTable::SWAP:
-                    case RoutingTable::PUSH:
+                    case RoutingTable::op_t::SWAP:
+                    case RoutingTable::op_t::PUSH:
                         nr._pre = r._ops[pid]._op_label;
                         break;
-                    case RoutingTable::POP:
+                    case RoutingTable::op_t::POP:
                     default:
                         throw base_error("Unexpected pop!");
                         assert(false);
                 }
             }
             switch (act._op) {
-                case RoutingTable::POP:
+                case RoutingTable::op_t::POP:
                     nr._op = pdaaal::POP;
                     throw base_error("Unexpected pop!");
                     assert(false);
                     break;
-                case RoutingTable::PUSH:
+                case RoutingTable::op_t::PUSH:
                     nr._op = pdaaal::PUSH;
                     nr._op_label = act._op_label;
                     break;
-                case RoutingTable::SWAP:
+                case RoutingTable::op_t::SWAP:
                     nr._op = pdaaal::SWAP;
                     nr._op_label = act._op_label;
                     break;
@@ -607,10 +607,10 @@ namespace aalwines {
                                         if (r._ops.size() > 1) continue; // would have been handled in other case
 
                                         if (r._via && r._via->match() == next._inf) {
-                                            if (r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP) {
+                                            if (r._ops.empty() || r._ops[0]._op == RoutingTable::op_t::SWAP) {
                                                 if (step._stack.size() == nstep._stack.size()) {
                                                     if (!r._ops.empty()) {
-                                                        assert(r._ops[0]._op == RoutingTable::SWAP);
+                                                        assert(r._ops[0]._op == RoutingTable::op_t::SWAP);
                                                         if (nstep._stack.front() != r._ops[0]._op_label)
                                                             continue;
                                                     } else if (!entry._top_label.overlaps(nstep._stack.front())) {
@@ -625,9 +625,9 @@ namespace aalwines {
                                                 }
                                             } else {
                                                 assert(r._ops.size() == 1);
-                                                assert(r._ops[0]._op == RoutingTable::PUSH ||
-                                                       r._ops[0]._op == RoutingTable::POP);
-                                                if (r._ops[0]._op == RoutingTable::POP &&
+                                                assert(r._ops[0]._op == RoutingTable::op_t::PUSH ||
+                                                       r._ops[0]._op == RoutingTable::op_t::POP);
+                                                if (r._ops[0]._op == RoutingTable::op_t::POP &&
                                                     nstep._stack.size() == step._stack.size() - 1) {
                                                     if (!add_interfaces(disabled, active, entry, r))
                                                         continue;
@@ -635,7 +635,7 @@ namespace aalwines {
                                                     entries.push_back(&entry);
                                                     found = true;
                                                     break;
-                                                } else if (r._ops[0]._op == RoutingTable::PUSH &&
+                                                } else if (r._ops[0]._op == RoutingTable::op_t::PUSH &&
                                                            nstep._stack.size() == step._stack.size() + 1 &&
                                                            r._ops[0]._op_label == nstep._stack.front()) {
                                                     if (!add_interfaces(disabled, active, entry, r))
