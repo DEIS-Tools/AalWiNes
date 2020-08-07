@@ -138,7 +138,7 @@ int main(int argc, const char** argv)
     bool silent = false;
     bool dump_to_moped = false;
     bool no_timing = false;
-    std::string topology_destination, routing_destination, json_destination;
+    std::string topology_destination, routing_destination, json_destination, json_pretty_destination;
     static const char *engineTypes[] = {"", "Moped", "Post*", "Pre*"};
     static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
 
@@ -152,6 +152,7 @@ int main(int argc, const char** argv)
             ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
             ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
             ("write-json", po::value<std::string>(&json_destination), "Write the network in the AalWiNes MPLS Network format to the given file.")
+            ("write-json-pretty", po::value<std::string>(&json_pretty_destination), "Pretty print the network in the AalWiNes MPLS Network format to the given file.")
     ;
 
 
@@ -272,7 +273,7 @@ int main(int argc, const char** argv)
             network.write_prex_topology(out);
         else
         {
-            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl,
+            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
@@ -283,7 +284,7 @@ int main(int argc, const char** argv)
             network.write_prex_routing(out);
         else
         {
-            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl,
+            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
@@ -292,10 +293,20 @@ int main(int argc, const char** argv)
         if(out.is_open()) {
             auto j = json::object();
             j["network"] = network;
-            //out << j.dump(4) << std::endl; // TODO: Add pretty print option.
             out << j << std::endl;
         } else {
-            std::cerr << "Could not open --write-json\"" << json_destination << "\" for writing" << std::endl,
+            std::cerr << "Could not open --write-json\"" << json_destination << "\" for writing" << std::endl;
+            exit(-1);
+        }
+    }
+    if (!json_pretty_destination.empty()) {
+        std::ofstream out(json_pretty_destination);
+        if(out.is_open()) {
+            auto j = json::object();
+            j["network"] = network;
+            out << j.dump(2) << std::endl;
+        } else {
+            std::cerr << "Could not open --write-json-pretty\"" << json_pretty_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
