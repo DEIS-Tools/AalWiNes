@@ -52,11 +52,8 @@ public:
     }
 
     [[nodiscard]] std::string at(size_t index) const {
-        std::stack<uchar> path; size_t bindex, offset, ps; uint16_t size;
-        auto node = pt::find_metadata(index, path, bindex, offset, ps, size);
-        std::string destination(size, char());
-        pt::write_data(destination.data(), node, path, bindex, offset, ps, size);
-        return destination;
+        auto vector = pt::unpack(index);
+        return std::string(vector.data(), vector.size());
     }
 
 };
