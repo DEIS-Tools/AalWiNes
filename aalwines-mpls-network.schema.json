@@ -3,7 +3,12 @@
     "$id": "https://aalwines.cs.aau.dk/aalwines-mpls-network.schema.json",
     "title": "AalWiNes MPLS Network Format",
     "description": "An intermediate representation format for MPLS networks used as input for the AalWiNes tool.",
-    "$ref": "#/definitions/Network",
+    "properties" : {
+        "network": {
+          "$ref": "#/definitions/Network"
+        }
+    },
+    "required": ["network"],
     "definitions": {
         "Network": {
             "type": "object",
@@ -115,7 +120,7 @@
             },
             "additionalProperties": false,
             "required": [
-                "names",
+                "name",
                 "routing_table"
             ],
             "title": "Interface"
