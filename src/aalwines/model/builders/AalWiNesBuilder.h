@@ -1,20 +1,35 @@
-//
-// Created by Morten on 05-08-2020.
-//
+/*
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
+/*
+ *  Copyright Morten K. Schou
+ */
+
+/*
+ * File:   AalWiNesBuilder.h
+ * Author: Morten K. Schou <morten@h-schou.dk>
+ *
+ * Created on August 5, 2020
+ */
 #ifndef AALWINES_AALWINESBUILDER_H
 #define AALWINES_AALWINESBUILDER_H
 
 
-
-//  Then include this file, and then do
-//
-//     Network data = nlohmann::json::parse(jsonString);
 #include <json.hpp>
 #include <fstream>
 #include <sstream>
-
-
 #include <aalwines/model/Router.h>
 #include <aalwines/model/Network.h>
 
