@@ -121,7 +121,7 @@ namespace aalwines {
                         throw base_error(es.str());
                     }
                     std::string iname = nattr->value();
-                    network.add_interface_to(iname, router);
+                    network.insert_interface_to(iname, router);
                     inf = inf->next_sibling("interface");
                 }
             }

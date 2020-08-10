@@ -75,8 +75,8 @@ namespace aalwines {
         [[nodiscard]] const std::vector<std::unique_ptr<Router>>& routers() const { return _routers; }
         [[nodiscard]] size_t size() const { return _routers.size(); }
 
-        Interface* add_interface_to(const std::string& interface_name, Router* router);
-        Interface* add_interface_to(const std::string& interface_name, const std::string& router_name);
+        std::pair<bool, Interface*> insert_interface_to(const std::string& interface_name, Router* router);
+        std::pair<bool, Interface*> insert_interface_to(const std::string& interface_name, const std::string& router_name);
         [[nodiscard]] const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
         std::unordered_set<Query::label_t> interfaces(filter_t& filter);
 

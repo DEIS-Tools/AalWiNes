@@ -41,12 +41,12 @@ namespace aalwines {
         return id < _routers.size() ? _routers[id].get() : nullptr;
     }
 
-    Interface* Network::add_interface_to(const std::string& interface_name, Router* router) {
-        return router->add_interface(interface_name, _all_interfaces);
+    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, Router* router) {
+        return router->insert_interface(interface_name, _all_interfaces);
     }
-    Interface* Network::add_interface_to(const std::string& interface_name, const std::string& router_name) {
+    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, const std::string& router_name) {
         auto router = find_router(router_name);
-        return router == nullptr ? nullptr : add_interface_to(interface_name, router);
+        return router == nullptr ? std::make_pair(false, nullptr) : insert_interface_to(interface_name, router);
     }
 
     void Network::add_null_router() {
@@ -56,7 +56,7 @@ namespace aalwines {
                 if(inf->match() == nullptr) {
                     std::stringstream interface_name;
                     interface_name << "i" << inf->global_id();
-                    add_interface_to(interface_name.str(), null_router)->make_pairing(inf.get());
+                    insert_interface_to(interface_name.str(), null_router).second->make_pairing(inf.get());
                 }
             }
         }
@@ -115,7 +115,7 @@ namespace aalwines {
                 if (inf->target()->is_null()){
                     std::stringstream ss;
                     ss << "i" << inf->global_id();
-                    add_interface_to(ss.str(), null_router)->make_pairing(inf.get());
+                    insert_interface_to(ss.str(), null_router).second->make_pairing(inf.get());
                 }
             }
 
@@ -136,8 +136,8 @@ namespace aalwines {
         // Pair interfaces for injection and create virtual interface to filter post_label before POP.
         auto link_end = link->match();
         link->make_pairing(nested_ingoing);
-        auto virtual_guard = add_interface_to("__virtual_guard__", nested_outgoing->source()); // Assumes these names are unique for this router.
-        auto nested_end_link = add_interface_to("__end_link__", nested_outgoing->source());
+        auto virtual_guard = insert_interface_to("__virtual_guard__", nested_outgoing->source()).second; // Assumes these names are unique for this router.
+        auto nested_end_link = insert_interface_to("__end_link__", nested_outgoing->source()).second;
         nested_outgoing->make_pairing(virtual_guard);
         link_end->make_pairing(nested_end_link);
 
@@ -376,9 +376,9 @@ namespace aalwines {
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i];
             auto router = network.add_router(name);
-            network.add_interface_to("i" + name, router);
+            network.insert_interface_to("i" + name, router);
             for (const auto& other : links[i]) {
-                network.add_interface_to(other, router);
+                network.insert_interface_to(other, router);
             }
         }
         for (size_t i = 0; i < names.size(); ++i) {

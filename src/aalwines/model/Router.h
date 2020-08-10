@@ -115,7 +115,8 @@ namespace aalwines {
 
         void print_dot(std::ostream& out);
         [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
-        Interface* add_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
+        std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
+        Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
         Interface* get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected = nullptr);
         std::string interface_name(size_t i);

@@ -186,9 +186,9 @@ namespace aalwines
             });
         }
 
-        Network network(std::move(mapping), std::move(routers), std::move(interfaces));
-        network.add_null_router();
-        return network;
+        Network result(std::move(mapping), std::move(routers), std::move(interfaces));
+        result.add_null_router();
+        return result;
     }
 
     void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, Network::routermap_t& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap)
@@ -502,7 +502,7 @@ namespace aalwines
                 continue;
             }
             else {
-                auto inf = parent->get_interface(all_interfaces, tl);
+                auto inf = parent->get_interface(tl, all_interfaces);
                 entry._ingoing = inf;
                 entry._top_label = Query::label_t::any_ip;
                 sticky = 0;
@@ -594,7 +594,7 @@ namespace aalwines
                         }
                         else {
                             auto& d = indirect.get_data(alt.second);
-                            r._via = parent->get_interface(all_interfaces, d.first);
+                            r._via = parent->get_interface(d.first, all_interfaces);
                         }
                     }
                     else {
@@ -745,7 +745,7 @@ namespace aalwines
             return inf;
         }
         else {
-            return parent->get_interface(all_interfaces, iname);
+            return parent->get_interface(iname, all_interfaces);
         }
     }
 

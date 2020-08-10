@@ -50,11 +50,10 @@ namespace aalwines {
         return _names.back();
     }
 
-
-    Interface* Router::add_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
+    std::pair<bool,Interface*> Router::insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
         auto res = _interface_map.insert(interface_name);
         if (!res.first) {
-            return _interface_map.get_data(res.second);
+            return std::make_pair(false, _interface_map.get_data(res.second));
         }
         auto iid = _interfaces.size();
         auto gid = all_interfaces.size();
@@ -62,7 +61,11 @@ namespace aalwines {
         auto interface = _interfaces.back().get();
         all_interfaces.emplace_back(interface);
         _interface_map.get_data(res.second) = interface;
-        return interface;
+        return std::make_pair(true, interface);
+    }
+
+    Interface* Router::get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
+        return insert_interface(interface_name, all_interfaces).second;
     }
 
     Interface* Router::find_interface(const std::string& interface_name) {
@@ -70,7 +73,8 @@ namespace aalwines {
         return res.first ? _interface_map.get_data(res.second) : nullptr;
     }
 
-    // TODO: Merge this with add_interface
+    // Legacy version of get_interface. Only used for Juniper parsing.
+    // TODO: Figure out how to use new get_interface instead without breaking things.
     Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected) {
         auto res = _interface_map.insert(interface_name);
         if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {

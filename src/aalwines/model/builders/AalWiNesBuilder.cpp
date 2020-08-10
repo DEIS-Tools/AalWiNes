@@ -42,7 +42,8 @@ namespace aalwines {
         for (const auto& json_router : json_routers) {
             auto names = json_router.at("names").get<std::vector<std::string>>();
             if (names.empty()) {
-                throw base_error("error: Router must have at least one name.");
+                es << "error: Router must have at least one name." << std::endl;
+                throw base_error(es.str());
             }
             auto loc_it = json_router.find("location");
             auto coordinate = loc_it != json_router.end() ? std::optional<Coordinate>(loc_it->get<Coordinate>()) : std::nullopt;
@@ -51,13 +52,17 @@ namespace aalwines {
 
             auto json_interfaces = json_router.at("interfaces");
             if (!json_interfaces.is_array()) {
-                es << "error: interfaces field of router \"" << names[0] << "\" is not an array.";
+                es << "error: interfaces field of router \"" << names[0] << "\" is not an array." << std::endl;
                 throw base_error(es.str());
             }
             // First create all interfaces.
             for (const auto& json_interface : json_interfaces) {
                 auto interface_name = json_interface.at("name").get<std::string>();
-                network.add_interface_to(interface_name, router);
+                auto [was_inserted, _] = network.insert_interface_to(interface_name, router);
+                if (!was_inserted) {
+                    es << "error: Duplicate interface name \"" << interface_name << "\" on router \"" << names[0] << "\"." << std::endl;
+                    throw base_error(es.str());
+                }
             }
             // Then create routing tables for the interfaces.
             for (const auto& json_interface : json_interfaces) {
@@ -65,7 +70,7 @@ namespace aalwines {
 
                 auto json_routing_table = json_interface.at("routing_table");
                 if (!json_routing_table.is_object()) {
-                    es << "error: routing table field for interface \"" << interface_name << "\" of router \"" << names[0] << "\" is not an object.";
+                    es << "error: routing table field for interface \"" << interface_name << "\" of router \"" << names[0] << "\" is not an object." << std::endl;
                     throw base_error(es.str());
                 }
 
