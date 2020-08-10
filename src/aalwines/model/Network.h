@@ -92,11 +92,6 @@ namespace aalwines {
         void print_simple(std::ostream& s);
         void print_json(std::ostream& s);
 
-        // TODO: move these functions out:
-        void write_prex_topology(std::ostream& s);
-        void write_prex_routing(std::ostream& s);
-
-
         std::string name;
 
     private:

@@ -266,24 +266,20 @@ int main(int argc, const char** argv)
         network.print_dot(std::cout);
     }
     
-    if(!topology_destination.empty())
-    {
+    if(!topology_destination.empty()) {
         std::ofstream out(topology_destination);
-        if(out.is_open())
-            network.write_prex_topology(out);
-        else
-        {
+        if(out.is_open()) {
+            PRexBuilder::write_prex_topology(network, out);
+        } else {
             std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
-    if(!routing_destination.empty())
-    {
+    if(!routing_destination.empty()) {
         std::ofstream out(routing_destination);
-        if(out.is_open())
-            network.write_prex_routing(out);
-        else
-        {
+        if(out.is_open()) {
+            PRexBuilder::write_prex_routing(network, out);
+        } else {
             std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
