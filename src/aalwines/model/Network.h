@@ -50,6 +50,14 @@ namespace aalwines {
         Network() = default;
         explicit Network(std::string name) : name(std::move(name)) {};
 
+        virtual ~Network() = default;
+        Network(const Network& network) {
+            *this = network;
+        };
+        Network& operator=(const Network& other);
+        Network(Network&&) = default;
+        Network& operator=(Network&&) = default;
+
         template<typename... Args >
         Router* add_router(std::string name, Args&&... args) {
             return add_router(std::vector<std::string>{std::move(name)}, std::forward<Args>(args)...);
@@ -95,7 +103,6 @@ namespace aalwines {
         std::string name;
 
     private:
-        // NO TOUCHEE AFTER INIT!
         routermap_t _mapping;
         std::vector<std::unique_ptr<Router>> _routers;
         std::vector<const Interface*> _all_interfaces;

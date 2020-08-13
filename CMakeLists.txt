@@ -74,6 +74,7 @@ if(BUILD_TESTING AND AALWINES_BuildTests)
     #testing
     add_subdirectory(${CMAKE_SOURCE_DIR}/test/)
     enable_testing()
+    add_test(NAME NetworkTest         COMMAND NetworkTest)
     add_test(NAME SyntacticNetwork    COMMAND SyntacticNetwork)
     add_test(NAME RouteConstruction   COMMAND RouteConstruction)
     add_test(NAME QueryTest           COMMAND QueryTest)

@@ -87,6 +87,7 @@ namespace aalwines {
         Router* _parent = nullptr;
         Interface* _matching = nullptr;
         RoutingTable _table;
+        friend class Router;
     };
 
     class Router {
@@ -96,6 +97,14 @@ namespace aalwines {
         : _index(id), _names(std::move(names)), _coordinate(std::move(coordinate)) { };
         Router(size_t id, std::vector<std::string> names, bool is_null)
         : _index(id), _names(std::move(names)), _is_null(is_null) { };
+
+        virtual ~Router() = default;
+        Router(const Router& router) {
+            *this = router;
+        };
+        Router& operator=(const Router& router);
+        Router(Router&&) = default;
+        Router& operator=(Router&&) = default;
 
         [[nodiscard]] size_t index() const {
             return _index;

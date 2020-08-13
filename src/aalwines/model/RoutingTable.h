@@ -81,7 +81,7 @@ namespace aalwines {
 
         struct entry_t {
             label_t _top_label;
-            const Interface* _ingoing = nullptr; // this needs to be removed, it is only really used during merges of Routingtables for filtering
+            const Interface* _ingoing = nullptr; // TODO: this needs to be removed, it is only really used during merges of Routingtables for filtering
             std::vector<forward_t> _rules;
 
             entry_t() = default;
@@ -117,6 +117,8 @@ namespace aalwines {
         void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
         void add_to_outgoing(const Interface* outgoing, action_t action);
         void simple_merge(const RoutingTable& other);
+
+        void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
         
     private:
         std::vector<entry_t>::iterator insert_entry(label_t top_label);

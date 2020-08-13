@@ -32,6 +32,57 @@
 
 namespace aalwines {
 
+    Network& Network::operator=(const Network& other) {
+        if (this == &other) return *this; // Safely handle self-assignment.
+
+        name = other.name;
+        // _mapping = other._mapping; Copy of ptrie still not working.
+        _mapping = routermap_t(); // Start from empty map instead.
+        _routers.clear();
+        _routers.reserve(other._routers.size());
+        _all_interfaces.clear();
+        _all_interfaces.reserve(other._all_interfaces.size());
+        // Copy-construct routers
+        for (const auto& router : other._routers) {
+            auto router_p = _routers.emplace_back(std::make_unique<Router>(*router)).get();
+            for (const auto& router_name : router->names()) {
+                _mapping[router_name] = router_p;
+            }
+        }
+        /*// Update pointers in _mapping // Do this when copy of ptrie works..
+        for (auto& router : _mapping) {
+            router = _routers[router->index()].get();
+        }*/
+
+        // Add interface pointers
+        for (const auto& router : _routers) {
+            for (const auto& interface : router->interfaces()) {
+                _all_interfaces.push_back(interface.get());
+            }
+        }
+        // Ensure global_id of interfaces is correct.
+        std::sort(_all_interfaces.begin(), _all_interfaces.end(), [](const Interface* a, const Interface* b){
+            return a->global_id() < b->global_id();
+        });
+#ifndef NDEBUG
+        for(size_t i = 0; i < _all_interfaces.size(); ++i) {
+            assert(_all_interfaces[i]->global_id() == i);
+        }
+#endif
+
+        // Update pairings
+        for (auto& router : _routers) {
+            for (auto& interface : router->interfaces()) {
+                auto match =  interface->match();
+                if (match != nullptr) {
+                    assert(match->source() != nullptr);
+                    interface->make_pairing(_routers[match->source()->index()]->interfaces()[match->id()].get());
+                }
+            }
+        }
+        return *this;
+    }
+
     Router* Network::find_router(const std::string& router_name) {
         auto from_res = _mapping.exists(router_name);
         return from_res.first ? _mapping.get_data(from_res.second) : nullptr;

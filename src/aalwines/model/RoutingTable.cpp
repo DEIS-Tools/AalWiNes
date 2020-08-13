@@ -406,4 +406,12 @@ namespace aalwines
         return s;
     }
 
+    void RoutingTable::update_interfaces(const std::function<Interface*(const Interface*)>& update_fn) {
+        for (auto& entry : _entries) {
+            for (auto& rule : entry._rules) {
+                rule._via = update_fn(rule._via);
+            }
+        }
+    }
+
 }

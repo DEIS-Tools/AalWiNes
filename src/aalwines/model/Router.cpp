@@ -32,8 +32,33 @@
 #include <streambuf>
 #include <sstream>
 #include <set>
+#include <cassert>
 
 namespace aalwines {
+
+    Router& Router::operator=(const Router& router) {
+        _index = router._index;
+        _names = router._names;
+        _coordinate = router._coordinate;
+        _is_null = router._is_null;
+        _interfaces.clear();
+        _interfaces.reserve(router._interfaces.size());
+        // _interface_map = router._interface_map; // Copy of ptrie not working.
+        _interface_map = string_map<Interface*>(); // Start from empty map instead
+
+        for (auto& interface : router._interfaces) {
+            assert(_interfaces.size() == interface->id());
+            auto new_interface = _interfaces.emplace_back(std::make_unique<Interface>(*interface)).get();
+            _interface_map[interface->get_name()] = new_interface;
+            new_interface->_parent = this;
+        }
+        for (auto& interface : _interfaces) {
+            interface->table().update_interfaces([this](const Interface* old) -> Interface* {
+                return old == nullptr ? nullptr : this->_interfaces[old->id()].get();
+            });
+        }
+        return *this;
+    }
 
     void Router::add_name(const std::string& name) {
         _names.emplace_back(name);
