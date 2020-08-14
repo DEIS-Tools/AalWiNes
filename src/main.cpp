@@ -328,7 +328,7 @@ int main(int argc, const char** argv)
                 Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
                 json_output["answers"] = verifier.run(query_strings);
             } else { // a void(void) function encodes 'no weight'.
-                Verifier<std::function<void(void)>> verifier(builder, [](){}, engine, tos, no_ip_swap, !no_timing, get_trace);
+                Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
                 json_output["answers"] = verifier.run(query_strings);
             }
 

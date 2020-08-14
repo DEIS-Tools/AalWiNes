@@ -27,8 +27,54 @@
 #ifndef OUTCOME_H
 #define OUTCOME_H
 
+#include <ostream>
+#include <json.hpp>
+
 namespace utils {
-    enum outcome_t { YES, NO, MAYBE };    
+    enum class outcome_t { YES, NO, MAYBE };
+
+    std::ostream& operator<<(std::ostream& os, const outcome_t& outcome) {
+        switch (outcome) {
+            case outcome_t::YES:
+                os << "YES";
+                break;
+            case outcome_t::NO:
+                os << "NO";
+                break;
+            case outcome_t::MAYBE:
+                os << "MAYBE";
+                break;
+        }
+        return os;
+    }
+
+    using json = nlohmann::json;
+    inline void from_json(const json & j, outcome_t& outcome) {
+        if (j.is_null()) {
+            outcome = outcome_t::MAYBE;
+        } else if (j.is_boolean()) {
+            if (j.get<bool>()) {
+                outcome = outcome_t::YES;
+            } else {
+                outcome = outcome_t::NO;
+            }
+        } else {
+            throw base_error("error: outcome must be either true, false or null.");
+        }
+    }
+    inline void to_json(json & j, const outcome_t& outcome) {
+        switch (outcome) {
+            case outcome_t::YES:
+                j = true;
+                break;
+            case outcome_t::NO:
+                j = false;
+                break;
+            case outcome_t::MAYBE:
+                j = nullptr;
+                break;
+        }
+    }
 }
 
 #endif /* OUTCOME_H */

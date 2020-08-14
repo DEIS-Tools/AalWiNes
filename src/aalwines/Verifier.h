@@ -50,6 +50,8 @@ namespace aalwines {
     public:
         constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
+        explicit Verifier(Builder& builder, size_t engine = 2, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
+        : Verifier(builder, [](){}, engine, reduction, no_ip_swap, print_timing, print_trace) {};
         Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 2, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
         : _builder(builder), weight_fn(weight_fn), engine(engine), reduction(reduction), no_ip_swap(no_ip_swap), print_timing(print_timing), print_trace(print_trace) {};
 
@@ -82,7 +84,7 @@ namespace aalwines {
             stopwatch reduction_time(false);
             stopwatch verification_time(false);
 
-            utils::outcome_t result = utils::MAYBE;
+            utils::outcome_t result = utils::outcome_t::MAYBE;
             for (auto m : modes) {
                 proof = std::stringstream(); // Clear stream from previous mode.
 
@@ -108,7 +110,7 @@ namespace aalwines {
                         if(engine_outcome) {
                             auto trace = moped.get_trace(pda);
                             if (factory.write_json_trace(proof, trace))
-                                result = utils::YES;
+                                result = utils::outcome_t::YES;
                         }
                         break;
                     case 2: {
@@ -129,7 +131,7 @@ namespace aalwines {
                                 trace = solver.get_trace<pdaaal::Trace_Type::Any>(pda, std::move(solver_result.second));
                             }
                             if (factory.write_json_trace(proof, trace))
-                                result = utils::YES;
+                                result = utils::outcome_t::YES;
                         }
                         break;
                     }
@@ -140,7 +142,7 @@ namespace aalwines {
                         if (engine_outcome) {
                             auto trace = solver.get_trace(pda, std::move(solver_result.second));
                             if (factory.write_json_trace(proof, trace))
-                                result = utils::YES;
+                                result = utils::outcome_t::YES;
                         }
                         break;
                     }
@@ -150,12 +152,12 @@ namespace aalwines {
 
                 // Determine result from the outcome of verification and the mode (over/under-approximation) used.
                 if (q.number_of_failures() == 0) {
-                    result = engine_outcome ? utils::YES : utils::NO;
+                    result = engine_outcome ? utils::outcome_t::YES : utils::outcome_t::NO;
                 }
-                if (result == utils::MAYBE && m == Query::OVER && !engine_outcome) {
-                    result = utils::NO;
+                if (result == utils::outcome_t::MAYBE && m == Query::OVER && !engine_outcome) {
+                    result = utils::outcome_t::NO;
                 }
-                if (result != utils::MAYBE) {
+                if (result != utils::outcome_t::MAYBE) {
                     output["mode"] = m;
                     break;
                 }
@@ -163,7 +165,7 @@ namespace aalwines {
 
             output["result"] = result;
 
-            if (print_trace && result == utils::YES) {
+            if (print_trace && result == utils::outcome_t::YES) {
                 if constexpr (is_weighted) {
                     output["trace-weight"] = trace_weight;
                 }
