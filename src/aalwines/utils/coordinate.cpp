@@ -34,7 +34,7 @@ namespace aalwines {
 
     double Coordinate::distance_to(const Coordinate& other) const {
         // Using the Haversine formula.
-        return _R_km * 2 * std::asin(std::sqrt(std::pow((_rad_lat - other._rad_lat)/2, 2) +
+        return _R_km * 2 * std::asin(std::sqrt(std::pow(std::sin((_rad_lat - other._rad_lat)/2), 2) +
         std::cos(_rad_lat) * std::cos(other._rad_lat) * std::pow(std::sin((_rad_long - other._rad_long) / 2), 2)));
     }
 
