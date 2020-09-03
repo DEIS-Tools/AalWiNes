@@ -26,6 +26,7 @@
 
 #include <aalwines/model/builders/JuniperBuilder.h>
 #include <aalwines/model/builders/PRexBuilder.h>
+#include <aalwines/model/builders/AalWiNesBuilder.h>
 
 #include <aalwines/model/NetworkPDAFactory.h>
 #include <aalwines/model/NetworkWeight.h>
@@ -137,8 +138,7 @@ int main(int argc, const char** argv)
     bool silent = false;
     bool dump_to_moped = false;
     bool no_timing = false;
-    std::string topology_destination;
-    std::string routing_destination;
+    std::string topology_destination, routing_destination, json_destination, json_pretty_destination;
     static const char *engineTypes[] = {"", "Moped", "Post*", "Pre*"};
     static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
 
@@ -151,12 +151,16 @@ int main(int argc, const char** argv)
             ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
             ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
             ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
+            ("write-json", po::value<std::string>(&json_destination), "Write the network in the AalWiNes MPLS Network format to the given file.")
+            ("write-json-pretty", po::value<std::string>(&json_pretty_destination), "Pretty print the network in the AalWiNes MPLS Network format to the given file.")
     ;
 
 
-    std::string junos_config, prex_topo, prex_routing;
+    std::string json_file, junos_config, prex_topo, prex_routing;
     bool skip_pfe = false;
     input.add_options()
+            ("input", po::value<std::string>(&json_file),
+             "An json-file defining the network in the AalWiNes MPLS Network format")
             ("juniper", po::value<std::string>(&junos_config),
             "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
             ("topology", po::value<std::string>(&prex_topo), 
@@ -216,6 +220,12 @@ int main(int argc, const char** argv)
         exit(-1);
     }
 
+    if(!json_file.empty() && (!prex_routing.empty() || !prex_topo.empty() || !junos_config.empty()))
+    {
+        std::cerr << "--input cannot be used with --junos or --topology or --routing." << std::endl;
+        exit(-1);
+    }
+
     if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty()))
     {
         std::cerr << "--junos cannot be used with --topology or --routing." << std::endl;
@@ -228,9 +238,9 @@ int main(int argc, const char** argv)
         exit(-1);        
     }
     
-    if(junos_config.empty() && prex_routing.empty() && prex_topo.empty())
+    if(junos_config.empty() && prex_routing.empty() && prex_topo.empty() && json_file.empty())
     {
-        std::cerr << "Either a Junos configuration or a P-Rex configuration must be given." << std::endl;
+        std::cerr << "Either a Junos configuration or a P-Rex configuration or an AalWiNes json configuration must be given." << std::endl;
         exit(-1);                
     }
     
@@ -246,8 +256,9 @@ int main(int argc, const char** argv)
     std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
     
     stopwatch parsingwatch;
-    auto network = junos_config.empty() ?
+    auto network = junos_config.empty() ? (json_file.empty() ?
         PRexBuilder::parse(prex_topo, prex_routing, warnings) :
+        AalWiNesBuilder::parse(json_file, warnings)) :
         JuniperBuilder::parse(junos_config, warnings, skip_pfe);
     parsingwatch.stop();
 
@@ -262,7 +273,7 @@ int main(int argc, const char** argv)
             network.write_prex_topology(out);
         else
         {
-            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl,
+            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
@@ -273,7 +284,29 @@ int main(int argc, const char** argv)
             network.write_prex_routing(out);
         else
         {
-            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl,
+            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl;
+            exit(-1);
+        }
+    }
+    if (!json_destination.empty()) {
+        std::ofstream out(json_destination);
+        if(out.is_open()) {
+            auto j = json::object();
+            j["network"] = network;
+            out << j << std::endl;
+        } else {
+            std::cerr << "Could not open --write-json\"" << json_destination << "\" for writing" << std::endl;
+            exit(-1);
+        }
+    }
+    if (!json_pretty_destination.empty()) {
+        std::ofstream out(json_pretty_destination);
+        if(out.is_open()) {
+            auto j = json::object();
+            j["network"] = network;
+            out << j.dump(2) << std::endl;
+        } else {
+            std::cerr << "Could not open --write-json-pretty\"" << json_pretty_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }

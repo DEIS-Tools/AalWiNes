@@ -43,7 +43,7 @@ namespace aalwines {
     class RoutingTable {
     public:
 
-        enum type_t {
+        enum type_t { // TODO: Deprecate (?)
             DISCARD, RECEIVE, ROUTE, MPLS
         };
 
@@ -67,11 +67,11 @@ namespace aalwines {
             type_t _type = MPLS;
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
-            size_t _weight = 0;
-            uint32_t _custom_weight = 0;
+            size_t _priority = 0;
+            uint32_t _weight = 0;
             forward_t() = default;
-            forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t weight)
-                : _type(type), _ops(std::move(ops)), _via(via), _weight(weight) {};
+            forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
+                : _type(type), _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
@@ -83,6 +83,9 @@ namespace aalwines {
             label_t _top_label;
             const Interface* _ingoing = nullptr; // this needs to be removed, it is only really used during merges of Routingtables for filtering
             std::vector<forward_t> _rules;
+
+            entry_t() = default;
+            explicit entry_t(label_t top_label) : _top_label{top_label} { };
 
             bool operator==(const entry_t& other) const;
             bool operator!=(const entry_t& other) const;
@@ -104,6 +107,7 @@ namespace aalwines {
         void sort();
         bool check_nondet(std::ostream& e);
         entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
+        entry_t& emplace_entry(label_t top_label) { _entries.emplace_back(top_label); return _entries.back(); }
         void pop_entry() { _entries.pop_back(); }
 
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);

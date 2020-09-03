@@ -96,7 +96,7 @@ namespace aalwines
             std::vector<forward_t> new_rules;
             for (const auto& f : e._rules) {
                 if (f._via == failed_inf) {
-                    new_rules.emplace_back(f._type, f._ops, backup_inf, f._weight + 1);
+                    new_rules.emplace_back(f._type, f._ops, backup_inf, f._priority + 1);
                     new_rules.back().add_action(action_t{PUSH, failover_label});
                 }
             }
@@ -134,7 +134,7 @@ namespace aalwines
                     if (std::find(iit->_rules.begin(), iit->_rules.end(), rule) != iit->_rules.end()) continue;
                     // Different traffic engineering group
                     if (std::find_if(iit->_rules.begin(), iit->_rules.end(),
-                                     [w = rule._weight](const forward_t& r){ return r._weight == w; })
+                                     [w = rule._priority](const forward_t& r){ return r._priority == w; })
                         == iit->_rules.end()) {
                         iit->_rules.push_back(rule);
                     } else {
@@ -229,7 +229,7 @@ namespace aalwines
         return !(*this == other);
     }
     bool RoutingTable::forward_t::operator==(const forward_t& other) const {
-        return _type == other._type && _via == other._via && _weight == other._weight
+        return _type == other._type && _via == other._via && _priority == other._priority
                && _ops.size() == other._ops.size() && std::equal(_ops.begin(), _ops.end(), other._ops.begin());
     }
     bool RoutingTable::forward_t::operator!=(const forward_t& other) const {
@@ -334,7 +334,7 @@ namespace aalwines
     void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex, const Network* network) const
     {
         s << "{";
-        s << "\"weight\":" << _weight;
+        s << "\"weight\":" << _priority;
         if (_via) {
             s << ", \"via\":";
             if (use_hex) {

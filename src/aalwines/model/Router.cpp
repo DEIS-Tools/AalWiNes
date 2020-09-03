@@ -35,10 +35,6 @@
 namespace aalwines
 {
 
-    Router::Router(size_t id, bool is_null) : _index(id), _is_null(is_null)
-    {
-    }
-
     void Router::add_name(const std::string& name)
     {
         _names.emplace_back(name);
@@ -160,6 +156,14 @@ namespace aalwines
         }
     }
 
+    std::string Interface::get_name() const {
+        if (_parent == nullptr) {
+            return "";
+        }
+        std::unique_ptr<char[]> name = _parent->interface_name(_id);
+        return std::string(name.get());
+    }
+
     void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher)
     {
         for (auto& i : _interfaces)
@@ -247,7 +251,7 @@ namespace aalwines
                 s << "\t\t[" << e._top_label << "] {\n";
                 for(auto& fwd : e._rules)
                 {
-                    s << "\t\t\t" << fwd._weight << " |-[";
+                    s << "\t\t\t" << fwd._priority << " |-[";
                     for(auto& o : fwd._ops)
                     {
                         o.print_json(s, false, false);

@@ -341,7 +341,7 @@ namespace aalwines {
                     auto tegrps = dest->first_node("te-groups");
                     if(tegrps) // could be empty? // Could be more?
                     {
-                        size_t weight = 0;
+                        size_t priority = 0;
                         auto grp = tegrps->first_node("te-group");
                         while(grp)
                         {
@@ -355,7 +355,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = nullptr;
                                     entry._rules.back()._type = RoutingTable::DISCARD;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = priority;
                                 }
                                 el = routes->first_node("reroute");
                                 if(el)
@@ -363,7 +363,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = nullptr;
                                     entry._rules.back()._type = RoutingTable::ROUTE;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = priority;
                                 }
                                 el = routes->first_node("receive");
                                 if(el)
@@ -371,7 +371,7 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = nullptr;
                                     entry._rules.back()._type = RoutingTable::RECEIVE;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = priority;
                                 }
                                 auto route = routes->first_node("route");
                                 while(route)
@@ -386,11 +386,11 @@ namespace aalwines {
                                     entry._rules.emplace_back();
                                     entry._rules.back()._via = router->find_interface(toattr->value());
                                     entry._rules.back()._type = RoutingTable::MPLS;
-                                    entry._rules.back()._weight = weight;
+                                    entry._rules.back()._priority = priority;
 
-                                    auto custom_weight = route->first_attribute("weight");
-                                    if (custom_weight != nullptr) {
-                                        entry._rules.back()._custom_weight = std::stoul(custom_weight->value());
+                                    auto weight = route->first_attribute("weight");
+                                    if (weight != nullptr) {
+                                        entry._rules.back()._weight = std::stoul(weight->value());
                                     }
 
                                     if(entry._rules.back()._via == nullptr)
@@ -467,7 +467,7 @@ namespace aalwines {
                             }
                             
                             grp = grp->next_sibling("te-group");
-                            if(any) ++weight;
+                            if(any) ++priority;
                         }
                     }
                     table.sort();

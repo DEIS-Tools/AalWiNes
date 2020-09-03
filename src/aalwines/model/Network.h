@@ -26,6 +26,7 @@
 
 #ifndef NETWORK_H
 #define NETWORK_H
+
 #include "Router.h"
 #include "RoutingTable.h"
 #include "Query.h"
@@ -43,6 +44,7 @@ public:
     Network(routermap_t&& mapping, std::vector<std::unique_ptr < Router>>&& routers, std::vector<const Interface*>&& all_interfaces);
 
     Router *get_router(size_t id);
+    const std::vector<std::unique_ptr<Router>>& routers() const { return _routers; }
 
     void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
@@ -61,6 +63,9 @@ public:
     void write_prex_routing(std::ostream& s);
 
     static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
+
+    std::string name;
+
 private:
     // NO TOUCHEE AFTER INIT!
     routermap_t _mapping;

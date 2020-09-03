@@ -92,7 +92,7 @@ namespace aalwines {
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& e) -> uint32_t {
                         std::unordered_set<const Interface*> edges;
                         for (const auto& other : e._rules) {
-                            if (other._weight < r._weight) {
+                            if (other._priority < r._priority) {
                                 edges.emplace(other._via);
                             }
                         }
@@ -110,7 +110,7 @@ namespace aalwines {
                     };
                 case AtomicProperty::custom:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
-                        return r._custom_weight;
+                        return r._weight;
                     };
 /*                case AtomicProperty::latency:
                     return [this](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {

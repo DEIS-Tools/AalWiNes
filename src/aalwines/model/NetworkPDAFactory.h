@@ -232,12 +232,12 @@ namespace aalwines {
         auto err = std::numeric_limits<int32_t>::max();
         switch (_query.approximation()) {
             case Query::OVER:
-                if ((int) forward._weight > num_fail)
+                if ((int) forward._priority > num_fail)
                     return err;
                 else
                     return 0;
             case Query::UNDER: {
-                auto nm = state._appmode + forward._weight;
+                auto nm = state._appmode + forward._priority;
                 if ((int) nm > num_fail)
                     return err;
                 else
@@ -527,13 +527,13 @@ namespace aalwines {
         }
         // find all rules with a "covered" pre but lower weight.
         // these must have been disabled!
-        if (fwd._weight == 0)
+        if (fwd._priority == 0)
             return true;
         std::unordered_set<const Interface *> tmp = disabled;
 
         // find failing rule and disable _via interface
         for(auto &rule : entry._rules){
-            if (rule._weight < fwd._weight) {
+            if (rule._priority < fwd._priority) {
                 if (active.count(rule._via) > 0) return false;
                 tmp.insert(rule._via);
                 if (tmp.size() > (uint32_t) _query.number_of_failures()) {
@@ -593,10 +593,10 @@ namespace aalwines {
                                     switch (_query.approximation()) {
                                         case Query::UNDER:
                                             assert(next._appmode >= s._appmode);
-                                            ok = ((ssize_t) r._weight) == (next._appmode - s._appmode);
+                                            ok = ((ssize_t) r._priority) == (next._appmode - s._appmode);
                                             break;
                                         case Query::OVER:
-                                            ok = ((ssize_t) r._weight) <= _query.number_of_failures();
+                                            ok = ((ssize_t) r._priority) <= _query.number_of_failures();
                                             break;
                                         case Query::DUAL:
                                             throw base_error("Tracing for DUAL not yet implemented");
