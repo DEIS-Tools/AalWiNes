@@ -240,7 +240,7 @@ int main(int argc, const char** argv)
     
     if(junos_config.empty() && prex_routing.empty() && prex_topo.empty() && json_file.empty())
     {
-        std::cerr << "Either a Junos configuration or a P-Rex configuration or a AalWiNes json configuration must be given." << std::endl;
+        std::cerr << "Either a Junos configuration or a P-Rex configuration or an AalWiNes json configuration must be given." << std::endl;
         exit(-1);                
     }
     
