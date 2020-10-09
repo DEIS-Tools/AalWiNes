@@ -178,7 +178,7 @@ namespace aalwines {
         return _parent == nullptr ? "" : _parent->interface_name(_id);
     }
 
-    std::string Router::interface_name(size_t i) {
+    std::string Router::interface_name(size_t i) const {
         return _interface_map.at(i);
     }
 
@@ -187,7 +187,7 @@ namespace aalwines {
             i->make_pairing(interfaces, matcher);
     }
 
-    void Router::print_dot(std::ostream& out) {
+    void Router::print_dot(std::ostream& out) const {
         if (_interfaces.empty())
             return;
         std::string n;
@@ -206,7 +206,7 @@ namespace aalwines {
 
     }
 
-    void Router::print_simple(std::ostream& s) {
+    void Router::print_simple(std::ostream& s) const {
         for(auto& i : _interfaces)
         {
             auto name = interface_name(i->id());
@@ -240,9 +240,10 @@ namespace aalwines {
         }
     }
 
-    void Router::print_json(std::ostream& s) {
+    void Router::print_json(json_stream& json_output) const {
         if (_coordinate) {
-            s << "\t\t\t\"lat\": " << _coordinate->latitude() << ",\n\t\t\t\"lng\": " << _coordinate->longitude() << ",\n";
+            json_output.entry("lat", _coordinate->latitude());
+            json_output.entry("lng", _coordinate->longitude());
         }
         std::unordered_map<std::string,std::unordered_set<Query::label_t>> interfaces;
         std::set<std::string> targets;
@@ -267,47 +268,23 @@ namespace aalwines {
                 }
             }
         }
-        s << "\t\t\t\"targets\": [\n";
-        bool first = true;
-        for(auto& tn : targets)
-        {
-            if (first)
-            {
-                first = false;
-            }
-            else
-            {
-                s << ",\n";
-            }
-            s << "\t\t\t\t\"" << tn << "\"";
+        auto json_targets = json::array();
+        for(auto& tn : targets) {
+            json_targets.push_back(tn);
         }
-        s << "\n\t\t\t],\n";
+        json_output.entry("targets", json_targets);
 
-        s << "\t\t\t\"interfaces\": {\n";
-        first = true;
-        for(const auto& in : interfaces)
-        {
-            if (first)
-            {
-                first = false;
-            }
-            else
-            {
-                s << ",\n";
-            }
-            s << "\t\t\t\t\"" << in.first << "\": [";
-            bool first_label = true;
+        json_output.begin_object("interfaces");
+        for(const auto& in : interfaces) {
+            auto labels = json::array();
             for (const auto& label : in.second) {
-                if (first_label) {
-                    first_label = false;
-                } else {
-                    s << ",";
-                }
-                s << "\"" << label << "\"";
+                std::stringstream s;
+                s << label;
+                labels.push_back(s.str());
             }
-            s << "]";
+            json_output.entry(in.first, labels);
         }
-        s << "\n\t\t\t}\n";
+        json_output.end_object();
     }
 
     void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {

@@ -213,41 +213,28 @@ namespace aalwines {
         link->make_pairing(nested_ingoing);
     }
 
-    void Network::print_dot(std::ostream& s)
-    {
+    void Network::print_dot(std::ostream& s) const {
         s << "digraph network {\n";
-        for (auto& r : _routers) {
+        for (const auto& r : _routers) {
             r->print_dot(s);
         }
         s << "}" << std::endl;
     }
-    void Network::print_simple(std::ostream& s)
-    {
-        for(auto& r : _routers)
-        {
+    void Network::print_simple(std::ostream& s) const {
+        for(const auto& r : _routers) {
             s << "router: \"" << r->name() << "\":\n";
             r->print_simple(s);
         }
     }
-    void Network::print_json(std::ostream& s)
-    {
-        s << "\t\"routers\": {\n";
-        bool first = true;
-        for(auto& r : _routers)
-        {
-            if (r->is_null()) {
-                continue;
-            }
-            if (first) {
-                first = false;
-            } else {
-                s << ",\n";
-            }            
-            s << "\t\t\"" << r->name() << "\": {\n";
-            r->print_json(s);
-            s << "\t\t}";
+    void Network::print_json(json_stream& json_output) const {
+        json_output.begin_object("routers");
+        for(const auto& r : _routers) {
+            if (r->is_null()) continue;
+            json_output.begin_object(r->name());
+            r->print_json(json_output);
+            json_output.end_object();
         }
-        s << "\n\t}";
+        json_output.end_object();
     }
 
 

@@ -22,6 +22,7 @@
 //
 
 #include <aalwines/utils/errors.h>
+#include <aalwines/utils/json_stream.h>
 #include <aalwines/query/QueryBuilder.h>
 
 #include <aalwines/model/builders/JuniperBuilder.h>
@@ -239,18 +240,9 @@ int main(int argc, const char** argv)
             exit(-1);
         }
     }
-
-    if (!dump_to_moped && (print_net || !query_file.empty()))
-    {
-        // TODO: Make this work together with json_output.
-        std::cout << "{\n";
-        if (print_net) {
-            network.print_json(std::cout);
-            if (!query_file.empty())
-            {
-                std::cout << ",\n";
-            }
-        }
+    json_stream json_output;
+    if (!dump_to_moped && print_net) {
+        network.print_json(json_output);
     }
     std::vector<std::string> query_strings;
     if(!query_file.empty()) {
@@ -319,25 +311,23 @@ int main(int argc, const char** argv)
                 }
             }
         } else {
-            json json_output;
             if(!no_timing) {
-                json_output["network-parsing-time"] = parsingwatch.duration();
-                json_output["query-parsing-time"] = queryparsingwatch.duration();
+                json_output.entry("network-parsing-time", parsingwatch.duration());
+                json_output.entry("query-parsing-time", queryparsingwatch.duration());
             }
             if (weight_fn) {
                 Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
-                json_output["answers"] = verifier.run(query_strings);
+                json_output.begin_object("answers");
+                verifier.run(query_strings, json_output);
+                json_output.end_object();
             } else { // a void(void) function encodes 'no weight'.
                 Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
-                json_output["answers"] = verifier.run(query_strings);
+                json_output.begin_object("answers");
+                verifier.run(query_strings, json_output);
+                json_output.end_object();
             }
-
-            std::cout << json_output.dump(4);
         }
     }
 
-    if (!dump_to_moped && (print_net || !query_file.empty())) {
-        std::cout << "\n}\n";
-    }
     return 0;
 }

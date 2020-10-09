@@ -39,6 +39,10 @@
 
 #include "RoutingTable.h"
 
+#include <aalwines/utils/json_stream.h>
+#include <json.hpp>
+using json = nlohmann::json;
+
 namespace aalwines {
     class Interface {
     public:
@@ -122,17 +126,17 @@ namespace aalwines {
         [[nodiscard]] const std::string& name() const;
         [[nodiscard]] const std::vector<std::string>& names() const { return _names; }
 
-        void print_dot(std::ostream& out);
+        void print_dot(std::ostream& out) const;
         [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
         std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
         Interface* get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected = nullptr);
-        std::string interface_name(size_t i);
+        std::string interface_name(size_t i) const;
         void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
 
-        void print_simple(std::ostream& s);
-        void print_json(std::ostream& s);
+        void print_simple(std::ostream& s) const;
+        void print_json(json_stream& json_output) const;
 
         void set_latitude_longitude(const std::string& latitude, const std::string& longitude);
         [[nodiscard]] std::string latitude() const {return _coordinate ? std::to_string(_coordinate->latitude()) : ""; };

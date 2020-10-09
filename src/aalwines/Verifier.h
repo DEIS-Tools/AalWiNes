@@ -27,6 +27,7 @@
 #ifndef AALWINES_VERIFIER_H
 #define AALWINES_VERIFIER_H
 
+#include <aalwines/utils/json_stream.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
 #include <aalwines/query/QueryBuilder.h>
@@ -55,18 +56,23 @@ namespace aalwines {
         Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 2, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
         : _builder(builder), weight_fn(weight_fn), engine(engine), reduction(reduction), no_ip_swap(no_ip_swap), print_timing(print_timing), print_trace(print_trace) {};
 
-        json run(const std::vector<std::string>& query_strings) {
-            json results = json::object();
+        void run(const std::vector<std::string>& query_strings, json_stream& json_output) {
             size_t query_no = 0;
             for (auto& q : _builder._result) {
-                auto res = run_once(q);
-                res["query"] = query_strings[query_no];
                 std::stringstream qn;
                 qn << "Q" << query_no+1;
-                results[qn.str()] = res;
+
+                auto res = run_once(q);
+                res["query"] = query_strings[query_no];
+                json_output.entry(qn.str(), res);
+
+                //json_output.begin_object(qn.str());
+                //json_output.entry("query", query_strings[query_no]);
+                //run_once(q, json_output);
+                //json_output.end_object();
+
                 ++query_no;
             }
-            return results;
         }
 
         json run_once(Query& q){

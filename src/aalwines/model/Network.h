@@ -31,6 +31,7 @@
 #include "RoutingTable.h"
 #include "Query.h"
 #include "filter.h"
+#include <aalwines/utils/json_stream.h>
 
 #include <ptrie/ptrie_map.h>
 #include <utility>
@@ -59,8 +60,8 @@ namespace aalwines {
         Network& operator=(Network&&) = default;
 
         template<typename... Args >
-        Router* add_router(std::string name, Args&&... args) {
-            return add_router(std::vector<std::string>{std::move(name)}, std::forward<Args>(args)...);
+        Router* add_router(std::string router_name, Args&&... args) {
+            return add_router(std::vector<std::string>{std::move(router_name)}, std::forward<Args>(args)...);
         }
         template<typename... Args >
         Router* add_router(std::vector<std::string> names, Args&&... args) {
@@ -96,9 +97,9 @@ namespace aalwines {
 
         static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
 
-        void print_dot(std::ostream& s);
-        void print_simple(std::ostream& s);
-        void print_json(std::ostream& s);
+        void print_dot(std::ostream& s) const;
+        void print_simple(std::ostream& s) const;
+        void print_json(json_stream& json_output) const;
 
         std::string name;
 
