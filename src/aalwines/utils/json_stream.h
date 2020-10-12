@@ -61,6 +61,19 @@ public:
         out << value.dump();
     }
 
+    void entry_object(const std::string& key, const json& value) {
+        if (!value.is_object()) {
+            entry(key,value);
+        } else {
+            begin_object(key);
+            for (const auto& [k, v] : value.items()) {
+                entry(k,v);
+            }
+            end_object();
+        }
+
+    }
+
     void close() {
         while (indent > 0) {
             end_object();

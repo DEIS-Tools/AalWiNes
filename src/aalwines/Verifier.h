@@ -64,12 +64,7 @@ namespace aalwines {
 
                 auto res = run_once(q);
                 res["query"] = query_strings[query_no];
-                json_output.entry(qn.str(), res);
-
-                //json_output.begin_object(qn.str());
-                //json_output.entry("query", query_strings[query_no]);
-                //run_once(q, json_output);
-                //json_output.end_object();
+                json_output.entry_object(qn.str(), res);
 
                 ++query_no;
             }
