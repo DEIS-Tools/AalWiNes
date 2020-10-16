@@ -41,6 +41,8 @@
 #include <aalwines/utils/outcome.h>
 #include <aalwines/Verifier.h>
 
+#include <aalwines/model/builders/NetworkParsing.h>
+
 #include <boost/program_options.hpp>
 
 #include <iostream>
@@ -63,9 +65,9 @@ int main(int argc, const char** argv)
     po::options_description opts;
     opts.add_options()
             ("help,h", "produce help message");
-    
+
+    NetworkParsing parser("Input Options");
     po::options_description output("Output Options");
-    po::options_description input("Input Options");
     po::options_description verification("Verification Options");    
     
     bool print_dot = false;
@@ -89,22 +91,6 @@ int main(int argc, const char** argv)
             ("write-json-pretty", po::value<std::string>(&json_pretty_destination), "Pretty print the network in the AalWiNes MPLS Network format to the given file.")
     ;
 
-
-    std::string json_file, junos_config, prex_topo, prex_routing;
-    bool skip_pfe = false;
-    input.add_options()
-            ("input", po::value<std::string>(&json_file),
-             "An json-file defining the network in the AalWiNes MPLS Network format")
-            ("juniper", po::value<std::string>(&junos_config),
-            "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
-            ("topology", po::value<std::string>(&prex_topo), 
-            "An xml-file defining the topology in the P-Rex format")
-            ("routing", po::value<std::string>(&prex_routing), 
-            "An xml-file defining the routing in the P-Rex format")
-            ("skip-pfe", po::bool_switch(&skip_pfe),
-            "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
-            ;
-
     std::string query_file;
     std::string weight_file;
     unsigned int link_failures = 0;
@@ -121,9 +107,9 @@ int main(int argc, const char** argv)
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup,4=simple+backup")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
             ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression")
-            ;    
-    
-    opts.add(input);
+            ;
+
+    opts.add(parser.options());
     opts.add(output);
     opts.add(verification);
 
@@ -154,47 +140,9 @@ int main(int argc, const char** argv)
         exit(-1);
     }
 
-    if(!json_file.empty() && (!prex_routing.empty() || !prex_topo.empty() || !junos_config.empty()))
-    {
-        std::cerr << "--input cannot be used with --junos or --topology or --routing." << std::endl;
-        exit(-1);
-    }
-
-    if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty()))
-    {
-        std::cerr << "--junos cannot be used with --topology or --routing." << std::endl;
-        exit(-1);
-    }
-    
-    if(prex_routing.empty() != prex_topo.empty())
-    {
-        std::cerr << "Both --topology and --routing have to be non-empty." << std::endl;
-        exit(-1);        
-    }
-    
-    if(junos_config.empty() && prex_routing.empty() && prex_topo.empty() && json_file.empty())
-    {
-        std::cerr << "Either a Junos configuration or a P-Rex configuration or an AalWiNes json configuration must be given." << std::endl;
-        exit(-1);                
-    }
-    
-    if(skip_pfe && junos_config.empty())
-    {
-        std::cerr << "--skip-pfe is only avaliable for --junos configurations." << std::endl;
-        exit(-1);
-    }
-    
     if(silent) no_parser_warnings = true;
-    
-    std::stringstream dummy;
-    std::ostream& warnings = no_parser_warnings ? dummy : std::cerr;
-    
-    stopwatch parsingwatch;
-    auto network = junos_config.empty() ? (json_file.empty() ?
-        PRexBuilder::parse(prex_topo, prex_routing, warnings) :
-        AalWiNesBuilder::parse(json_file, warnings)) :
-        JuniperBuilder::parse(junos_config, warnings, skip_pfe);
-    parsingwatch.stop();
+
+    auto network = parser.parse(no_parser_warnings);
 
     if (print_dot) {
         network.print_dot(std::cout);
@@ -312,7 +260,7 @@ int main(int argc, const char** argv)
             }
         } else {
             if(!no_timing) {
-                json_output.entry("network-parsing-time", parsingwatch.duration());
+                json_output.entry("network-parsing-time", parser.duration());
                 json_output.entry("query-parsing-time", queryparsingwatch.duration());
             }
             if (weight_fn) {
