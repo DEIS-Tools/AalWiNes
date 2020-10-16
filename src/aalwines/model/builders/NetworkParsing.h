@@ -51,6 +51,7 @@ namespace aalwines {
                  "An xml-file defining the topology in the P-Rex format")
                 ("routing", po::value<std::string>(&prex_routing),
                  "An xml-file defining the routing in the P-Rex format")
+                 ("gml", po::value<std::string>(&topo_zoo),"A gml-file defining the topology in the format from topology zoo")
                 ("skip-pfe", po::bool_switch(&skip_pfe),
                  "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
                 ;
@@ -61,7 +62,7 @@ namespace aalwines {
         Network parse(bool no_warnings = false);
 
     private:
-        std::string json_file, junos_config, prex_topo, prex_routing;
+        std::string json_file, junos_config, prex_topo, prex_routing, topo_zoo;
         bool skip_pfe = false;
         po::options_description input;
         stopwatch parsing_stopwatch{false};

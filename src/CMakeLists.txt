@@ -13,7 +13,8 @@ add_flex_bison_dependency(flexer bparser)
 find_package(Boost 1.66 COMPONENTS program_options regex filesystem REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
-add_library(aalwines ${HEADER_FILES} aalwines/model/builders/JuniperBuilder.cpp aalwines/model/builders/PRexBuilder.cpp aalwines/model/builders/AalWiNesBuilder.cpp aalwines/model/builders/NetworkParsing.cpp
+add_library(aalwines ${HEADER_FILES} aalwines/model/builders/JuniperBuilder.cpp aalwines/model/builders/PRexBuilder.cpp
+		aalwines/model/builders/AalWiNesBuilder.cpp aalwines/model/builders/NetworkParsing.cpp aalwines/model/builders/TopologyBuilder.cpp
 		aalwines/model/Router.cpp aalwines/model/RoutingTable.cpp aalwines/model/Query.cpp aalwines/model/Network.cpp
 		aalwines/model/filter.cpp ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} aalwines/query/QueryBuilder.cpp
 		aalwines/engine/Moped.cpp aalwines/utils/coordinate.cpp

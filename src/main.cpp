@@ -28,6 +28,7 @@
 #include <aalwines/model/builders/JuniperBuilder.h>
 #include <aalwines/model/builders/PRexBuilder.h>
 #include <aalwines/model/builders/AalWiNesBuilder.h>
+#include <aalwines/model/builders/TopologyBuilder.h>
 
 #include <aalwines/model/NetworkPDAFactory.h>
 #include <aalwines/model/NetworkWeight.h>
@@ -76,7 +77,7 @@ int main(int argc, const char** argv)
     bool silent = false;
     bool dump_to_moped = false;
     bool no_timing = false;
-    std::string topology_destination, routing_destination, json_destination, json_pretty_destination;
+    std::string topology_destination, routing_destination, json_destination, json_pretty_destination, json_topo_destination;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -89,6 +90,7 @@ int main(int argc, const char** argv)
             ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
             ("write-json", po::value<std::string>(&json_destination), "Write the network in the AalWiNes MPLS Network format to the given file.")
             ("write-json-pretty", po::value<std::string>(&json_pretty_destination), "Pretty print the network in the AalWiNes MPLS Network format to the given file.")
+            ("write-json-topology", po::value<std::string>(&json_topo_destination), "Write the topology of the network in the AalWiNes MPLS Network format to the given file.")
     ;
 
     std::string query_file;
@@ -185,6 +187,17 @@ int main(int argc, const char** argv)
             out << j.dump(2) << std::endl;
         } else {
             std::cerr << "Could not open --write-json-pretty\"" << json_pretty_destination << "\" for writing" << std::endl;
+            exit(-1);
+        }
+    }
+    if (!json_topo_destination.empty()) {
+        std::ofstream out(json_topo_destination);
+        if(out.is_open()) {
+            auto j = json::object();
+            j["network"] = TopologyBuilder::json_topology(network);
+            out << j << std::endl;
+        } else {
+            std::cerr << "Could not open --write-json-topology\"" << json_topo_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
