@@ -28,6 +28,7 @@
 #define AALWINES_COORDINATE_H
 
 #include <ostream>
+#include <vector>
 
 namespace aalwines {
 
@@ -40,6 +41,7 @@ namespace aalwines {
         [[nodiscard]] double latitude() const { return _latitude; }
         [[nodiscard]] double longitude() const { return _longitude; }
         void write_xml_attributes(std::ostream& s) const;
+        static Coordinate mid_point(const std::vector<Coordinate>& coordinates);
         bool operator==(const Coordinate& other) const {
             return _latitude == other._latitude && _longitude == other._longitude;
         }

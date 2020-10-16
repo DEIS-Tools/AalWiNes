@@ -142,6 +142,8 @@ namespace aalwines {
         [[nodiscard]] std::string latitude() const {return _coordinate ? std::to_string(_coordinate->latitude()) : ""; };
         [[nodiscard]] std::string longitude() const {return _coordinate ? std::to_string(_coordinate->longitude()) : ""; };
         [[nodiscard]] std::optional<Coordinate> coordinate() const { return _coordinate; }
+        void set_coordinate(Coordinate coordinate) { _coordinate.emplace(coordinate); }
+
     private:
         size_t _index = std::numeric_limits<size_t>::max();
         std::vector<std::string> _names;

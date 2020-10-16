@@ -261,5 +261,33 @@ namespace aalwines {
         network.add_null_router();
         return network;
     }
+    Network Network::make_network(const std::vector<std::pair<std::string,Coordinate>>& names, const std::vector<std::vector<std::string>>& links) {
+        Network network;
+        std::map<std::string, std::string> _interface_map;
+        for (size_t i = 0; i < names.size(); ++i) {
+            auto name = names[i].first;
+            auto coordinate = names[i].second;
+            auto router = network.add_router(name, coordinate);
+            network.insert_interface_to("eg" + std::to_string(0), router);
+            size_t interface_count = 0;
+            for (const auto& other : links[i]) {
+                network.insert_interface_to("in" + std::to_string(interface_count), router);
+                _interface_map.insert({name + other, ("in" + std::to_string(interface_count))});
+                ++interface_count;
+            }
+        }
+        for (size_t i = 0; i < names.size(); ++i) {
+            auto name = names[i].first;
+            for (const auto &other : links[i]) {
+                auto router1 = network.find_router(name);
+                assert(router1 != nullptr);
+                auto router2 = network.find_router(other);
+                if(router2 == nullptr) continue;
+                router1->find_interface(_interface_map[name + other])->make_pairing(router2->find_interface(_interface_map[other + name]));
+            }
+        }
+        network.add_null_router();
+        return network;
+    }
 
 }

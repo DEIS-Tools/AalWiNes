@@ -41,5 +41,15 @@ namespace aalwines {
     void Coordinate::write_xml_attributes(std::ostream& s) const {
         s << " latitude=\"" << _latitude << "\" longitude=\"" << _longitude << "\" ";
     }
+    Coordinate Coordinate::mid_point(const std::vector<Coordinate>& coordinates) {
+        // Not sure if this is actually a good mid-point, but it suffices for now.
+        double lat = 0;
+        double lon = 0;
+        for (const auto& c : coordinates) {
+            lat += c.latitude();
+            lon += c.longitude();
+        }
+        return Coordinate(lat/coordinates.size(), lon/coordinates.size());
+    }
 }
 
