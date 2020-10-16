@@ -36,9 +36,13 @@ namespace aalwines {
     class PRexBuilder {
     public:
         static Network parse(const std::string& topo_fn, const std::string& routing_fn, std::ostream& warnings);
+
+        static void write_prex_topology(const Network& network, std::ostream& s);
+        static void write_prex_routing(const Network& network, std::ostream& s);
+
     private:
-        static void build_routers(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, Network::routermap_t& mapping, std::ostream& warnings);
-        static void build_tables(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, Network::routermap_t& mapping, std::ostream& warnings);
+        static void build_routers(rapidxml::xml_document<>& topo_xml, Network& network, std::ostream& warnings);
+        static void build_tables(rapidxml::xml_document<>& topo_xml, Network& network, std::ostream& warnings);
         static void open_xml(const std::string& topo_fn, rapidxml::xml_document<>& doc, std::vector<char>& buffer);
     };
 }

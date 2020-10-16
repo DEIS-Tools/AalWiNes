@@ -32,54 +32,76 @@
 #include <streambuf>
 #include <sstream>
 #include <set>
-namespace aalwines
-{
+#include <cassert>
 
-    void Router::add_name(const std::string& name)
-    {
+namespace aalwines {
+
+    Router& Router::operator=(const Router& router) {
+        _index = router._index;
+        _names = router._names;
+        _coordinate = router._coordinate;
+        _is_null = router._is_null;
+        _interfaces.clear();
+        _interfaces.reserve(router._interfaces.size());
+        // _interface_map = router._interface_map; // Copy of ptrie not working.
+        _interface_map = string_map<Interface*>(); // Start from empty map instead
+
+        for (auto& interface : router._interfaces) {
+            assert(_interfaces.size() == interface->id());
+            auto new_interface = _interfaces.emplace_back(std::make_unique<Interface>(*interface)).get();
+            _interface_map[interface->get_name()] = new_interface;
+            new_interface->_parent = this;
+        }
+        for (auto& interface : _interfaces) {
+            interface->table().update_interfaces([this](const Interface* old) -> Interface* {
+                return old == nullptr ? nullptr : this->_interfaces[old->id()].get();
+            });
+        }
+        return *this;
+    }
+
+    void Router::add_name(const std::string& name) {
         _names.emplace_back(name);
     }
 
-    void Router::change_name(const std::string& name)
-    {
+    void Router::change_name(const std::string& name) {
         assert(_names.size() == 1);
         _names.clear();
         _names.emplace_back(name);
     }
 
-    const std::string& Router::name() const
-    {
-        assert(_names.size() > 0);
+    const std::string& Router::name() const {
+        assert(!_names.empty());
         return _names.back();
     }
 
-    Interface* Router::find_interface(std::string iface)
-    {
-        for (size_t i = 0; i < iface.size(); ++i) {
-            if (iface[i] == ' ') {
-                iface = iface.substr(0, i);
-                break;
-            }
+    std::pair<bool,Interface*> Router::insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
+        auto res = _interface_map.insert(interface_name);
+        if (!res.first) {
+            return std::make_pair(false, _interface_map.get_data(res.second));
         }
-        size_t l = strlen(iface.c_str());
-        auto res = _interface_map.exists(iface.c_str(), l);
-        if(!res.first)
-            return nullptr;
-        else
-            return _interface_map.get_data(res.second);
+        auto iid = _interfaces.size();
+        auto gid = all_interfaces.size();
+        _interfaces.emplace_back(std::make_unique<Interface>(iid, gid, this));
+        auto interface = _interfaces.back().get();
+        all_interfaces.emplace_back(interface);
+        _interface_map.get_data(res.second) = interface;
+        return std::make_pair(true, interface);
     }
-    
-    Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, std::string iface, Router* expected)
-    {
-        for (size_t i = 0; i < iface.size(); ++i) {
-            if (iface[i] == ' ') {
-                iface = iface.substr(0, i);
-                break;
-            }
-        }
-        size_t l = strlen(iface.c_str());
-        _inamelength = std::max(_inamelength, l);
-        auto res = _interface_map.insert(iface.c_str(), iface.length());
+
+    Interface* Router::get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
+        return insert_interface(interface_name, all_interfaces).second;
+    }
+
+    Interface* Router::find_interface(const std::string& interface_name) {
+        auto res = _interface_map.exists(interface_name);
+        return res.first ? _interface_map.get_data(res.second) : nullptr;
+    }
+
+    // Legacy version of get_interface. Only used for Juniper parsing.
+    // TODO: Figure out how to use new get_interface instead without breaking things.
+    Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected) {
+        auto res = _interface_map.insert(interface_name);
         if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {
             auto tgt = _interface_map.get_data(res.second)->target();
             auto tname = tgt != nullptr ? tgt->name() : "SINK";
@@ -93,25 +115,21 @@ namespace aalwines
         auto iid = _interfaces.size();
         auto gid = all_interfaces.size();
         _interfaces.emplace_back(std::make_unique<Interface>(iid, gid, expected, this));
-        all_interfaces.emplace_back(_interfaces.back().get());
-        _interface_map.get_data(res.second) = _interfaces.back().get();
-        return _interfaces.back().get();
+        auto interface = _interfaces.back().get();
+        all_interfaces.emplace_back(interface);
+        _interface_map.get_data(res.second) = interface;
+        return interface;
     }
 
-    Interface::Interface(size_t id, size_t global_id, Router* target, Router* parent) : _id(id), _global_id(global_id), _target(target), _parent(parent)
-    {
-    }
 
-    void Interface::make_pairing(Interface* interface)
-    {
+    void Interface::make_pairing(Interface* interface) {
         _matching = interface;
         interface->_matching = this;
         interface->_target = _parent;
         _target = interface->_parent;
     }
 
-    void Interface::make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher)
-    {
+    void Interface::make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher) {
         if (_matching != nullptr)
             return;
         if (_target == nullptr)
@@ -132,9 +150,9 @@ namespace aalwines
                     auto n = _parent->interface_name(_id);
                     auto n2 = _target->interface_name(_matching->_id);
                     auto n3 = _target->interface_name(i->_id);
-                    e << n.get() << " could be matched with both :\n";
-                    e << n2.get() << " and\n";
-                    e << n3.get() << std::endl;
+                    e << n << " could be matched with both :\n";
+                    e << n2 << " and\n";
+                    e << n3 << std::endl;
                     throw base_error(e.str());
                 }
                 _matching = i.get();
@@ -149,7 +167,7 @@ namespace aalwines
 
             std::stringstream e;
             auto n = _parent->interface_name(_id);
-            e << _parent->name() << "." << n.get();
+            e << _parent->name() << "." << n;
             auto iface = _target->get_interface(all_interfaces, e.str(), _parent);
             _matching = iface;
             iface->_matching = this;
@@ -157,71 +175,29 @@ namespace aalwines
     }
 
     std::string Interface::get_name() const {
-        if (_parent == nullptr) {
-            return "";
-        }
-        std::unique_ptr<char[]> name = _parent->interface_name(_id);
-        return std::string(name.get());
+        return _parent == nullptr ? "" : _parent->interface_name(_id);
     }
 
-    void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher)
-    {
+    std::string Router::interface_name(size_t i) const {
+        return _interface_map.at(i);
+    }
+
+    void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher) {
         for (auto& i : _interfaces)
             i->make_pairing(interfaces, matcher);
     }
 
-    void Router::add_null_router(std::vector<std::unique_ptr<Router>>& routers, std::vector<const Interface*>& all_interfaces, Network::routermap_t& mapping)
-    {
-        std::stringstream es;
-        Router* nullrouter = nullptr;
-        {
-            size_t id = routers.size();
-            routers.emplace_back(std::make_unique<Router>(id, true));
-            Router& router = *routers.back().get();
-            router.add_name("NULL");
-            auto res = mapping.insert("NULL", 4);
-            if(!res.first)
-            {
-                es << "error: Duplicate definition of \"NULL\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
-                throw base_error(es.str());
-            }
-            mapping.get_data(res.second) = &router;
-            nullrouter = routers.back().get();           
-        }
-        for(auto& r : routers)
-        {
-            for(auto& inf : r->interfaces())
-            {
-                if(inf->match() == nullptr)
-                {
-                    std::stringstream ss;
-                    ss << "i" << inf->global_id();
-                    auto interface = nullrouter->get_interface(all_interfaces, ss.str(), r.get()); // will add the interface
-                    if(interface == nullptr)
-                    {
-                        es << "Could not find interface " << ss.str() << " for matching of links in router " << nullrouter->name();
-                        throw base_error(es.str());                    
-                    }
-                    interface->make_pairing(inf.get());
-                }
-            }
-        }
-    }
-
-
-    void Router::print_dot(std::ostream& out)
-    {
+    void Router::print_dot(std::ostream& out) const {
         if (_interfaces.empty())
             return;
-        auto n = std::make_unique<char[]>(_inamelength + 1);
+        std::string n;
         for (auto& i : _interfaces) {
-            auto res = _interface_map.unpack(i->id(), n.get());
-            n[res] = 0;
+            n = interface_name(i->id());
             auto tgtstring = i->target() != nullptr ? i->target()->name() : "SINK";
             out << "\"" << name() << "\" -> \"" << tgtstring
-                    << "\" [ label=\"" << n.get() << "\" ];\n";
+                    << "\" [ label=\"" << n << "\" ];\n";
         }
-        if (_interfaces.size() == 0)
+        if (_interfaces.empty())
             out << "\"" << name() << "\" [shape=triangle];\n";
         else
             out << "\"" << name() << "\" [shape=circle];\n";
@@ -230,21 +206,11 @@ namespace aalwines
 
     }
 
-    std::unique_ptr<char[] > Router::interface_name(size_t i)
-    {
-        auto n = std::make_unique<char[]>(_inamelength + 1);
-        assert(i < _interface_map.size());
-        auto res = _interface_map.unpack(i, n.get());
-        n[res] = 0;
-        return n;
-    }
-
-    void Router::print_simple(std::ostream& s)
-    {
+    void Router::print_simple(std::ostream& s) const {
         for(auto& i : _interfaces)
         {
             auto name = interface_name(i->id());
-            s << "\tinterface: \"" << name.get() << "\"\n";
+            s << "\tinterface: \"" << name << "\"\n";
             const RoutingTable& table = i->table();
             for(auto& e : table.entries())
             {
@@ -262,7 +228,7 @@ namespace aalwines
                     {
                         s << via->source()->name() << ".";
                         auto tn = fwd._via->source()->interface_name(fwd._via->id());
-                        s << tn.get() << "\n";
+                        s << tn << "\n";
                     }
                     else
                     {
@@ -273,19 +239,19 @@ namespace aalwines
             }
         }
     }
-    void Router::print_json(std::ostream& s)
-    {
+
+    void Router::print_json(json_stream& json_output) const {
         if (_coordinate) {
-            s << "\t\t\t\"lat\": " << _coordinate->latitude() << ",\n\t\t\t\"lng\": " << _coordinate->longitude() << ",\n";
+            json_output.entry("lat", _coordinate->latitude());
+            json_output.entry("lng", _coordinate->longitude());
         }
         std::unordered_map<std::string,std::unordered_set<Query::label_t>> interfaces;
         std::set<std::string> targets;
-        auto if_name = std::make_unique<char[]>(_inamelength + 1);
+        std::string if_name;
         for(auto& i : _interfaces)
         {
-            auto res = _interface_map.unpack(i->id(), if_name.get());
-            if_name[res] = 0;
-            auto& label_set = interfaces.try_emplace(if_name.get()).first->second;
+            if_name = interface_name(i->id());
+            auto& label_set = interfaces.try_emplace(if_name).first->second;
 
             const RoutingTable& table = i->table();
             for(auto& e : table.entries())
@@ -302,48 +268,25 @@ namespace aalwines
                 }
             }
         }
-        s << "\t\t\t\"targets\": [\n";
-        bool first = true;
-        for(auto& tn : targets)
-        {
-            if (first)
-            {
-                first = false;
-            }
-            else
-            {
-                s << ",\n";
-            }
-            s << "\t\t\t\t\"" << tn << "\"";
+        auto json_targets = json::array();
+        for(auto& tn : targets) {
+            json_targets.push_back(tn);
         }
-        s << "\n\t\t\t],\n";
+        json_output.entry("targets", json_targets);
 
-        s << "\t\t\t\"interfaces\": {\n";
-        first = true;
-        for(const auto& in : interfaces)
-        {
-            if (first)
-            {
-                first = false;
-            }
-            else
-            {
-                s << ",\n";
-            }
-            s << "\t\t\t\t\"" << in.first << "\": [";
-            bool first_label = true;
+        json_output.begin_object("interfaces");
+        for(const auto& in : interfaces) {
+            auto labels = json::array();
             for (const auto& label : in.second) {
-                if (first_label) {
-                    first_label = false;
-                } else {
-                    s << ",";
-                }
-                s << "\"" << label << "\"";
+                std::stringstream s;
+                s << label;
+                labels.push_back(s.str());
             }
-            s << "]";
+            json_output.entry(in.first, labels);
         }
-        s << "\n\t\t\t}\n";
+        json_output.end_object();
     }
+
     void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
         _coordinate.emplace(std::stod(latitude), std::stod(longitude));
     }

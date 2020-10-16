@@ -125,7 +125,6 @@ namespace aalwines {
     inline void to_json(json & j, const RoutingTable::action_t& action) {
         j = json::object();
         switch (action._op) {
-            default: // TODO: Make RoutingTable::op_t enum class and remove this default:
             case RoutingTable::op_t::POP:
                 j["pop"] = "";
                 break;

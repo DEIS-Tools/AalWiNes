@@ -22,6 +22,7 @@
 //
 
 #include <aalwines/utils/errors.h>
+#include <aalwines/utils/json_stream.h>
 #include <aalwines/query/QueryBuilder.h>
 
 #include <aalwines/model/builders/JuniperBuilder.h>
@@ -38,6 +39,7 @@
 #include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
+#include <aalwines/Verifier.h>
 
 #include <boost/program_options.hpp>
 
@@ -49,72 +51,6 @@
 namespace po = boost::program_options;
 using namespace aalwines;
 using namespace pdaaal;
-
-template<typename W_FN>
-bool do_verification(stopwatch& compilation_time, stopwatch& reduction_time, stopwatch& verification_time,
-        Query& q, Query::mode_t m, Network& network, bool no_ip_swap, std::pair<size_t,size_t>& reduction, size_t tos,
-        size_t engine, Moped& moped, SolverAdapter& solver, utils::outcome_t& result,
-        std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t >& trace, std::stringstream& proof,
-        std::vector<unsigned int>& trace_weight, const W_FN& weight_fn) {
-    compilation_time.start();
-    q.set_approximation(m);
-    NetworkPDAFactory factory(q, network, no_ip_swap, weight_fn);
-    auto pda = factory.compile();
-    compilation_time.stop();
-    reduction_time.start();
-    reduction = Reducer::reduce(pda, tos, pda.initial(), pda.terminal());
-    reduction_time.stop();
-
-    verification_time.start();
-    bool engine_outcome;
-    switch(engine) {
-        case 1:
-            engine_outcome = moped.verify(pda, true);
-            verification_time.stop();
-            if(engine_outcome) {
-                trace = moped.get_trace(pda);
-                if (factory.write_json_trace(proof, trace))
-                    result = utils::YES;
-            }
-            break;
-        case 2: {
-            using W = typename W_FN::result_type;
-            SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
-            if constexpr (pdaaal::is_weighted<typename W_FN::result_type>) {
-                solver_result = solver.post_star<pdaaal::Trace_Type::Shortest>(pda);
-            } else {
-                solver_result = solver.post_star<pdaaal::Trace_Type::Any>(pda);
-            }
-            engine_outcome = solver_result.first;
-            verification_time.stop();
-            if (engine_outcome) {
-                if constexpr (pdaaal::is_weighted<typename W_FN::result_type>) {
-                    std::tie(trace, trace_weight) = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
-                } else {
-                    trace = solver.get_trace<pdaaal::Trace_Type::Any>(pda, std::move(solver_result.second));
-                }
-                if (factory.write_json_trace(proof, trace))
-                    result = utils::YES;
-            }
-            break;
-        }
-        case 3: {
-            auto solver_result = solver.pre_star(pda, true);
-            engine_outcome = solver_result.first;
-            verification_time.stop();
-            if (engine_outcome) {
-                trace = solver.get_trace(pda, std::move(solver_result.second));
-                if (factory.write_json_trace(proof, trace))
-                    result = utils::YES;
-            }
-            break;
-        }
-        default:
-            throw base_error("Unsupported --engine value given");
-    }
-    return engine_outcome;
-}
-
 
 /*
  TODO:
@@ -139,8 +75,6 @@ int main(int argc, const char** argv)
     bool dump_to_moped = false;
     bool no_timing = false;
     std::string topology_destination, routing_destination, json_destination, json_pretty_destination;
-    static const char *engineTypes[] = {"", "Moped", "Post*", "Pre*"};
-    static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -266,24 +200,20 @@ int main(int argc, const char** argv)
         network.print_dot(std::cout);
     }
     
-    if(!topology_destination.empty())
-    {
+    if(!topology_destination.empty()) {
         std::ofstream out(topology_destination);
-        if(out.is_open())
-            network.write_prex_topology(out);
-        else
-        {
+        if(out.is_open()) {
+            PRexBuilder::write_prex_topology(network, out);
+        } else {
             std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
     }
-    if(!routing_destination.empty())
-    {
+    if(!routing_destination.empty()) {
         std::ofstream out(routing_destination);
-        if(out.is_open())
-            network.write_prex_routing(out);
-        else
-        {
+        if(out.is_open()) {
+            PRexBuilder::write_prex_routing(network, out);
+        } else {
             std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl;
             exit(-1);
         }
@@ -310,21 +240,12 @@ int main(int argc, const char** argv)
             exit(-1);
         }
     }
-    
-    if (!dump_to_moped && (print_net || !query_file.empty()))
-    {
-        std::cout << "{\n";
-        if (print_net) {
-            network.print_json(std::cout);
-            if (!query_file.empty())
-            {
-                std::cout << ",\n";
-            }
-        }
+    json_stream json_output;
+    if (!dump_to_moped && print_net) {
+        network.print_json(json_output);
     }
-    std::vector<std::string> queries;
-    if(!query_file.empty())
-    {
+    std::vector<std::string> query_strings;
+    if(!query_file.empty()) {
         stopwatch queryparsingwatch;
         Builder builder(network);
         {
@@ -337,7 +258,7 @@ int main(int argc, const char** argv)
                 std::string str;
                 while(getline(qstream, str)){
                     str.erase(std::remove(str.begin(), str.end(), '\r'), str.end());
-                    queries.emplace_back(str);
+                    query_strings.emplace_back(str);
                 }
                 qstream.close();
                 std::ifstream qstream(query_file);
@@ -381,126 +302,32 @@ int main(int argc, const char** argv)
             weight_fn = std::nullopt;
         }
 
-        if(!dump_to_moped)
-        {
-            if(!no_timing)
-            {
-                std::cout << "\t\"network-parsing-time\":" << (parsingwatch.duration()) 
-                          << ", \"query-parsing-time\":" << (queryparsingwatch.duration()) << ",\n";
-            }
-            std::cout << "\t\"answers\":{\n";
-        }
-
-        Moped moped;
-        SolverAdapter solver;
-        size_t query_no = 0;
-        for(auto& q : builder._result)
-        {
-            ++query_no;
-            stopwatch compilation_time(false);
-            if(dump_to_moped)
-            {
-                compilation_time.start();
-                NetworkPDAFactory factory(q, network, no_ip_swap);
-                auto pda = factory.compile();
-                Moped::dump_pda(pda, std::cout);
-            }
-            else
-            {
-            std::vector<Query::mode_t> modes{q.approximation()};
-            Query::mode_t mode = q.approximation();
-            bool was_dual = q.approximation() == Query::DUAL;
-            if(was_dual)
-                modes = std::vector<Query::mode_t>{Query::OVER, Query::UNDER};
-            std::pair<size_t,size_t> reduction;
-            utils::outcome_t result = utils::MAYBE;
-            stopwatch reduction_time(false);
-            stopwatch verification_time(false);
-            std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
-            std::vector<unsigned int> trace_weight;
-            std::stringstream proof;
-            for(auto m : modes) {
-                proof = std::stringstream(); // Clear stream from previous mode.
-                bool engine_outcome;
-                if (weight_fn) {
-                    engine_outcome = do_verification(compilation_time, reduction_time,
-                            verification_time,q, m, network, no_ip_swap, reduction, tos, engine,
-                            moped, solver,result, trace, proof, trace_weight, weight_fn.value());
-                } else {
-                    engine_outcome = do_verification<std::function<void(void)>>(compilation_time, reduction_time,
-                            verification_time,q, m,network, no_ip_swap, reduction, tos, engine,
-                            moped, solver,result, trace, proof, trace_weight, [](){});
+        if(dump_to_moped) {
+            for(auto& q : builder._result) {
+                if (dump_to_moped) {
+                    NetworkPDAFactory factory(q, network, builder.all_labels(), no_ip_swap);
+                    auto pda = factory.compile();
+                    Moped::dump_pda(pda, std::cout);
                 }
-                if(q.number_of_failures() == 0)
-                    result = engine_outcome ? utils::YES : utils::NO;
-
-                if(result == utils::MAYBE && m == Query::OVER && !engine_outcome)
-                    result = utils::NO;
-                if(result != utils::MAYBE) {
-                    mode = m;
-                    break;
-                }
-                /*else
-                    trace.clear();*/
             }
-
-            // move this into function that generalizes
-            // and extracts trace at the same time.
-
-            std::cout << "\t\"Q" << query_no << "\" : {\n\t\t\"query\": \"";
-            std::cout << queries[query_no - 1];
-            std::cout << "\",\n\t\t\"result\":";
-            switch(result)
-            {
-            case utils::MAYBE:
-                std::cout << "null";
-                break;
-            case utils::NO:
-                std::cout << "false";
-                break;
-            case utils::YES:
-                std::cout << "true";
-                break;
+        } else {
+            if(!no_timing) {
+                json_output.entry("network-parsing-time", parsingwatch.duration());
+                json_output.entry("query-parsing-time", queryparsingwatch.duration());
             }
-            std::cout << ",\n";
-            std::cout << "\t\t\"engine\": \"" << engineTypes[engine] << "\", " << std::endl;
-            std::cout << "\t\t\"mode\": \"" << modeTypes[mode] << "\", " << std::endl;
-            std::cout << "\t\t\"reduction\":[" << reduction.first << ", " << reduction.second << "]";
-            if(get_trace && result == utils::YES)
-            {
-                if(weight_fn) {
-                    std::cout << ",\n\t\t\"trace-weight\": [";
-                    for(size_t i = 0; i < trace_weight.size(); i++){
-                        if(i != 0) std::cout << ", ";
-                        std::cout << trace_weight[i];
-                    }
-                    std::cout << "]";
-                }
-                std::cout << ",\n\t\t\"trace\":[\n";
-                std::cout << proof.str();
-                std::cout << "\n\t\t]";
+            if (weight_fn) {
+                Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
+                json_output.begin_object("answers");
+                verifier.run(query_strings, json_output);
+                json_output.end_object();
+            } else { // a void(void) function encodes 'no weight'.
+                Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
+                json_output.begin_object("answers");
+                verifier.run(query_strings, json_output);
+                json_output.end_object();
             }
-            if(!no_timing)
-            {
-                std::cout << ",\n\t\t\"compilation-time\":" << (compilation_time.duration())
-                          << ",\n\t\t\"reduction-time\":" << (reduction_time.duration())
-                         << ",\n\t\t\"verification-time\":" << (verification_time.duration());
-            }
-            std::cout << "\n\t}";
-            if(query_no != builder._result.size())
-                std::cout << ",";
-            std::cout << "\n";
-            }
-        }
-
-        if(!dump_to_moped)
-        {
-            std::cout << "\n}";
         }
     }
-    if (!dump_to_moped && (print_net || !query_file.empty()))
-    {
-        std::cout << "\n}\n";
-    }
+
     return 0;
 }

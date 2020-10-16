@@ -53,29 +53,27 @@ namespace aalwines {
 
     Network PRexBuilder::parse(const std::string& topo_fn, const std::string& routing_fn, std::ostream& warnings)
     {
-        std::vector<std::unique_ptr<Router> > routers;
-        std::vector<const Interface*> interfaces;
-        Network::routermap_t mapping;        
+        Network network;
 
         {
             rapidxml::xml_document<> topo_xml;
             std::vector<char> buffer;
             open_xml(topo_fn, topo_xml, buffer);
-            build_routers(topo_xml, routers, interfaces, mapping, warnings);
+            build_routers(topo_xml, network, warnings);
         }
         
         {
             rapidxml::xml_document<> routing_xml;
             std::vector<char> buffer;
             open_xml(routing_fn, routing_xml, buffer);
-            build_tables(routing_xml, routers, interfaces, mapping, warnings);
+            build_tables(routing_xml, network, warnings);
         }
         
-        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
+        return network;
     }
 
     
-    void PRexBuilder::build_routers(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& all_interfaces, Network::routermap_t& mapping, std::ostream& warnings)
+    void PRexBuilder::build_routers(rapidxml::xml_document<>& topo_xml, Network& network, std::ostream& warnings)
     {
         std::stringstream es;
         auto nw = topo_xml.first_node("network");
@@ -101,24 +99,14 @@ namespace aalwines {
                 throw base_error(es.str());
             }
             std::string name = nattr->value();
-            size_t id = routers.size();
-            routers.emplace_back(std::make_unique<Router>(id));
-            Router& router = *routers.back().get();
-            router.add_name(name);
-            auto res = mapping.insert(name.c_str(), name.length());
-            if(!res.first)
-            {
-                es << "error: Duplicate definition of \"" << name << "\", previously found in entry " << mapping.get_data(res.second)->index() << std::endl;
-                throw base_error(es.str());
-            }
-            mapping.get_data(res.second) = &router;
+            auto router = network.add_router(name);
             auto latattr = rxml->first_attribute("latitude");
             auto lonattr = rxml->first_attribute("longitude");
             if(latattr != nullptr && lonattr != nullptr)
             {
                 std::string latitude = latattr->value();
                 std::string longitude = lonattr->value();
-                router.set_latitude_longitude(latitude, longitude);
+                router->set_latitude_longitude(latitude, longitude);
             }
             auto interfaces = rxml->first_node("interfaces");
             if(interfaces)
@@ -133,7 +121,7 @@ namespace aalwines {
                         throw base_error(es.str());
                     }
                     std::string iname = nattr->value();
-                    router.get_interface(all_interfaces, iname); // will add the interface
+                    network.insert_interface_to(iname, router);
                     inf = inf->next_sibling("interface");
                 }
             }
@@ -187,13 +175,12 @@ namespace aalwines {
                 }
                 std::string rn = rattr->value();
                 std::string in = iattr->value();
-                auto res = mapping.exists(rn.c_str(), rn.length());
-                if(!res.first)
+                auto router = network.find_router(rn);
+                if(router == nullptr)
                 {
                     es << "Could not find router " << rn << " for matching of links.";
                     throw base_error(es.str());
                 }
-                auto& router = mapping.get_data(res.second);
                 auto interface = router->find_interface(in);
                 if(interface == nullptr)
                 {
@@ -207,10 +194,10 @@ namespace aalwines {
             assert(inter2->match() == inter1);
             link = link->next_sibling("link");
         }
-        Router::add_null_router(routers, all_interfaces, mapping);
+        network.add_null_router();
     }
 
-    void PRexBuilder::build_tables(rapidxml::xml_document<>& topo_xml, std::vector<std::unique_ptr<Router> >& routers, std::vector<const Interface*>& interfaces, Network::routermap_t& mapping, std::ostream& warnings)
+    void PRexBuilder::build_tables(rapidxml::xml_document<>& topo_xml, Network& network, std::ostream& warnings)
     {
         std::stringstream es;
         auto nw = topo_xml.first_node("routes");
@@ -236,13 +223,12 @@ namespace aalwines {
                 throw base_error(es.str());
             }
             std::string rn = for_attr->value();
-            auto res = mapping.exists(rn.c_str(), rn.length());
-            if(!res.first)
+            auto router = network.find_router(rn);
+            if(router == nullptr)
             {
                 es << "Could not find router " << rn << " for building routing-tables.";
                 throw base_error(es.str());
             }
-            auto router = mapping.get_data(res.second);
 
             auto dests = router_table->first_node("destinations");
             if(dests != nullptr)
@@ -423,7 +409,7 @@ namespace aalwines {
                                                     throw base_error(es.str());
                                                 }
                                                 ok = true;
-                                                op._op = RoutingTable::POP;
+                                                op._op = RoutingTable::op_t::POP;
                                             }
                                             else
                                             {
@@ -437,12 +423,12 @@ namespace aalwines {
                                                                        std::atoi(aattr->value() + (sticky ? 1 : 0)), 0);
                                                 if(type == "push")
                                                 {
-                                                    op._op = RoutingTable::PUSH;
+                                                    op._op = RoutingTable::op_t::PUSH;
                                                     ok = true;
                                                 }
                                                 else if(type == "swap")
                                                 {
-                                                    op._op = RoutingTable::SWAP;
+                                                    op._op = RoutingTable::op_t::SWAP;
                                                     ok = true;
                                                 }
                                                 else
@@ -493,5 +479,172 @@ namespace aalwines {
             router_table = router_table->next_sibling("routing");
         }
     }
+
+    void PRexBuilder::write_prex_topology(const Network &network, std::ostream &s) {
+        s << "<network>\n  <routers>\n";
+        for(const auto& r : network.routers()) {
+            if(r->is_null()) continue;
+            if(r->interfaces().empty()) continue;
+            s << "    <router name=\"" << r->name() << "\">\n";
+            s << "      <interfaces>\n";
+            for(const auto& inf : r->interfaces()) {
+                auto fname = r->interface_name(inf->id());
+                s << "        <interface name=\"" << fname << "\"/>\n";
+            }
+            s << "      </interfaces>\n";
+            s << "    </router>\n";
+        }
+        s << "  </routers>\n  <links>\n";
+        for(const auto& r : network.routers()) {
+            if(r->is_null()) continue;
+            for(const auto& inf : r->interfaces()) {
+                if(inf->source()->index() > inf->target()->index())
+                    continue;
+
+                if(inf->source()->is_null()) continue;
+                if(inf->target()->is_null()) continue;
+
+                auto fname = r->interface_name(inf->id());
+                auto oname = inf->target()->interface_name(inf->match()->id());
+                s << "    <link>\n      <sides>\n" <<
+                  "        <shared_interface interface=\"" << fname <<
+                  "\" router=\"" << inf->source()->name() << "\"/>\n" <<
+                  "        <shared_interface interface=\"" << oname <<
+                  "\" router=\"" << inf->target()->name() << "\"/>\n" <<
+                  "      </sides>\n    </link>\n";
+            }
+        }
+        s << "  </links>\n</network>\n";
+    }
+
+    void PRexBuilder::write_prex_routing(const Network &network, std::ostream &s)
+    {
+        s << "<routes>\n";
+        s << "  <routings>\n";
+        for(const auto& r : network.routers()) {
+            if(r->is_null()) continue;
+
+            // empty-check
+            bool all_empty = true;
+            for(const auto& inf : r->interfaces())
+                all_empty &= inf->table().empty();
+            if(all_empty)
+                continue;
+
+
+            s << "    <routing for=\"" << r->name() << "\">\n";
+            s << "      <destinations>\n";
+
+            // make uniformly sorted output, easier for debugging
+            std::vector<std::pair<std::string,Interface*>> sinfs;
+            for(auto& inf : r->interfaces())
+            {
+                auto fname = r->interface_name(inf->id());
+                sinfs.emplace_back(fname, inf.get());
+            }
+            std::sort(sinfs.begin(), sinfs.end(), [](auto& a, auto& b){
+                return strcmp(a.first.c_str(), b.first.c_str()) < 0;
+            });
+            for(auto& sinf : sinfs)
+            {
+                auto inf = sinf.second;
+                assert(std::is_sorted(inf->table().entries().begin(), inf->table().entries().end()));
+
+                for(auto& e : inf->table().entries())
+                {
+                    assert(e._ingoing == nullptr || e._ingoing == inf);
+                    s << "        <destination from=\"" << sinf.first << "\" ";
+                    if((e._top_label.type() & Query::MPLS) != 0)
+                    {
+                        s << "label=\"";
+                    }
+                    else if((e._top_label.type() & (Query::IP4 | Query::IP6 | Query::ANYIP)) != 0)
+                    {
+                        s << "ip=\"";
+                    }
+                    else
+                    {
+                        assert(false);
+                    }
+                    s << e._top_label << "\">\n";
+                    s << "          <te-groups>\n";
+                    s << "            <te-group>\n";
+                    s << "              <routes>\n";
+                    auto cpy = e._rules;
+                    std::sort(cpy.begin(), cpy.end(), [](auto& a, auto& b) {
+                        return a._priority < b._priority;
+                    });
+                    auto ow = cpy.empty() ? 0 : cpy.front()._priority;
+                    for(auto& rule : cpy)
+                    {
+                        if(rule._priority > ow)
+                        {
+                            s << "              </routes>\n";
+                            s << "            </te-group>\n";
+                            s << "            <te-group>\n";
+                            s << "              <routes>\n";
+                            ow = rule._priority;
+                        }
+                        assert(ow == rule._priority);
+                        bool handled = false;
+                        switch(rule._type)
+                        {
+                            case RoutingTable::DISCARD:
+                                s << "                <discard/>\n";
+                                handled = true;
+                                break;
+                            case RoutingTable::RECEIVE:
+                                s << "                <receive/>\n";
+                                handled = true;
+                                break;
+                            case RoutingTable::ROUTE:
+                                s << "                <reroute/>\n";
+                                handled = true;
+                                break;
+                            default:
+                                break;
+                        }
+                        if(!handled)
+                        {
+                            assert(rule._via->source() == r.get());
+                            auto tname = r->interface_name(rule._via->id());
+                            s << "                <route to=\"" << tname << "\">\n";
+                            s << "                  <actions>\n";
+                            for(auto& o : rule._ops)
+                            {
+                                switch(o._op)
+                                {
+                                    case RoutingTable::op_t::PUSH:
+                                        s << "                    <action arg=\"" << o._op_label << "\" type=\"push\"/>\n";
+                                        break;
+                                    case RoutingTable::op_t::POP:
+                                        s << "                    <action type=\"pop\"/>\n";
+                                        break;
+                                    case RoutingTable::op_t::SWAP:
+                                        s << "                    <action arg=\"" << o._op_label << "\" type=\"swap\"/>\n";
+                                        break;
+                                }
+                            }
+                            s << "                  </actions>\n";
+                            s << "                </route>\n";
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    s << "              </routes>\n";
+                    s << "            </te-group>\n";
+                    s << "          </te-groups>\n";
+                    s << "        </destination>\n";
+                }
+            }
+            s << "      </destinations>\n";
+            s << "    </routing>\n";
+        }
+        s << "  </routings>\n";
+        s << "</routes>\n";
+    }
+
 }
 

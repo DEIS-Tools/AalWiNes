@@ -54,11 +54,11 @@ namespace aalwines {
             const Interface *_inf = nullptr;
         } __attribute__((packed)); // packed is needed to make this work fast with ptries
     public:
-        NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap)
-        : NetworkPDAFactory(query, network, only_mpls_swap, [](){}) {};
+        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap)
+        : NetworkPDAFactory(query, network, std::move(all_labels), only_mpls_swap, [](){}) {};
 
-        NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap, const W_FN& weight_f)
-        :PDAFactory(query.construction(), query.destruction(), network.all_labels(), Query::label_t::unused_mpls), _network(network),
+        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap, const W_FN& weight_f)
+        :PDAFactory(query.construction(), query.destruction(), std::move(all_labels), Query::label_t::unused_mpls), _network(network),
         _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap), _weight_f(weight_f){
             NFA::state_t *ns = nullptr;
             Interface *nr = nullptr;
@@ -126,7 +126,7 @@ namespace aalwines {
     };
 
     template<typename W_FN>
-    NetworkPDAFactory(Query &query, Network &network, bool only_mpls_swap, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
+    NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
 
     template<typename W_FN, typename W>
     void NetworkPDAFactory<W_FN, W>::construct_initial() {
@@ -266,7 +266,7 @@ namespace aalwines {
                     rules.back()._pre = pre;
                     assert(rules.back()._pre.mask() == 0);
                 } else {
-                    for (auto &l : _network.get_labels(val, mask,
+                    for (auto &l : Builder::get_labels(this->_all_labels, val, mask,
                                                        (Query::type_t) (Query::MPLS | (pre.type() & Query::STICKY)))) {
                         rules.push_back(cpy);
                         rules.back()._pre = l;
@@ -280,7 +280,7 @@ namespace aalwines {
                 val = 0;
                 // fall through to IP
             case Query::IP4:
-                for (auto &l : _network.get_labels(val, mask, Query::IP4)) {
+                for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP4)) {
                     rules.push_back(cpy);
                     rules.back()._pre = l;
                     assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP4 ||
@@ -288,7 +288,7 @@ namespace aalwines {
                 }
                 if (pre.type() != Query::ANYIP) break; // fall through to IP6 if any
             case Query::IP6:
-                for (auto &l : _network.get_labels(val, mask, Query::IP6)) {
+                for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP6)) {
                     rules.push_back(cpy);
                     rules.back()._pre = l;
                     assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP6 ||
@@ -334,18 +334,18 @@ namespace aalwines {
             }
 
             switch (forward._ops[0]._op) {
-                case RoutingTable::POP:
+                case RoutingTable::op_t::POP:
                     nr._op = pdaaal::POP;
                     assert(entry._top_label.type() == Query::MPLS ||
                            entry._top_label.type() == Query::STICKY_MPLS);
                     break;
-                case RoutingTable::PUSH:
+                case RoutingTable::op_t::PUSH:
                     nr._op = pdaaal::PUSH;
                     assert(forward._ops[0]._op_label.type() == Query::MPLS ||
                            forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
                     nr._op_label = forward._ops[0]._op_label;
                     break;
-                case RoutingTable::SWAP:
+                case RoutingTable::op_t::SWAP:
                     nr._op = pdaaal::SWAP;
                     nr._op_label = forward._ops[0]._op_label;
                     break;
@@ -443,27 +443,27 @@ namespace aalwines {
             nr._pre = s._inf->table().entries()[s._eid]._top_label;
             for (auto pid = 0; pid <= s._opid; ++pid) {
                 switch (r._ops[pid]._op) {
-                    case RoutingTable::SWAP:
-                    case RoutingTable::PUSH:
+                    case RoutingTable::op_t::SWAP:
+                    case RoutingTable::op_t::PUSH:
                         nr._pre = r._ops[pid]._op_label;
                         break;
-                    case RoutingTable::POP:
+                    case RoutingTable::op_t::POP:
                     default:
                         throw base_error("Unexpected pop!");
                         assert(false);
                 }
             }
             switch (act._op) {
-                case RoutingTable::POP:
+                case RoutingTable::op_t::POP:
                     nr._op = pdaaal::POP;
                     throw base_error("Unexpected pop!");
                     assert(false);
                     break;
-                case RoutingTable::PUSH:
+                case RoutingTable::op_t::PUSH:
                     nr._op = pdaaal::PUSH;
                     nr._op_label = act._op_label;
                     break;
-                case RoutingTable::SWAP:
+                case RoutingTable::op_t::SWAP:
                     nr._op = pdaaal::SWAP;
                     nr._op_label = act._op_label;
                     break;
@@ -491,14 +491,12 @@ namespace aalwines {
         stream << "{";
 
         auto name = inf->source()->interface_name(inf->id());
-        stream << "\"ingoing\":\"" << name.get() << "\"";
+        stream << "\"ingoing\":\"" << name << "\"";
         stream << ",\"pre\":";
         if (entry._top_label.type() == Query::INTERFACE) {
             assert(false);
         } else {
             stream << "\"" << entry._top_label;
-            if (_network.is_service_label(entry._top_label))
-                stream << "^";
             stream << "\"";
         }
         stream << ",\"rule\":";
@@ -607,10 +605,10 @@ namespace aalwines {
                                         if (r._ops.size() > 1) continue; // would have been handled in other case
 
                                         if (r._via && r._via->match() == next._inf) {
-                                            if (r._ops.empty() || r._ops[0]._op == RoutingTable::SWAP) {
+                                            if (r._ops.empty() || r._ops[0]._op == RoutingTable::op_t::SWAP) {
                                                 if (step._stack.size() == nstep._stack.size()) {
                                                     if (!r._ops.empty()) {
-                                                        assert(r._ops[0]._op == RoutingTable::SWAP);
+                                                        assert(r._ops[0]._op == RoutingTable::op_t::SWAP);
                                                         if (nstep._stack.front() != r._ops[0]._op_label)
                                                             continue;
                                                     } else if (!entry._top_label.overlaps(nstep._stack.front())) {
@@ -625,9 +623,9 @@ namespace aalwines {
                                                 }
                                             } else {
                                                 assert(r._ops.size() == 1);
-                                                assert(r._ops[0]._op == RoutingTable::PUSH ||
-                                                       r._ops[0]._op == RoutingTable::POP);
-                                                if (r._ops[0]._op == RoutingTable::POP &&
+                                                assert(r._ops[0]._op == RoutingTable::op_t::PUSH ||
+                                                       r._ops[0]._op == RoutingTable::op_t::POP);
+                                                if (r._ops[0]._op == RoutingTable::op_t::POP &&
                                                     nstep._stack.size() == step._stack.size() - 1) {
                                                     if (!add_interfaces(disabled, active, entry, r))
                                                         continue;
@@ -635,7 +633,7 @@ namespace aalwines {
                                                     entries.push_back(&entry);
                                                     found = true;
                                                     break;
-                                                } else if (r._ops[0]._op == RoutingTable::PUSH &&
+                                                } else if (r._ops[0]._op == RoutingTable::op_t::PUSH &&
                                                            nstep._stack.size() == step._stack.size() + 1 &&
                                                            r._ops[0]._op_label == nstep._stack.front()) {
                                                     if (!add_interfaces(disabled, active, entry, r))
@@ -694,9 +692,9 @@ namespace aalwines {
                     assert(from_router != nullptr);
                     assert(to_router != nullptr);
                     stream << R"("from_router":")" << from_router->name() << "\""
-                           << R"(,"from_interface":")" << from_router->interface_name(from_inf->id()).get() << "\""
+                           << R"(,"from_interface":")" << from_router->interface_name(from_inf->id()) << "\""
                            << R"(,"to_router":")" << to_router->name() << "\""
-                           << R"(,"to_interface":")" << to_router->interface_name(to_inf->id()).get() << "\"";
+                           << R"(,"to_interface":")" << to_router->interface_name(to_inf->id()) << "\"";
                     stream << ",\"stack\":[";
                     bool first_symbol = true;
                     for (auto &symbol : step._stack) {

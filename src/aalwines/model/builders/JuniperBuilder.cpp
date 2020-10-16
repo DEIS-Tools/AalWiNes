@@ -185,10 +185,10 @@ namespace aalwines
                 return diff == 1 && i1->target() == i2->source() && i2->target() == i1->source();
             });
         }
-        
-        Router::add_null_router(routers, interfaces, mapping);
-   
-        return Network(std::move(mapping), std::move(routers), std::move(interfaces));
+
+        Network result(std::move(mapping), std::move(routers), std::move(interfaces));
+        result.add_null_router();
+        return result;
     }
 
     void JuniperBuilder::router_parse_adjacency(Router& router, std::istream& data, std::vector<std::unique_ptr<Router> >& routers, Network::routermap_t& mapping, std::vector<const Interface*>& all_interfaces, std::ostream& warnings, std::unordered_map<const Interface*, uint32_t>& ipmap)
@@ -502,7 +502,7 @@ namespace aalwines
                 continue;
             }
             else {
-                auto inf = parent->get_interface(all_interfaces, tl);
+                auto inf = parent->get_interface(tl, all_interfaces);
                 entry._ingoing = inf;
                 entry._top_label = Query::label_t::any_ip;
                 sticky = 0;
@@ -594,7 +594,7 @@ namespace aalwines
                         }
                         else {
                             auto& d = indirect.get_data(alt.second);
-                            r._via = parent->get_interface(all_interfaces, d.first);
+                            r._via = parent->get_interface(d.first, all_interfaces);
                         }
                     }
                     else {
@@ -654,18 +654,18 @@ namespace aalwines
             if (ostr[i] == ',') continue;
             if (!parse_label) {
                 if (ostr[i] == 'S') {
-                    f._ops.back()._op = RoutingTable::SWAP;
+                    f._ops.back()._op = RoutingTable::op_t::SWAP;
                     i += 4;
                     parse_label = true;
                 }
                 else if (ostr[i] == 'P') {
                     if (ostr[i + 1] == 'u') {
-                        f._ops.back()._op = RoutingTable::PUSH;
+                        f._ops.back()._op = RoutingTable::op_t::PUSH;
                         parse_label = true;
                         i += 4;
                     }
                     else if (ostr[i + 1] == 'o') {
-                        f._ops.back()._op = RoutingTable::POP;
+                        f._ops.back()._op = RoutingTable::op_t::POP;
                         i += 2;
                         f._ops.emplace_back();
                         continue;
@@ -705,12 +705,12 @@ namespace aalwines
             {
                 switch(op._op)
                 {
-                case RoutingTable::PUSH:
+                case RoutingTable::op_t::PUSH:
                     if(depth == 0)
                         op._op_label.set_type(Query::STICKY_MPLS);
                     ++depth;
                     break;
-                case RoutingTable::POP:
+                case RoutingTable::op_t::POP:
                     --depth;
                     if(depth < 0) 
                     {
@@ -719,7 +719,7 @@ namespace aalwines
                         throw base_error(e.str());                            
                     }
                     break;
-                case RoutingTable::SWAP:
+                case RoutingTable::op_t::SWAP:
                     if(depth == 1)
                         op._op_label.set_type(Query::STICKY_MPLS);
                     break;
@@ -745,7 +745,7 @@ namespace aalwines
             return inf;
         }
         else {
-            return parent->get_interface(all_interfaces, iname);
+            return parent->get_interface(iname, all_interfaces);
         }
     }
 

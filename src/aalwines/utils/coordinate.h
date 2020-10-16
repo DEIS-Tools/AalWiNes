@@ -35,6 +35,7 @@ namespace aalwines {
     public:
         explicit Coordinate(std::pair<double, double> pair) : Coordinate(pair.first, pair.second) {};
         Coordinate(double latitude, double longitude);
+
         [[nodiscard]] double distance_to(const Coordinate& other) const;
         [[nodiscard]] double latitude() const { return _latitude; }
         [[nodiscard]] double longitude() const { return _longitude; }
@@ -48,10 +49,10 @@ namespace aalwines {
 
     private:
         static constexpr double _R_km = 6372.8;
-        const double _latitude;
-        const double _longitude;
-        const double _rad_lat;
-        const double _rad_long;
+        double _latitude;
+        double _longitude;
+        double _rad_lat;
+        double _rad_long;
     };
 }
 
