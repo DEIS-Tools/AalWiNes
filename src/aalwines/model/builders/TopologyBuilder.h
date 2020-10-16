@@ -18,25 +18,33 @@
  */
 
 /*
- * File:   TopologyZooBuilder.h
+ * File:   TopologyBuilder.h
  * Author: Dan Kristiansen
  *
  * Created on 04-06-2020.
  */
 
-#ifndef AALWINES_TOPOLOGYZOOBUILDER_H
-#define AALWINES_TOPOLOGYZOOBUILDER_H
+#ifndef AALWINES_TOPOLOGYBUILDER_H
+#define AALWINES_TOPOLOGYBUILDER_H
 
 #include <aalwines/model/Network.h>
-
+#include <aalwines/model/builders/AalWiNesBuilder.h>
 #include <utility>
 
 namespace aalwines {
-    class TopologyZooBuilder {
+
+    class TopologyBuilder {
     public:
-        static Network parse(const std::string& gml);
+
+        // Parses a network topology in the gml format used by Topology Zoo.
+        static Network parse(const std::string& gml, std::ostream& warnings = std::cerr);
+
+        // Extracts the topology (assuming all links are bidirectional) from the network into the json format.
+        // Note: The standard to_json function uses non-empty routing-tables to determine existence of links (and direction).
+        static json json_topology(const aalwines::Network& network, bool no_routing = true);
+
     };
 }
 
 
-#endif //AALWINES_TOPOLOGYZOOBUILDER_H
+#endif //AALWINES_TOPOLOGYBUILDER_H

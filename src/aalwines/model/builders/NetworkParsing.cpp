@@ -29,37 +29,39 @@
 #include <aalwines/model/builders/JuniperBuilder.h>
 #include <aalwines/model/builders/PRexBuilder.h>
 #include <aalwines/model/builders/AalWiNesBuilder.h>
+#include <aalwines/model/builders/TopologyBuilder.h>
 #include <iostream>
 
 namespace aalwines {
 
     Network NetworkParsing::parse(bool no_warnings) {
-        if(!json_file.empty() && (!prex_routing.empty() || !prex_topo.empty() || !junos_config.empty()))
-        {
-            std::cerr << "--input cannot be used with --junos or --topology or --routing." << std::endl;
+
+        if(junos_config.empty() && prex_routing.empty() && prex_topo.empty() && json_file.empty() && topo_zoo.empty()) {
+            std::cerr << "Either an AalWiNes json configuration, a Junos configuration, a P-Rex configuration or a .gml topology must be given." << std::endl;
             exit(-1);
         }
 
-        if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty()))
-        {
-            std::cerr << "--junos cannot be used with --topology or --routing." << std::endl;
+        if(!json_file.empty() && (!prex_routing.empty() || !prex_topo.empty() || !junos_config.empty() || !topo_zoo.empty())) {
+            std::cerr << "--input cannot be used with --junos, --topology, --routing or --gml." << std::endl;
             exit(-1);
         }
 
-        if(prex_routing.empty() != prex_topo.empty())
-        {
+        if(!junos_config.empty() && (!prex_routing.empty() || !prex_topo.empty() || !topo_zoo.empty())) {
+            std::cerr << "--junos cannot be used with --topology or --routing or --gml." << std::endl;
+            exit(-1);
+        }
+
+        if(!topo_zoo.empty() && (!prex_routing.empty() || !prex_topo.empty())) {
+            std::cerr << "--gml cannot be used with --topology or --routing." << std::endl;
+            exit(-1);
+        }
+
+        if(prex_routing.empty() != prex_topo.empty()) {
             std::cerr << "Both --topology and --routing have to be non-empty." << std::endl;
             exit(-1);
         }
 
-        if(junos_config.empty() && prex_routing.empty() && prex_topo.empty() && json_file.empty())
-        {
-            std::cerr << "Either a Junos configuration or a P-Rex configuration or an AalWiNes json configuration must be given." << std::endl;
-            exit(-1);
-        }
-
-        if(skip_pfe && junos_config.empty())
-        {
+        if(skip_pfe && junos_config.empty()) {
             std::cerr << "--skip-pfe is only avaliable for --junos configurations." << std::endl;
             exit(-1);
         }
@@ -68,8 +70,9 @@ namespace aalwines {
         std::ostream& warnings = no_warnings ? dummy : std::cerr;
 
         parsing_stopwatch.start();
-        auto network = junos_config.empty() ? (json_file.empty() ?
+        auto network = junos_config.empty() ? (json_file.empty() ? (topo_zoo.empty() ?
                        PRexBuilder::parse(prex_topo, prex_routing, warnings) :
+                       TopologyBuilder::parse(topo_zoo, warnings)) :
                        AalWiNesBuilder::parse(json_file, warnings)) :
                        JuniperBuilder::parse(junos_config, warnings, skip_pfe);
         parsing_stopwatch.stop();

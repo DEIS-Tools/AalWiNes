@@ -18,7 +18,7 @@
  */
 
 /*
- * File:   TopologyZooBuilder.cpp
+ * File:   TopologyBuilder.cpp
  * Author: Dan Kristiansen
  *
  * Created on 04-06-2020.
@@ -26,7 +26,7 @@
 
 #include <fstream>
 #include <sstream>
-#include "TopologyZooBuilder.h"
+#include "TopologyBuilder.h"
 
 namespace aalwines {
 
@@ -49,7 +49,7 @@ namespace aalwines {
         rtrim(s);
     }
 
-    Network aalwines::TopologyZooBuilder::parse(const std::string &gml) {
+    Network aalwines::TopologyBuilder::parse(const std::string &gml, std::ostream& warnings) {
         std::ifstream file(gml);
 
         if(not file){
@@ -134,5 +134,52 @@ namespace aalwines {
             }
         }
         return Network::make_network(_all_routers, _return_links);
+    }
+
+    inline json to_json_no_routing(const Router& router) {
+        auto j = json::object();
+        j["names"] = router.names();
+        j["interfaces"] = json::array();
+        for (const auto& interface : router.interfaces()) {
+            auto j_i = json::object();
+            j_i["name"] = interface->get_name();
+            j_i["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
+            j["interfaces"].push_back(j_i);
+        }
+        if (router.coordinate()) {
+            j["location"] = router.coordinate().value();
+        }
+        return j;
+    }
+
+    json TopologyBuilder::json_topology(const Network& network, bool no_routing) {
+        auto j = json::object();
+        j["name"] = network.name;
+        j["routers"] = json::array();
+        for (const auto& router : network.routers()) {
+            if (router->is_null()) continue;
+            if (no_routing) {
+                j["routers"].push_back(to_json_no_routing(*router));
+            } else {
+                j["routers"].push_back(router);
+            }
+        }
+        auto links_j = json::array();
+        for (const auto& interface : network.all_interfaces()){
+            if (interface->match() == nullptr) continue; // Not connected
+            if (interface->source()->is_null() || interface->target()->is_null()) continue; // Skip the NULL router
+            assert(interface->match()->match() == interface);
+            if (interface->global_id() > interface->match()->global_id()) continue; // Already covered by bidirectional link the other way.
+
+            auto link_j = json::object();
+            link_j["from_interface"] = interface->get_name();
+            link_j["from_router"] = interface->source()->name();
+            link_j["to_interface"] = interface->match()->get_name();
+            link_j["to_router"] = interface->target()->name();
+            link_j["bidirectional"] = true;
+            links_j.push_back(link_j);
+        }
+        j["links"] = links_j;
+        return j;
     }
 }

@@ -25,7 +25,7 @@
  */
 
 #include <aalwines/model/builders/PRexBuilder.h>
-#include <aalwines/model/builders/TopologyZooBuilder.h>
+#include <aalwines/model/builders/TopologyBuilder.h>
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <string>
@@ -82,7 +82,7 @@ int main(int argc, const char** argv)
     }
 
     //std::ostream& warnings = std::cerr; // TODO: Consider implementing silent version
-    auto network = TopologyZooBuilder::parse(topo_zoo); //, warnings);
+    auto network = TopologyBuilder::parse(topo_zoo); //, warnings);
     std::vector<std::pair<Router*, Router*>> unlinked_routers;
 
     for (auto &r : network.routers()) {
