@@ -30,6 +30,7 @@
 #include <aalwines/model/builders/PRexBuilder.h>
 #include <aalwines/model/builders/AalWiNesBuilder.h>
 #include <aalwines/model/builders/TopologyBuilder.h>
+#include <aalwines/model/builders/NetworkSAXHandler.h>
 #include <iostream>
 
 namespace aalwines {
