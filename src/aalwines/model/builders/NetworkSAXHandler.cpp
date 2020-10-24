@@ -174,7 +174,7 @@ namespace aalwines {
         }
         auto from_router = router_map.get_data(from_id);
 
-        auto [to_exists, to_id] = router_map.exists(from_router_name);
+        auto [to_exists, to_id] = router_map.exists(to_router_name);
         if(!to_exists) {
             errors << "error: No router with name \"" << to_router_name << "\" was defined." << std::endl;
             return false;
