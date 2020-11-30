@@ -158,7 +158,9 @@ namespace aalwines {
         for (const auto& entry : table.entries()) {
             std::stringstream label;
             label << entry._top_label;
-            j[label.str()] = entry._rules;
+            std::vector<RoutingTable::forward_t> rules; // Filter out non-MPLS rules. ROUTE, RECEIVE and DISCARD types are undocumented legacy stuff...
+            std::copy_if(entry._rules.begin(), entry._rules.end(), std::back_inserter(rules), [](const RoutingTable::forward_t& rule){ return rule._type == RoutingTable::MPLS; });
+            j[label.str()] = rules;
         }
     }
 
