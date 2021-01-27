@@ -130,7 +130,7 @@ int main(int argc, const char** argv)
         exit(-1);
     }
     
-    if(engine > 3)
+    if(engine > 7)
     {
         std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
@@ -236,7 +236,7 @@ int main(int argc, const char** argv)
 
         std::optional<NetworkWeight::weight_function> weight_fn;
         if (!weight_file.empty()) {
-            if (engine != 2) {
+            if (engine != 2 && engine != 4) {
                 std::cerr << "Shortest trace using weights is only implemented for --engine 2 (post*). Not for --engine " << engine << std::endl;
                 exit(-1);
             }

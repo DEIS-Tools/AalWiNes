@@ -27,6 +27,7 @@
 #ifndef AALWINES_VERIFIER_H
 #define AALWINES_VERIFIER_H
 
+#include <aalwines/model/CegarVerifier.h>
 #include <aalwines/utils/json_stream.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
@@ -43,8 +44,6 @@ namespace aalwines {
         static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
         j = modeTypes[mode];
     }
-
-    using namespace pdaaal;
 
     template<typename W_FN = std::function<void(void)>>
     class Verifier {
@@ -72,7 +71,7 @@ namespace aalwines {
 
         json run_once(Query& q){
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Moped", "Post*", "Pre*"};
+            static const char *engineTypes[] {"", "Moped", "Post*", "Pre*", "New_Post*", "New_Pre*", "CEGAR_Post*", "CEGAR_NoAbstraction_Post*"};
             output["engine"] = engineTypes[engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
@@ -86,87 +85,179 @@ namespace aalwines {
             stopwatch verification_time(false);
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
-            for (auto m : modes) {
-                proof = std::stringstream(); // Clear stream from previous mode.
 
-                // Construct PDA
-                compilation_time.start();
-                q.set_approximation(m);
-                NetworkPDAFactory factory(q, _builder._network, _builder.all_labels(), no_ip_swap, weight_fn);
-                auto pda = factory.compile();
-                compilation_time.stop();
-
-                // Reduce PDA
-                reduction_time.start();
-                output["reduction"] = Reducer::reduce(pda, reduction, pda.initial(), pda.terminal());
-                reduction_time.stop();
-
-                // Choose engine, run verification, and (if relevant) get the trace.
-                verification_time.start();
-                bool engine_outcome;
-                switch(engine) {
-                    case 1:
-                        engine_outcome = moped.verify(pda, true);
-                        verification_time.stop();
-                        if(engine_outcome) {
-                            auto trace = moped.get_trace(pda);
-                            if (factory.write_json_trace(proof, trace))
-                                result = utils::outcome_t::YES;
-                        }
-                        break;
-                    case 2: {
-                        using W = typename W_FN::result_type;
-                        SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
-                        if constexpr (is_weighted) {
-                            solver_result = solver.post_star<pdaaal::Trace_Type::Shortest>(pda);
-                        } else {
-                            solver_result = solver.post_star<pdaaal::Trace_Type::Any>(pda);
-                        }
-                        engine_outcome = solver_result.first;
-                        verification_time.stop();
-                        if (engine_outcome) {
-                            std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
-                            if constexpr (is_weighted) {
-                                std::tie(trace, trace_weight) = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
-                            } else {
-                                trace = solver.get_trace<pdaaal::Trace_Type::Any>(pda, std::move(solver_result.second));
-                            }
-                            if (factory.write_json_trace(proof, trace))
-                                result = utils::outcome_t::YES;
-                        }
-                        break;
+            if (engine == 7) {
+                assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
+                q.compile_nfas();
+                auto res = CegarVerifier::verify<true>(_builder._network, q, _builder.all_labels(), q.number_of_failures());
+                if (res) {
+                    result = utils::outcome_t::YES;
+                    if (print_trace) {
+                        output["trace"] = res.value();
                     }
-                    case 3: {
-                        auto solver_result = solver.pre_star(pda, true);
-                        engine_outcome = solver_result.first;
-                        verification_time.stop();
-                        if (engine_outcome) {
-                            auto trace = solver.get_trace(pda, std::move(solver_result.second));
-                            if (factory.write_json_trace(proof, trace))
-                                result = utils::outcome_t::YES;
-                        }
-                        break;
-                    }
-                    default:
-                        throw base_error("Unsupported --engine value given");
-                }
-
-                // Determine result from the outcome of verification and the mode (over/under-approximation) used.
-                if (q.number_of_failures() == 0) {
-                    result = engine_outcome ? utils::outcome_t::YES : utils::outcome_t::NO;
-                }
-                if (result == utils::outcome_t::MAYBE && m == Query::OVER && !engine_outcome) {
+                } else {
                     result = utils::outcome_t::NO;
                 }
-                if (result != utils::outcome_t::MAYBE) {
-                    output["mode"] = m;
-                    break;
+            } else if (engine == 6) {
+                assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
+                q.compile_nfas();
+                auto res = CegarVerifier::verify<false>(_builder._network, q, _builder.all_labels(), q.number_of_failures());
+                if (res) {
+                    result = utils::outcome_t::YES;
+                    if (print_trace) {
+                        output["trace"] = res.value();
+                    }
+                } else {
+                    result = utils::outcome_t::NO;
+                }
+            } else if (engine >= 4) {
+                assert(false); // Not in this version...
+                /*for (auto m : modes) {
+                    proof = std::stringstream(); // Clear stream from previous mode.
+
+                    // Construct PDA
+                    compilation_time.start();
+                    q.set_approximation(m);
+                    q.compile_nfas();
+                    NewNetworkPDAFactory factory(q, _builder._network, _builder.all_labels(), no_ip_swap, weight_fn);
+                    auto pda = factory.compile(q.construction(), q.destruction());
+                    compilation_time.stop();
+
+                    // Reduce PDA
+                    reduction_time.start();
+                    //output["reduction"] = Reducer::reduce(pda, reduction, pda.initial(), pda.terminal()); // Reductions are not supported for the new PDA construction.
+                    reduction_time.stop();
+
+                    // Choose engine, run verification, and (if relevant) get the trace.
+                    verification_time.start();
+                    bool engine_outcome;
+                    switch(engine) {
+                        case 4: {
+                            constexpr pdaaal::Trace_Type trace_type = is_weighted ? pdaaal::Trace_Type::Shortest : pdaaal::Trace_Type::Any;
+                            engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(pda);
+                            verification_time.stop();
+                            if (engine_outcome) {
+                                std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
+                                if constexpr (is_weighted) {
+                                    std::tie(trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(pda);
+                                } else {
+                                    trace = pdaaal::Solver::get_trace<trace_type>(pda);
+                                }
+                                if (factory.write_json_trace(proof, trace))
+                                    result = utils::outcome_t::YES;
+                            }
+                            break;
+                        }
+                        case 5: {
+                            engine_outcome = pdaaal::Solver::pre_star_accepts(pda);
+                            verification_time.stop();
+                            if (engine_outcome) {
+                                auto trace = pdaaal::Solver::get_trace(pda);
+                                if (factory.write_json_trace(proof, trace))
+                                    result = utils::outcome_t::YES;
+                            }
+                            break;
+                        }
+                        default:
+                            throw base_error("Unsupported --engine value given");
+                    }
+
+                    // Determine result from the outcome of verification and the mode (over/under-approximation) used.
+                    if (q.number_of_failures() == 0) {
+                        result = engine_outcome ? utils::outcome_t::YES : utils::outcome_t::NO;
+                    }
+                    if (result == utils::outcome_t::MAYBE && m == Query::OVER && !engine_outcome) {
+                        result = utils::outcome_t::NO;
+                    }
+                    if (result != utils::outcome_t::MAYBE) {
+                        output["mode"] = m;
+                        break;
+                    }
+                }*/
+            } else {
+                for (auto m : modes) {
+                    proof = std::stringstream(); // Clear stream from previous mode.
+
+                    // Construct PDA
+                    compilation_time.start();
+                    q.set_approximation(m);
+                    NetworkPDAFactory factory(q, _builder._network, _builder.all_labels(), no_ip_swap, weight_fn);
+                    auto pda = factory.compile();
+                    compilation_time.stop();
+
+                    // Reduce PDA
+                    reduction_time.start();
+                    output["reduction"] = pdaaal::Reducer::reduce(pda, reduction, pda.initial(), pda.terminal());
+                    reduction_time.stop();
+
+                    // Choose engine, run verification, and (if relevant) get the trace.
+                    verification_time.start();
+                    bool engine_outcome;
+                    switch(engine) {
+                        case 1:
+                            engine_outcome = moped.verify(pda, true);
+                            verification_time.stop();
+                            if(engine_outcome) {
+                                auto trace = moped.get_trace(pda);
+                                if (factory.write_json_trace(proof, trace))
+                                    result = utils::outcome_t::YES;
+                            }
+                            break;
+                        case 2: {
+                            using W = typename W_FN::result_type;
+                            pdaaal::SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
+                            if constexpr (is_weighted) {
+                                solver_result = solver.post_star<pdaaal::Trace_Type::Shortest>(pda);
+                            } else {
+                                solver_result = solver.post_star<pdaaal::Trace_Type::Any>(pda);
+                            }
+                            engine_outcome = solver_result.first;
+                            verification_time.stop();
+                            if (engine_outcome) {
+                                std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
+                                if constexpr (is_weighted) {
+                                    std::tie(trace, trace_weight) = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
+                                } else {
+                                    trace = solver.get_trace<pdaaal::Trace_Type::Any>(pda, std::move(solver_result.second));
+                                }
+                                if (factory.write_json_trace(proof, trace))
+                                    result = utils::outcome_t::YES;
+                            }
+                            break;
+                        }
+                        case 3: {
+                            auto solver_result = solver.pre_star(pda, true);
+                            engine_outcome = solver_result.first;
+                            verification_time.stop();
+                            if (engine_outcome) {
+                                auto trace = solver.get_trace(pda, std::move(solver_result.second));
+                                if (factory.write_json_trace(proof, trace))
+                                    result = utils::outcome_t::YES;
+                            }
+                            break;
+                        }
+                        default:
+                            throw base_error("Unsupported --engine value given");
+                    }
+
+                    // Determine result from the outcome of verification and the mode (over/under-approximation) used.
+                    if (q.number_of_failures() == 0) {
+                        result = engine_outcome ? utils::outcome_t::YES : utils::outcome_t::NO;
+                    }
+                    if (result == utils::outcome_t::MAYBE && m == Query::OVER && !engine_outcome) {
+                        result = utils::outcome_t::NO;
+                    }
+                    if (result != utils::outcome_t::MAYBE) {
+                        output["mode"] = m;
+                        break;
+                    }
                 }
             }
 
+
             output["result"] = result;
 
-            if (print_trace && result == utils::outcome_t::YES) {
+            if (print_trace && result == utils::outcome_t::YES && engine < 6) {
                 if constexpr (is_weighted) {
                     output["trace-weight"] = trace_weight;
                 }
@@ -198,8 +289,8 @@ namespace aalwines {
         bool print_trace;
 
         // Solver engines
-        Moped moped;
-        SolverAdapter solver;
+        pdaaal::Moped moped;
+        pdaaal::SolverAdapter solver;
 
 
     };

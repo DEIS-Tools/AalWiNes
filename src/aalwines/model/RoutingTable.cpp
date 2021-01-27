@@ -280,6 +280,28 @@ namespace aalwines
             break;
         }
     }
+    json RoutingTable::action_t::to_json() const {
+        json result;
+        switch (_op) {
+            case op_t::SWAP: {
+                std::stringstream s;
+                s << _op_label;
+                result["swap"] = s.str();
+                return result;
+            }
+            case op_t::PUSH: {
+                std::stringstream s;
+                s << _op_label;
+                result["push"] = s.str();
+                break;
+            }
+            case op_t::POP: {
+                result = "pop";
+                break;
+            }
+        }
+        return result;
+    }
 
     void RoutingTable::entry_t::print_json(std::ostream& s) const
     {
@@ -351,6 +373,20 @@ namespace aalwines
             s << "]";
         }
         s << "}";
+    }
+
+    json RoutingTable::forward_t::to_json() const {
+        json rule = json::object();
+        rule["weight"] = _priority;
+        assert(_via);
+        rule["via"] = _via->get_name();
+        if (!_ops.empty()) {
+            rule["ops"] = json::array();
+            for (const auto& op : _ops) {
+                rule["ops"].push_back(op.to_json());
+            }
+        }
+        return rule;
     }
 
     void RoutingTable::print_json(std::ostream& s) const

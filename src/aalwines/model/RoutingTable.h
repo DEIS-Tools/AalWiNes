@@ -31,9 +31,12 @@
 #include <vector>
 #include <map>
 
+#include <json.hpp>
 #include <ptrie/ptrie_map.h>
 
 #include "Query.h"
+
+using json = nlohmann::json;
 
 namespace aalwines {
     class Router;
@@ -59,12 +62,13 @@ namespace aalwines {
             action_t() = default;
             action_t(op_t op, label_t op_label) : _op(op), _op_label(op_label) {};
             void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
+            [[nodiscard]] json to_json() const;
             bool operator==(const action_t& other) const;
             bool operator!=(const action_t& other) const;
         };
 
         struct forward_t {
-            type_t _type = MPLS;
+            type_t _type = MPLS; // TODO: Remove when burning the JuniperBuilder.
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _priority = 0;
@@ -73,6 +77,7 @@ namespace aalwines {
             forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
                 : _type(type), _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
+            [[nodiscard]] json to_json() const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
             bool operator!=(const forward_t& other) const;

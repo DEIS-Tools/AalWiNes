@@ -27,6 +27,7 @@
 #ifndef QUERY_H
 #define QUERY_H
 #include <pdaaal/NFA.h>
+#include <pdaaal/ptrie_interface.h>
 #include "aalwines/utils/errors.h"
 #include "aalwines/utils/parsing.h"
 
@@ -54,8 +55,7 @@ namespace aalwines {
             uint64_t _value = 0;               
         public:
             friend struct ptrie::byte_iterator<label_t>;
-            label_t()
-            {
+            label_t() {
                 _type = NONE;
                 _mask = 0;
                 _value = 0;
@@ -64,15 +64,15 @@ namespace aalwines {
                 set_value(s);
             }
             
-            type_t type() const { return _type; }
-            uint8_t mask() const { return _mask; }
-            uint64_t value() const { return _value; }
+            [[nodiscard]] type_t type() const { return _type; }
+            [[nodiscard]] uint8_t mask() const { return _mask; }
+            [[nodiscard]] uint64_t value() const { return _value; }
 
             void set_value(const std::string& s) {
                 if(s.empty()) {
                     set_value(Query::ANYIP, 0, 0);
                 } else if(s == "ip4") {
-                    set_value(Query::IP6, 0, 32);
+                    set_value(Query::IP4, 0, 32);
                 } else if(s == "ip6") {
                     set_value(Query::IP6, 0, 64);
                 } else if(s == "ip") {
@@ -151,7 +151,7 @@ namespace aalwines {
                 set_value(_type, _value, mask);
             }
             
-            bool uses_mask() const {
+            [[nodiscard]] bool uses_mask() const {
                 return _mask != 0 && _mask != 64 && _type != INTERFACE && _type != ANYIP;
             }
 
@@ -235,7 +235,7 @@ namespace aalwines {
                 return stream;
             }
             
-            bool overlaps(const label_t& other) const {
+            [[nodiscard]] bool overlaps(const label_t& other) const {
                 if(_type == other._type)
                 {
                     auto m = std::max(other._mask, _mask);
@@ -259,14 +259,8 @@ namespace aalwines {
             const static label_t any_ip6;
         };
 
-        Query() {
-        };
+        Query() = default;
         Query(pdaaal::NFA<label_t>&& pre, pdaaal::NFA<label_t>&& path, pdaaal::NFA<label_t>&& post, int lf, mode_t mode);
-        Query(Query&&) = default;
-        Query(const Query&) = default;
-        virtual ~Query() = default;
-        Query& operator=(Query&&) = default;
-        Query& operator=(const Query&) = default;
 
         pdaaal::NFA<label_t> & construction() {
             return _prestack;
@@ -280,18 +274,24 @@ namespace aalwines {
             return _path;
         }
         
-        void set_approximation(mode_t approx)
-        {
+        void set_approximation(mode_t approx) {
             _mode = approx;
         }
         
-        mode_t approximation() const {
+        [[nodiscard]] mode_t approximation() const {
             return _mode;
         }
 
-        int number_of_failures() const {
+        [[nodiscard]] int number_of_failures() const {
             return _link_failures;
         }
+
+        void compile_nfas() {
+            _prestack.compile();
+            _poststack.compile();
+            _path.compile();
+        }
+
         void print_dot(std::ostream& out);
     private:
         pdaaal::NFA<label_t> _prestack;
@@ -349,5 +349,9 @@ namespace ptrie {
         }
     };
 }
+namespace pdaaal::utils {
+    template <> struct has_custom_byte_iterator<aalwines::Query::label_t> : std::true_type {};
+}
+
 #endif /* QUERY_H */
 

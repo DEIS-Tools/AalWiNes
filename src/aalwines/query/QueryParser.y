@@ -176,9 +176,9 @@ regex
     | LSQBRCKT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($2), false); }
     | LSQBRCKT HAT atom_list RSQBRCKT { $$ = NFA<Query::label_t>(std::move($3), true); } // negated set
     | slabel { $$ = NFA<Query::label_t>(std::move($1), false); } // Singleton labelset
-    | ANYIP { $$ = builder.any_ip(); }
-    | ANYMPLS { $$ = builder.any_mpls(); }
-    | ANYSTICKYMPLS { $$ = builder.any_sticky(); }
+    | ANYIP { $$ = NFA<Query::label_t>(builder.any_ip()); }
+    | ANYMPLS { $$ = NFA<Query::label_t>(builder.any_mpls()); }
+    | ANYSTICKYMPLS { $$ = NFA<Query::label_t>(builder.any_sticky()); }
     | LPAREN cregex RPAREN { $$ = std::move($2); }
     ;
 

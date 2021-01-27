@@ -78,7 +78,7 @@ namespace pdaaal {
 
     template<typename T, typename W, typename C>
     void Moped::dump_pda(const PDAAdapter<T,W,C>& pda, std::ostream& s) {
-        using rule_t = rule_t<W,C>;
+        using rule_t = details::rule_t<W,C>;
         using state_t = typename PDAAdapter<T,W,C>::state_t;
         auto write_op = [](std::ostream& s, const rule_t& rule, std::string noop) {
             assert(rule._to != 0);

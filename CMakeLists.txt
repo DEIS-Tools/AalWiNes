@@ -32,8 +32,12 @@ if (AALWINES_GetDependencies)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
     
     ExternalProject_add(ptrie-ext
-        URL https://github.com/petergjoel/ptrie/archive/v1.1.0.zip
-        URL_HASH SHA512=092a8f50ca21d1199b19a10c4e0273c93a717a9f6491998a16bf21d21d37e6537ffd8a06ac41a2b623241da6036546d44b754567441944565e2a16646378cf29
+        GIT_REPOSITORY git@github.com:MortenSchou/ptrie.git
+        GIT_TAG af7f132f2c3e81f7402be51828f3e1076ff895a1
+        #URL https://github.com/petergjoel/ptrie/archive/v1.1.1.zip
+        #URL_HASH SHA512=5435d6f8132d273b50eccd721790d559f7dc67ffdada75fec315f4c53705199f31f1ddc80dda0cb86f883db27076fa6d324d28516b442fecce3ffa51213aef4e
+        #URL https://github.com/petergjoel/ptrie/archive/v1.1.0.zip
+        #URL_HASH SHA512=092a8f50ca21d1199b19a10c4e0273c93a717a9f6491998a16bf21d21d37e6537ffd8a06ac41a2b623241da6036546d44b754567441944565e2a16646378cf29
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     )
     file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/include)
@@ -45,13 +49,15 @@ if (AALWINES_GetDependencies)
         INSTALL_COMMAND cd ../rapidxml-ext && ${CMAKE_COMMAND} -E copy rapidxml.hpp rapidxml_iterators.hpp rapidxml_print.hpp rapidxml_utils.hpp ${EXTERNAL_INSTALL_LOCATION}/include 
     )
     file(DOWNLOAD
-            https://github.com/nlohmann/json/releases/download/v3.7.3/json.hpp
+            https://github.com/nlohmann/json/releases/download/v3.9.1/json.hpp
             ${EXTERNAL_INSTALL_LOCATION}/include/json.hpp
-            EXPECTED_HASH SHA256=3b5d2b8f8282b80557091514d8ab97e27f9574336c804ee666fda673a9b59926
+            EXPECTED_HASH SHA256=7804b38146921d03374549c9e2a5e3acda097814c43caf2b96a0278e58df26e0
     )
     ExternalProject_add(pdaaal-ext
-        URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.5.zip
-        URL_HASH SHA512=7c9e1418c491f693b1dbcfac8b20aa10cc0ecc8db1456000d1b8ea3c1376d9dbe545abbfe550d7d5020631c4dcb44fe2b6205654337c68a16227f0810e0f32a6
+        GIT_REPOSITORY git@github.com:MortenSchou/PDAAAL.git
+        GIT_TAG 4d0c1b1e9fc9c936bde6953cd3f659c3ffe69553
+        #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.5.zip
+        #URL_HASH SHA512=7c9e1418c491f693b1dbcfac8b20aa10cc0ecc8db1456000d1b8ea3c1376d9dbe545abbfe550d7d5020631c4dcb44fe2b6205654337c68a16227f0810e0f32a6
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include
     )
 
