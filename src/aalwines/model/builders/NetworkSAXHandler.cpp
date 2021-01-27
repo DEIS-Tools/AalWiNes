@@ -27,7 +27,7 @@
 #include "NetworkSAXHandler.h"
 
 namespace aalwines {
-    std::ostream& operator<<(std::ostream& s, NetworkSAXHandler::keys key) {
+    constexpr std::ostream& operator<<(std::ostream& s, NetworkSAXHandler::keys key) {
         switch (key) {
             case NetworkSAXHandler::keys::none:
                 s << "<initial>";
@@ -117,7 +117,7 @@ namespace aalwines {
         return s;
     }
 
-    std::ostream &operator<<(std::ostream& s, NetworkSAXHandler::context::context_type type) {
+    constexpr std::ostream &operator<<(std::ostream& s, NetworkSAXHandler::context::context_type type) {
         switch (type) {
             case NetworkSAXHandler::context::context_type::unknown:
                 s << "<unknown>";
@@ -162,7 +162,7 @@ namespace aalwines {
                 s << "entry array";
                 break;
             case NetworkSAXHandler::context::context_type::entry:
-                s << "entry";
+                s << "routing entry";
                 break;
             case NetworkSAXHandler::context::context_type::operation_array:
                 s << "operation array";
@@ -172,6 +172,92 @@ namespace aalwines {
                 break;
         }
         return s;
+    }
+    constexpr NetworkSAXHandler::keys NetworkSAXHandler::context::get_key(NetworkSAXHandler::context::context_type context_type, NetworkSAXHandler::context::key_flag flag) {
+        switch (context_type) {
+            case NetworkSAXHandler::context::context_type::initial:
+                if (flag == NetworkSAXHandler::context::key_flag::FLAG_1) {
+                    return NetworkSAXHandler::keys::network;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::network:
+                switch (flag) {
+                    case NetworkSAXHandler::context::key_flag::FLAG_1:
+                        return NetworkSAXHandler::keys::network_name;
+                    case NetworkSAXHandler::context::key_flag::FLAG_2:
+                        return NetworkSAXHandler::keys::routers;
+                    case NetworkSAXHandler::context::key_flag::FLAG_3:
+                        return NetworkSAXHandler::keys::links;
+                    default:
+                        break;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::link:
+                switch (flag) {
+                    case NetworkSAXHandler::context::key_flag::FLAG_1:
+                        return NetworkSAXHandler::keys::from_interface;
+                    case NetworkSAXHandler::context::key_flag::FLAG_2:
+                        return NetworkSAXHandler::keys::from_router;
+                    case NetworkSAXHandler::context::key_flag::FLAG_3:
+                        return NetworkSAXHandler::keys::to_interface;
+                    case NetworkSAXHandler::context::key_flag::FLAG_4:
+                        return NetworkSAXHandler::keys::to_router;
+                    default:
+                        break;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::router:
+                switch (flag) {
+                    case NetworkSAXHandler::context::key_flag::FLAG_1:
+                        return NetworkSAXHandler::keys::router_name;
+                    case NetworkSAXHandler::context::key_flag::FLAG_2:
+                        return NetworkSAXHandler::keys::interfaces;
+                    default:
+                        break;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::location:
+                switch (flag) {
+                    case NetworkSAXHandler::context::key_flag::FLAG_1:
+                        return NetworkSAXHandler::keys::latitude;
+                    case NetworkSAXHandler::context::key_flag::FLAG_2:
+                        return NetworkSAXHandler::keys::longitude;
+                    default:
+                        break;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::interface:
+                switch (flag) {
+                    case NetworkSAXHandler::context::key_flag::FLAG_1:
+                        return NetworkSAXHandler::keys::interface_name; // NOTE: Also NetworkSAXHandler::keys::interface_names
+                    case NetworkSAXHandler::context::key_flag::FLAG_2:
+                        return NetworkSAXHandler::keys::routing_table;
+                    default:
+                        break;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::entry:
+                switch (flag) {
+                    case NetworkSAXHandler::context::key_flag::FLAG_1:
+                        return NetworkSAXHandler::keys::entry_out;
+                    case NetworkSAXHandler::context::key_flag::FLAG_2:
+                        return NetworkSAXHandler::keys::priority;
+                    case NetworkSAXHandler::context::key_flag::FLAG_3:
+                        return NetworkSAXHandler::keys::ops;
+                    default:
+                        break;
+                }
+                break;
+            case NetworkSAXHandler::context::context_type::operation:
+                if (flag == NetworkSAXHandler::context::key_flag::FLAG_1) {
+                    return NetworkSAXHandler::keys::pop; // NOTE: Also NetworkSAXHandler::keys::swap and NetworkSAXHandler::keys::push
+                }
+                break;
+            default:
+                break;
+        }
+        assert(false);
+        return NetworkSAXHandler::keys::unknown;
     }
 
     bool NetworkSAXHandler::pair_link(const std::string &from_router_name, const std::string &from_interface_name,
@@ -431,6 +517,26 @@ namespace aalwines {
         return true;
     }
 
+    template <NetworkSAXHandler::context::context_type type, NetworkSAXHandler::context::key_flag flag,
+              NetworkSAXHandler::keys key, NetworkSAXHandler::keys... alternatives>
+              // 'key' is the key to use. 'alternatives' are any other keys using the same flag in the same context (i.e. a one_of(key, alternatives...) requirement).
+    bool NetworkSAXHandler::handle_key() {
+        static_assert(flag == NetworkSAXHandler::context::FLAG_1 || flag == NetworkSAXHandler::context::FLAG_2
+                   || flag == NetworkSAXHandler::context::FLAG_3 || flag == NetworkSAXHandler::context::FLAG_4,
+                   "Template parameter flag must be a single key, not a union or empty.");
+        static_assert(((NetworkSAXHandler::context::get_key(type, flag) == key) || ... || (NetworkSAXHandler::context::get_key(type, flag) == alternatives)),
+                   "The result of get_key(type, flag) must match 'key' or one of the alternatives");
+        if (!context_stack.top().needs_value(flag)) {
+            errors << "Duplicate definition of key: \"" << key;
+            ((errors << "\"/\"" << alternatives), ...);
+            errors << "\" in " << type << " object. " << std::endl;
+            return false;
+        }
+        context_stack.top().got_value(flag);
+        last_key = key;
+        return true;
+    }
+
     bool NetworkSAXHandler::key(NetworkSAXHandler::string_t &key) {
         if (context_stack.empty()) {
             errors << "Expected the start of an object before key: " << key << std::endl;
@@ -439,71 +545,31 @@ namespace aalwines {
         switch (context_stack.top().type) {
             case context::context_type::initial:
                 if (key == "network") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "network" in initial object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::network;
+                    if (!handle_key<context::context_type::initial,context::FLAG_1,keys::network>()) return false;
                 } else {
                     last_key = keys::unknown;
                 }
                 break;
             case context::context_type::network:
                 if (key == "name") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "name" in network object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::network_name;
+                    if (!handle_key<context::context_type::network,context::FLAG_1,keys::network_name>()) return false;
                 } else if (key == "routers") {
-                    if (!context_stack.top().needs_value(context::FLAG_2)) {
-                        errors << R"(Duplicate definition of key: "routers" in network object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_2);
-                    last_key = keys::routers;
+                    if (!handle_key<context::context_type::network,context::FLAG_2,keys::routers>()) return false;
                 } else if (key == "links") {
-                    if (!context_stack.top().needs_value(context::FLAG_3)) {
-                        errors << R"(Duplicate definition of key: "links" in network object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_3);
-                    last_key = keys::links;
+                    if (!handle_key<context::context_type::network,context::FLAG_3,keys::links>()) return false;
                 } else { // "additionalProperties": true
                     last_key = keys::unknown;
                 }
                 break;
             case context::context_type::link:
                 if (key == "from_interface") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "from_interface" in link object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::from_interface;
+                    if (!handle_key<context::context_type::link,context::FLAG_1,keys::from_interface>()) return false;
                 } else if (key == "from_router") {
-                    if (!context_stack.top().needs_value(context::FLAG_2)) {
-                        errors << R"(Duplicate definition of key: "from_router" in link object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_2);
-                    last_key = keys::from_router;
+                    if (!handle_key<context::context_type::link,context::FLAG_2,keys::from_router>()) return false;
                 } else if (key == "to_interface") {
-                    if (!context_stack.top().needs_value(context::FLAG_3)) {
-                        errors << R"(Duplicate definition of key: "to_interface" in link object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_3);
-                    last_key = keys::to_interface;
+                    if (!handle_key<context::context_type::link,context::FLAG_3,keys::to_interface>()) return false;
                 } else if (key == "to_router") {
-                    if (!context_stack.top().needs_value(context::FLAG_4)) {
-                        errors << R"(Duplicate definition of key: "to_router" in link object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_4);
-                    last_key = keys::to_router;
+                    if (!handle_key<context::context_type::link,context::FLAG_4,keys::to_router>()) return false;
                 } else if (key == "bidirectional") {
                     last_key = keys::bidirectional;
                 } else { // "additionalProperties": true
@@ -512,19 +578,9 @@ namespace aalwines {
                 break;
             case context::context_type::router:
                 if (key == "name") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "name" in router object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::router_name;
+                    if (!handle_key<context::context_type::router,context::FLAG_1,keys::router_name>()) return false;
                 } else if (key == "interfaces") {
-                    if (!context_stack.top().needs_value(context::FLAG_2)) {
-                        errors << R"(Duplicate definition of key: "interfaces" in router object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_2);
-                    last_key = keys::interfaces;
+                    if (!handle_key<context::context_type::router,context::FLAG_2,keys::interfaces>()) return false;
                 } else if (key == "location") {
                     last_key = keys::location;
                 } else if (key == "alias") {
@@ -536,26 +592,11 @@ namespace aalwines {
                 break;
             case context::context_type::interface:
                 if (key == "name") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "name" and/or "names" in interface object. Only one of these are allowed)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::interface_name;
+                    if (!handle_key<context::context_type::interface,context::FLAG_1,keys::interface_name, keys::interface_names>()) return false;
                 } else if (key == "names") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "names" and/or "name" in interface object. Only one of these are allowed)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::interface_names;
+                    if (!handle_key<context::context_type::interface,context::FLAG_1,keys::interface_names, keys::interface_name>()) return false;
                 } else if (key == "routing_table") {
-                    if (!context_stack.top().needs_value(context::FLAG_2)) {
-                        errors << R"(Duplicate definition of key: "routing_table" in interface object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_2);
-                    last_key = keys::routing_table;
+                    if (!handle_key<context::context_type::interface,context::FLAG_2,keys::routing_table>()) return false;
                 } else {
                     errors << "Unexpected key in interface object: " << key << std::endl;
                     return false;
@@ -567,26 +608,11 @@ namespace aalwines {
                 break;
             case context::context_type::entry:
                 if (key == "out") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "out" in routing entry object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::entry_out;
+                    if (!handle_key<context::context_type::entry,context::FLAG_1,keys::entry_out>()) return false;
                 } else if (key == "priority") {
-                    if (!context_stack.top().needs_value(context::FLAG_2)) {
-                        errors << R"(Duplicate definition of key: "priority" in routing entry object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_2);
-                    last_key = keys::priority;
+                    if (!handle_key<context::context_type::entry,context::FLAG_2,keys::priority>()) return false;
                 } else if (key == "ops") {
-                    if (!context_stack.top().needs_value(context::FLAG_3)) {
-                        errors << R"(Duplicate definition of key: "ops" in routing entry object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_3);
-                    last_key = keys::ops;
+                    if (!handle_key<context::context_type::entry,context::FLAG_3,keys::ops>()) return false;
                 } else if (key == "weight") {
                     last_key = keys::weight;
                 } else {
@@ -596,26 +622,11 @@ namespace aalwines {
                 break;
             case context::context_type::operation:
                 if (key == "pop") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplication key definition in operation object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::pop;
+                    if (!handle_key<context::context_type::operation,context::FLAG_1,keys::pop, keys::swap, keys::push>()) return false;
                 } else if (key == "swap") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplication key definition in operation object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::swap;
+                    if (!handle_key<context::context_type::operation,context::FLAG_1,keys::swap, keys::pop, keys::push>()) return false;
                 } else if (key == "push") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplication key definition in operation object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::push;
+                    if (!handle_key<context::context_type::operation,context::FLAG_1,keys::push, keys::pop, keys::swap>()) return false;
                 } else {
                     errors << "Unexpected key in operation object: " << key << std::endl;
                     return false;
@@ -623,19 +634,9 @@ namespace aalwines {
                 break;
             case context::context_type::location:
                 if (key == "latitude") {
-                    if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "latitude" in location object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::latitude;
+                    if (!handle_key<context::context_type::location,context::FLAG_1,keys::latitude>()) return false;
                 } else if (key == "longitude") {
-                    if (!context_stack.top().needs_value(context::FLAG_2)) {
-                        errors << R"(Duplicate definition of key: "longitude" in location object)" << std::endl;
-                        return false;
-                    }
-                    context_stack.top().got_value(context::FLAG_2);
-                    last_key = keys::longitude;
+                    if (!handle_key<context::context_type::location,context::FLAG_2,keys::longitude>()) return false;
                 } else { // "additionalProperties": true
                     last_key = keys::unknown;
                 }
@@ -655,7 +656,22 @@ namespace aalwines {
             return false;
         }
         if (context_stack.top().missing_keys()) {
-            errors << "error: Missing key." << std::endl; // TODO: Improve error message.
+            errors << "error: Missing key(s): ";
+            bool first = true;
+            for (const auto& flag : context::all_flags) {
+                if (context_stack.top().needs_value(flag)) {
+                    if (!first) errors << ", ";
+                    first = false;
+                    auto key = NetworkSAXHandler::context::get_key(context_stack.top().type, flag);
+                    errors << key;
+                    if (key == NetworkSAXHandler::keys::interface_name) {
+                        errors << "/" << NetworkSAXHandler::keys::interface_names;
+                    } else if (key == NetworkSAXHandler::keys::pop) {
+                        errors << "/" << NetworkSAXHandler::keys::swap << "/" << NetworkSAXHandler::keys::push;
+                    }
+                }
+            }
+            errors << " in object: " << context_stack.top().type << std::endl;
             return false;
         }
         switch (context_stack.top().type) {

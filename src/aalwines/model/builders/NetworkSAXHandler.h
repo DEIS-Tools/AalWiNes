@@ -36,14 +36,20 @@ using json = nlohmann::json;
 
 namespace aalwines {
 
-    //template<typename BasicJsonType = json>
     class NetworkSAXHandler {
+    private:
+        enum class keys : uint32_t { none, unknown, network, network_name, routers, links, router_name, router_alias,
+            location, latitude, longitude, interfaces, interface_name, interface_names, routing_table,
+            table_label, entry_out, priority, ops, weight, pop, swap, push,
+            from_router, from_interface, to_router, to_interface, bidirectional };
+        friend constexpr std::ostream& operator<<( std::ostream&, keys key );
+
     public:
         struct context {
             enum class context_type : uint32_t { unknown, initial, network, link_array, link, router_array, router,
                                                  location, router_alias_array, interface_array, interface, interface_names_array, routing_table,
                                                  entry_array, entry, operation_array, operation };
-            friend std::ostream& operator<<(std::ostream&, context_type type );
+            friend constexpr std::ostream& operator<<(std::ostream&, context_type type );
             enum key_flag : uint32_t {
                 NO_FLAGS = 0,
                 FLAG_1 = 1,
@@ -57,28 +63,23 @@ namespace aalwines {
                 REQUIRES_3 = FLAG_1 | FLAG_2 | FLAG_3,
                 REQUIRES_4 = FLAG_1 | FLAG_2 | FLAG_3 | FLAG_4
             };
+            static constexpr std::array<key_flag,4> all_flags{key_flag::FLAG_1, key_flag::FLAG_2, key_flag::FLAG_3, key_flag::FLAG_4};
 
             context_type type;
             key_flag values_left;
 
-            void got_value(key_flag value) {
+            constexpr void got_value(key_flag value) {
                 values_left = static_cast<context::key_flag>(static_cast<uint32_t>(values_left) & ~static_cast<uint32_t>(value));
             }
-            [[nodiscard]] bool needs_value(key_flag value) const {
+            [[nodiscard]] constexpr bool needs_value(key_flag value) const {
                 return static_cast<uint32_t>(value) == (static_cast<uint32_t>(values_left) & static_cast<uint32_t>(value));
             }
-            [[nodiscard]] bool missing_keys() const {
+            [[nodiscard]] constexpr bool missing_keys() const {
                 return values_left != NO_FLAGS;
             }
-
+            static constexpr keys get_key(context_type context_type, key_flag flag);
         };
     private:
-        enum class keys : uint32_t { none, unknown, network, network_name, routers, links, router_name, router_alias,
-                                     location, latitude, longitude, interfaces, interface_name, interface_names, routing_table,
-                                     table_label, entry_out, priority, ops, weight, pop, swap, push,
-                                     from_router, from_interface, to_router, to_interface, bidirectional };
-        friend std::ostream& operator<<( std::ostream&, keys key );
-
         constexpr static context unknown_context = {context::context_type::unknown, context::NO_FLAGS };
         constexpr static context initial_context = {context::context_type::initial, context::REQUIRES_1 };
         constexpr static context network_context = {context::context_type::network, context::REQUIRES_3 };
@@ -133,11 +134,10 @@ namespace aalwines {
         // bool bidirectional = false; // Not used
 
         std::vector<std::tuple<std::string,std::string,std::string,std::string>> links; // Used if links are parsed before routers.
-
         bool pair_link(const std::string& from_router_name, const std::string& from_interface_name, const std::string& to_router_name, const std::string& to_interface_name);
         bool add_router_name(const std::string& value);
         bool add_interface_name(const std::string& value);
-
+        template <context::context_type type, context::key_flag flag, keys key, keys... alternatives> bool handle_key();
     public:
         using number_integer_t = typename json::number_integer_t;
         using number_unsigned_t = typename json::number_unsigned_t;
