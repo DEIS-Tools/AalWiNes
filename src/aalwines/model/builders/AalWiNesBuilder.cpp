@@ -104,7 +104,7 @@ namespace aalwines {
                             auto ops = json_routing_entry.at("ops").get<std::vector<RoutingTable::action_t>>();
                             auto priority = json_routing_entry.at("priority").get<size_t>();
                             auto weight = json_routing_entry.contains("weight") ? json_routing_entry.at("weight").get<uint32_t>() : 0;
-                            entry._rules.emplace_back(RoutingTable::type_t::MPLS, std::move(ops), via, priority, weight);
+                            entry._rules.emplace_back(std::move(ops), via, priority, weight);
                         }
                     }
                 }

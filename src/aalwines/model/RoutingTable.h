@@ -42,11 +42,6 @@ namespace aalwines {
     
     class RoutingTable {
     public:
-
-        enum type_t { // TODO: Deprecate (?)
-            DISCARD, RECEIVE, ROUTE, MPLS
-        };
-
         enum class op_t {
             PUSH, POP, SWAP
         };
@@ -64,14 +59,13 @@ namespace aalwines {
         };
 
         struct forward_t {
-            type_t _type = MPLS;
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _priority = 0;
             uint32_t _weight = 0;
             forward_t() = default;
-            forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
-                : _type(type), _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
+            forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
+                : _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
@@ -81,7 +75,6 @@ namespace aalwines {
 
         struct entry_t {
             label_t _top_label;
-            const Interface* _ingoing = nullptr; // TODO: this needs to be removed, it is only really used during merges of Routingtables for filtering
             std::vector<forward_t> _rules;
 
             entry_t() = default;
@@ -98,14 +91,11 @@ namespace aalwines {
 
     public:
         [[nodiscard]] bool empty() const;
-        bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
-        bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
         [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
-        bool check_nondet(std::ostream& e);
         entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
         entry_t& emplace_entry(label_t top_label) { _entries.emplace_back(top_label); return _entries.back(); }
         void pop_entry() { _entries.pop_back(); }
@@ -114,10 +104,10 @@ namespace aalwines {
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);
         void add_rule(label_t top_label, const forward_t& rule);
         void add_rule(label_t top_label, forward_t&& rule);
-        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0, type_t = MPLS);
+        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0);
         void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
         void add_to_outgoing(const Interface* outgoing, action_t action);
-        void simple_merge(const RoutingTable& other);
+        void merge(const RoutingTable& other);
 
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
         
