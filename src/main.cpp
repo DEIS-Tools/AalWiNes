@@ -25,8 +25,6 @@
 #include <aalwines/utils/json_stream.h>
 #include <aalwines/query/QueryBuilder.h>
 
-#include <aalwines/model/builders/JuniperBuilder.h>
-#include <aalwines/model/builders/PRexBuilder.h>
 #include <aalwines/model/builders/AalWiNesBuilder.h>
 #include <aalwines/model/builders/TopologyBuilder.h>
 
@@ -75,9 +73,8 @@ int main(int argc, const char** argv)
     bool print_net = false;
     bool no_parser_warnings = false;
     bool silent = false;
-    bool dump_to_moped = false;
     bool no_timing = false;
-    std::string topology_destination, routing_destination, json_destination, json_pretty_destination, json_topo_destination;
+    std::string json_destination, json_pretty_destination, json_topo_destination;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -85,9 +82,6 @@ int main(int argc, const char** argv)
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
-            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
-            ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
-            ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
             ("write-json", po::value<std::string>(&json_destination), "Write the network in the AalWiNes MPLS Network format to the given file.")
             ("write-json-pretty", po::value<std::string>(&json_pretty_destination), "Pretty print the network in the AalWiNes MPLS Network format to the given file.")
             ("write-json-topology", po::value<std::string>(&json_topo_destination), "Write the topology of the network in the AalWiNes MPLS Network format to the given file.")
@@ -136,12 +130,6 @@ int main(int argc, const char** argv)
         exit(-1);        
     }
 
-    if(engine != 0 && dump_to_moped)
-    {
-        std::cerr << "Cannot both verify (--engine > 0) and dump model (--dump-for-moped) to stdout" << std::endl;
-        exit(-1);
-    }
-
     if(silent) no_parser_warnings = true;
 
     auto network = parser.parse(no_parser_warnings);
@@ -149,25 +137,7 @@ int main(int argc, const char** argv)
     if (print_dot) {
         network.print_dot(std::cout);
     }
-    
-    if(!topology_destination.empty()) {
-        std::ofstream out(topology_destination);
-        if(out.is_open()) {
-            PRexBuilder::write_prex_topology(network, out);
-        } else {
-            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
-            exit(-1);
-        }
-    }
-    if(!routing_destination.empty()) {
-        std::ofstream out(routing_destination);
-        if(out.is_open()) {
-            PRexBuilder::write_prex_routing(network, out);
-        } else {
-            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl;
-            exit(-1);
-        }
-    }
+
     if (!json_destination.empty()) {
         std::ofstream out(json_destination);
         if(out.is_open()) {
@@ -202,7 +172,7 @@ int main(int argc, const char** argv)
         }
     }
     json_stream json_output;
-    if (!dump_to_moped && print_net) {
+    if (print_net) {
         network.print_json(json_output);
     }
     std::vector<std::string> query_strings;
@@ -263,30 +233,20 @@ int main(int argc, const char** argv)
             weight_fn = std::nullopt;
         }
 
-        if(dump_to_moped) {
-            for(auto& q : builder._result) {
-                if (dump_to_moped) {
-                    NetworkPDAFactory factory(q, network, builder.all_labels(), no_ip_swap);
-                    auto pda = factory.compile();
-                    Moped::dump_pda(pda, std::cout);
-                }
-            }
-        } else {
-            if(!no_timing) {
-                json_output.entry("network-parsing-time", parser.duration());
-                json_output.entry("query-parsing-time", queryparsingwatch.duration());
-            }
-            if (weight_fn) {
-                Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
-                json_output.begin_object("answers");
-                verifier.run(query_strings, json_output);
-                json_output.end_object();
-            } else { // a void(void) function encodes 'no weight'.
-                Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
-                json_output.begin_object("answers");
-                verifier.run(query_strings, json_output);
-                json_output.end_object();
-            }
+        if(!no_timing) {
+            json_output.entry("network-parsing-time", parser.duration());
+            json_output.entry("query-parsing-time", queryparsingwatch.duration());
+        }
+        if (weight_fn) {
+            Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
+            json_output.begin_object("answers");
+            verifier.run(query_strings, json_output);
+            json_output.end_object();
+        } else { // a void(void) function encodes 'no weight'.
+            Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
+            json_output.begin_object("answers");
+            verifier.run(query_strings, json_output);
+            json_output.end_object();
         }
     }
 
