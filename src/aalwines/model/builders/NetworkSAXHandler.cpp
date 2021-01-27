@@ -47,8 +47,11 @@ namespace aalwines {
             case NetworkSAXHandler::keys::links:
                 s << "links";
                 break;
-            case NetworkSAXHandler::keys::router_names:
-                s << "names";
+            case NetworkSAXHandler::keys::router_name:
+                s << "name";
+                break;
+            case NetworkSAXHandler::keys::router_alias:
+                s << "alias";
                 break;
             case NetworkSAXHandler::keys::location:
                 s << "location";
@@ -64,6 +67,9 @@ namespace aalwines {
                 break;
             case NetworkSAXHandler::keys::interface_name:
                 s << "name";
+                break;
+            case NetworkSAXHandler::keys::interface_names:
+                s << "names";
                 break;
             case NetworkSAXHandler::keys::routing_table:
                 s << "routing_table";
@@ -134,8 +140,8 @@ namespace aalwines {
             case NetworkSAXHandler::context::context_type::router:
                 s << "router";
                 break;
-            case NetworkSAXHandler::context::context_type::router_name_array:
-                s << "router name array";
+            case NetworkSAXHandler::context::context_type::router_alias_array:
+                s << "router alias array";
                 break;
             case NetworkSAXHandler::context::context_type::location:
                 s << "location";
@@ -148,6 +154,9 @@ namespace aalwines {
                 break;
             case NetworkSAXHandler::context::context_type::interface:
                 s << "interface";
+                break;
+            case NetworkSAXHandler::context::context_type::interface_names_array:
+                s << "interface names array";
                 break;
             case NetworkSAXHandler::context::context_type::entry_array:
                 s << "entry array";
@@ -280,41 +289,60 @@ namespace aalwines {
         return true;
     }
 
+    bool NetworkSAXHandler::add_router_name(const std::string& value) {
+        current_router->add_name(value);
+        auto res = router_map.insert(value);
+        if (!res.first) {
+            errors << "error: Duplicate definition of \"" << value << "\", previously found in entry "
+                   << router_map.get_data(res.second)->index() << std::endl;
+            return false;
+        }
+        router_map.get_data(res.second) = current_router;
+        return true;
+    }
+
+    bool NetworkSAXHandler::add_interface_name(const std::string& value) {
+        auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
+        if (!was_inserted) {
+            // Was this added because of an out-interface in an already parsed routing-table?
+            auto f = forward_constructed_interfaces.find(value);
+            if (f != forward_constructed_interfaces.end()) {
+                forward_constructed_interfaces.erase(f); // Then update set of pre constructed interfaces.
+            } else { // Otherwise we have duplicate interface definition.
+                if (current_router->names().empty()) {
+                    errors << "error: Duplicate interface name \"" << value << "\" on router with index " << current_router->index() << "." << std::endl;
+                } else {
+                    errors << "error: Duplicate interface name \"" << value << "\" on router \"" << current_router->name() << "\"." << std::endl;
+                }
+                return false;
+            }
+        }
+        current_interfaces.emplace_back(interface);
+        return true;
+    }
+
     bool NetworkSAXHandler::string(NetworkSAXHandler::string_t &value) {
         if (context_stack.empty()) {
             errors << "error: Unexpected string value: \"" << value << "\" outside of object." << std::endl;
             return false;
         }
-        if (context_stack.top().type == context::context_type::router_name_array) {
-            current_router->add_name(value);
-            auto res = router_map.insert(value);
-            if (!res.first) {
-                errors << "error: Duplicate definition of \"" << value << "\", previously found in entry "
-                       << router_map.get_data(res.second)->index() << std::endl;
-                return false;
-            }
-            router_map.get_data(res.second) = current_router;
-            return true;
+        switch (context_stack.top().type) {
+            case context::context_type::router_alias_array:
+                return add_router_name(value);
+            case context::context_type::interface_names_array:
+                return add_interface_name(value);
+            default:
+                break;
         }
         switch (last_key){
             case keys::network_name:
                 network_name = value;
                 break;
-            case keys::interface_name: {
-                auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
-                if (!was_inserted) {
-                    // Was this added because of an out-interface in an already parsed routing-table?
-                    auto f = forward_constructed_interfaces.find(value);
-                    if (f != forward_constructed_interfaces.end()) {
-                        forward_constructed_interfaces.erase(f); // Then update set of pre constructed interfaces.
-                    } else { // Otherwise we have duplicate interface definition.
-                        errors << "error: Duplicate interface name \"" << value << "\" on router \"" << current_router->name() << "\"." << std::endl;
-                        return false;
-                    }
-                }
-                current_interface = interface;
+            case keys::router_name:
+                current_router_name = value;
                 break;
-            }
+            case keys::interface_name:
+                return add_interface_name(value);
             case keys::entry_out: {
                 auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
                 if (was_inserted) {
@@ -483,13 +511,13 @@ namespace aalwines {
                 }
                 break;
             case context::context_type::router:
-                if (key == "names") {
+                if (key == "name") {
                     if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "names" in router object)" << std::endl;
+                        errors << R"(Duplicate definition of key: "name" in router object)" << std::endl;
                         return false;
                     }
                     context_stack.top().got_value(context::FLAG_1);
-                    last_key = keys::router_names;
+                    last_key = keys::router_name;
                 } else if (key == "interfaces") {
                     if (!context_stack.top().needs_value(context::FLAG_2)) {
                         errors << R"(Duplicate definition of key: "interfaces" in router object)" << std::endl;
@@ -499,6 +527,8 @@ namespace aalwines {
                     last_key = keys::interfaces;
                 } else if (key == "location") {
                     last_key = keys::location;
+                } else if (key == "alias") {
+                    last_key = keys::router_alias;
                 } else {
                     errors << "Unexpected key in router object: " << key << std::endl;
                     return false;
@@ -507,11 +537,18 @@ namespace aalwines {
             case context::context_type::interface:
                 if (key == "name") {
                     if (!context_stack.top().needs_value(context::FLAG_1)) {
-                        errors << R"(Duplicate definition of key: "name" in interface object)" << std::endl;
+                        errors << R"(Duplicate definition of key: "name" and/or "names" in interface object. Only one of these are allowed)" << std::endl;
                         return false;
                     }
                     context_stack.top().got_value(context::FLAG_1);
                     last_key = keys::interface_name;
+                } else if (key == "names") {
+                    if (!context_stack.top().needs_value(context::FLAG_1)) {
+                        errors << R"(Duplicate definition of key: "names" and/or "name" in interface object. Only one of these are allowed)" << std::endl;
+                        return false;
+                    }
+                    context_stack.top().got_value(context::FLAG_1);
+                    last_key = keys::interface_names;
                 } else if (key == "routing_table") {
                     if (!context_stack.top().needs_value(context::FLAG_2)) {
                         errors << R"(Duplicate definition of key: "routing_table" in interface object)" << std::endl;
@@ -520,7 +557,7 @@ namespace aalwines {
                     context_stack.top().got_value(context::FLAG_2);
                     last_key = keys::routing_table;
                 } else {
-                    errors << "Unexpected key in router object: " << key << std::endl;
+                    errors << "Unexpected key in interface object: " << key << std::endl;
                     return false;
                 }
                 break;
@@ -632,6 +669,9 @@ namespace aalwines {
                 break;
             }
             case context::context_type::router:
+                if(!add_router_name(current_router_name)) {
+                    return false;
+                }
                 if (!forward_constructed_interfaces.empty()) {
                     errors << "error: Interface " << *forward_constructed_interfaces.begin() << " used in a routing table is not defined on router " << current_router->name() << "." << std::endl ;
                     return false;
@@ -640,9 +680,15 @@ namespace aalwines {
             case context::context_type::location:
                 current_router->set_coordinate(Coordinate(latitude, longitude));
                 break;
-            case context::context_type::interface:
-                current_interface->table() = std::move(current_table);
+            case context::context_type::interface: {
+                // TODO: This construction can be optimized. Currently we copy shared routing tables onto each interface.
+                for (size_t i = 0; i < current_interfaces.size() - 1; ++i) {
+                    current_interfaces[i]->table() = current_table; // Copy assignment.
+                }
+                current_interfaces.back()->table() = std::move(current_table); // Move the last time. No need for extra copies.
+                current_interfaces.clear();
                 break;
+            }
             case context::context_type::entry:
                 current_table.back()._rules.emplace_back(RoutingTable::type_t::MPLS, std::move(ops), via, priority, weight);
                 break;
@@ -668,8 +714,11 @@ namespace aalwines {
             case keys::interfaces:
                 context_stack.push(interface_array);
                 break;
-            case keys::router_names:
-                context_stack.push(router_name_array);
+            case keys::router_alias:
+                context_stack.push(router_alias_array);
+                break;
+            case keys::interface_names:
+                context_stack.push(interface_names_array);
                 break;
             case keys::table_label:
                 context_stack.push(entry_array);

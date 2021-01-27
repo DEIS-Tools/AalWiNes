@@ -41,7 +41,7 @@ namespace aalwines {
     public:
         struct context {
             enum class context_type : uint32_t { unknown, initial, network, link_array, link, router_array, router,
-                                                 location, router_name_array, interface_array, interface, routing_table,
+                                                 location, router_alias_array, interface_array, interface, interface_names_array, routing_table,
                                                  entry_array, entry, operation_array, operation };
             friend std::ostream& operator<<(std::ostream&, context_type type );
             enum key_flag : uint32_t {
@@ -73,8 +73,8 @@ namespace aalwines {
 
         };
     private:
-        enum class keys : uint32_t { none, unknown, network, network_name, routers, links, router_names,
-                                     location, latitude, longitude, interfaces, interface_name, routing_table,
+        enum class keys : uint32_t { none, unknown, network, network_name, routers, links, router_name, router_alias,
+                                     location, latitude, longitude, interfaces, interface_name, interface_names, routing_table,
                                      table_label, entry_out, priority, ops, weight, pop, swap, push,
                                      from_router, from_interface, to_router, to_interface, bidirectional };
         friend std::ostream& operator<<( std::ostream&, keys key );
@@ -86,9 +86,10 @@ namespace aalwines {
         constexpr static context link_context = {context::context_type::link, context::REQUIRES_4 };
         constexpr static context router_array = {context::context_type::router_array, context::NO_FLAGS };
         constexpr static context router_context = {context::context_type::router, context::REQUIRES_2 };
-        constexpr static context router_name_array = {context::context_type::router_name_array, context::NO_FLAGS };
+        constexpr static context router_alias_array = {context::context_type::router_alias_array, context::NO_FLAGS };
         constexpr static context interface_array = {context::context_type::interface_array, context::NO_FLAGS };
         constexpr static context interface_context = {context::context_type::interface, context::REQUIRES_2 };
+        constexpr static context interface_names_array = {context::context_type::interface_names_array, context::NO_FLAGS };
         constexpr static context location_context = {context::context_type::location, context::REQUIRES_2 };
         constexpr static context table_context = {context::context_type::routing_table, context::REQUIRES_0 };
         constexpr static context entry_array = {context::context_type::entry_array, context::NO_FLAGS };
@@ -109,11 +110,12 @@ namespace aalwines {
 
         // Router
         Router* current_router = nullptr;
+        std::string current_router_name; // The primary name should be added last, so we will temporarily keep it here.
         double latitude = 0;
         double longitude = 0;
 
         // Interface
-        Interface* current_interface = nullptr;
+        std::vector<Interface*> current_interfaces;
         RoutingTable current_table;
         std::unordered_set<std::string> forward_constructed_interfaces;
 
@@ -133,6 +135,8 @@ namespace aalwines {
         std::vector<std::tuple<std::string,std::string,std::string,std::string>> links; // Used if links are parsed before routers.
 
         bool pair_link(const std::string& from_router_name, const std::string& from_interface_name, const std::string& to_router_name, const std::string& to_interface_name);
+        bool add_router_name(const std::string& value);
+        bool add_interface_name(const std::string& value);
 
     public:
         using number_integer_t = typename json::number_integer_t;
