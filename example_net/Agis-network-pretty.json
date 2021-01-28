@@ -759,9 +759,7 @@
           "latitude": 25.7743,
           "longitude": -80.1937
         },
-        "names": [
-          "Miami"
-        ]
+        "name": "Miami"
       },
       {
         "interfaces": [
@@ -1308,9 +1306,7 @@
           "latitude": 29.7633,
           "longitude": -95.3633
         },
-        "names": [
-          "Houston"
-        ]
+        "name": "Houston"
       },
       {
         "interfaces": [
@@ -5944,9 +5940,7 @@
           "latitude": 38.8951,
           "longitude": -77.0364
         },
-        "names": [
-          "Washington,_DC"
-        ]
+        "name": "Washington,_DC"
       },
       {
         "interfaces": [
@@ -15539,9 +15533,7 @@
           "latitude": 33.749,
           "longitude": -84.388
         },
-        "names": [
-          "Atlanta"
-        ]
+        "name": "Atlanta"
       },
       {
         "interfaces": [
@@ -16088,9 +16080,7 @@
           "latitude": 35.0845,
           "longitude": -106.651
         },
-        "names": [
-          "Mexico_City"
-        ]
+        "name": "Mexico_City"
       },
       {
         "interfaces": [
@@ -23056,9 +23046,7 @@
           "latitude": 33.4484,
           "longitude": -112.074
         },
-        "names": [
-          "Phoenix"
-        ]
+        "name": "Phoenix"
       },
       {
         "interfaces": [
@@ -38169,9 +38157,7 @@
           "latitude": 32.7831,
           "longitude": -96.8067
         },
-        "names": [
-          "Dallas"
-        ]
+        "name": "Dallas"
       },
       {
         "interfaces": [
@@ -43150,9 +43136,7 @@
           "latitude": 38.6273,
           "longitude": -90.1979
         },
-        "names": [
-          "St_Louis"
-        ]
+        "name": "St_Louis"
       },
       {
         "interfaces": [
@@ -43699,9 +43683,7 @@
           "latitude": 32.7153,
           "longitude": -117.157
         },
-        "names": [
-          "San_Diego"
-        ]
+        "name": "San_Diego"
       },
       {
         "interfaces": [
@@ -62186,9 +62168,7 @@
           "latitude": 34.0522,
           "longitude": -118.244
         },
-        "names": [
-          "Los_Angeles"
-        ]
+        "name": "Los_Angeles"
       },
       {
         "interfaces": [
@@ -70674,9 +70654,7 @@
           "latitude": 37.3541,
           "longitude": -121.955
         },
-        "names": [
-          "Santa_Clara"
-        ]
+        "name": "Santa_Clara"
       },
       {
         "interfaces": [
@@ -71223,9 +71201,7 @@
           "latitude": 37.9577,
           "longitude": -121.291
         },
-        "names": [
-          "Stockton"
-        ]
+        "name": "Stockton"
       },
       {
         "interfaces": [
@@ -72661,9 +72637,7 @@
           "latitude": 38.5816,
           "longitude": -121.494
         },
-        "names": [
-          "Sacramento"
-        ]
+        "name": "Sacramento"
       },
       {
         "interfaces": [
@@ -73210,9 +73184,7 @@
           "latitude": 36.7477,
           "longitude": -119.772
         },
-        "names": [
-          "Fresno"
-        ]
+        "name": "Fresno"
       },
       {
         "interfaces": [
@@ -76864,9 +76836,7 @@
           "latitude": 37.7749,
           "longitude": -122.419
         },
-        "names": [
-          "San_Francisco"
-        ]
+        "name": "San_Francisco"
       },
       {
         "interfaces": [
@@ -79535,9 +79505,7 @@
           "latitude": 40.7143,
           "longitude": -74.006
         },
-        "names": [
-          "New_York"
-        ]
+        "name": "New_York"
       },
       {
         "interfaces": [
@@ -80084,9 +80052,7 @@
           "latitude": 42.3584,
           "longitude": -71.0598
         },
-        "names": [
-          "Boston"
-        ]
+        "name": "Boston"
       },
       {
         "interfaces": [
@@ -82863,9 +82829,7 @@
           "latitude": 47.6062,
           "longitude": -122.332
         },
-        "names": [
-          "Seattle"
-        ]
+        "name": "Seattle"
       },
       {
         "interfaces": [
@@ -83412,9 +83376,7 @@
           "latitude": 40.7608,
           "longitude": -111.891
         },
-        "names": [
-          "Salt_Lake_City"
-        ]
+        "name": "Salt_Lake_City"
       },
       {
         "interfaces": [
@@ -92684,9 +92646,7 @@
           "latitude": 41.85,
           "longitude": -87.65
         },
-        "names": [
-          "Chicago"
-        ]
+        "name": "Chicago"
       },
       {
         "interfaces": [
@@ -93233,9 +93193,7 @@
           "latitude": 44.98,
           "longitude": -93.2638
         },
-        "names": [
-          "Minneapolis"
-        ]
+        "name": "Minneapolis"
       },
       {
         "interfaces": [
@@ -95986,9 +95944,7 @@
           "latitude": 42.3314,
           "longitude": -83.0457
         },
-        "names": [
-          "Detroit"
-        ]
+        "name": "Detroit"
       },
       {
         "interfaces": [
@@ -97467,9 +97423,7 @@
           "latitude": 38.028,
           "longitude": -121.885
         },
-        "names": [
-          "Pittsburg"
-        ]
+        "name": "Pittsburg"
       },
       {
         "interfaces": [
@@ -103216,9 +103170,7 @@
           "latitude": 39.9523,
           "longitude": -75.1638
         },
-        "names": [
-          "Philadelphia"
-        ]
+        "name": "Philadelphia"
       },
       {
         "interfaces": [
@@ -106175,9 +106127,7 @@
           "latitude": 39.9562,
           "longitude": -75.058
         },
-        "names": [
-          "Pennsauken"
-        ]
+        "name": "Pennsauken"
       }
     ]
   }

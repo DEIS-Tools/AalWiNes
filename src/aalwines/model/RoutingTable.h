@@ -114,6 +114,7 @@ namespace aalwines {
         entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
         entry_t& emplace_entry(label_t top_label) { _entries.emplace_back(top_label); return _entries.back(); }
         void pop_entry() { _entries.pop_back(); }
+        entry_t& back() { return _entries.back(); }
 
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);
         void add_rule(label_t top_label, const forward_t& rule);

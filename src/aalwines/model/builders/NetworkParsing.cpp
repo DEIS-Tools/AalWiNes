@@ -30,6 +30,7 @@
 #include <aalwines/model/builders/PRexBuilder.h>
 #include <aalwines/model/builders/AalWiNesBuilder.h>
 #include <aalwines/model/builders/TopologyBuilder.h>
+#include <aalwines/model/builders/NetworkSAXHandler.h>
 #include <iostream>
 
 namespace aalwines {
@@ -73,7 +74,7 @@ namespace aalwines {
         auto network = junos_config.empty() ? (json_file.empty() ? (topo_zoo.empty() ?
                        PRexBuilder::parse(prex_topo, prex_routing, warnings) :
                        TopologyBuilder::parse(topo_zoo, warnings)) :
-                       AalWiNesBuilder::parse(json_file, warnings)) :
+                       FastJsonBuilder::parse(json_file, warnings)) :
                        JuniperBuilder::parse(junos_config, warnings, skip_pfe);
         parsing_stopwatch.stop();
 

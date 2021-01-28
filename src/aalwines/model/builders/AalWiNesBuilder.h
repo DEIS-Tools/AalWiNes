@@ -172,7 +172,13 @@ namespace aalwines {
 
     inline void to_json(json & j, const Router& router) {
         j = json::object();
-        j["names"] = router.names();
+        j["name"] = router.names().back();
+        if (router.names().size() > 1) {
+            j["alias"] = json::array();
+            for (size_t i = 0; i < router.names().size() - 1; ++i) {
+                j["alias"].emplace_back(router.names()[i]);
+            }
+        }
         j["interfaces"] = router.interfaces();
         if (router.coordinate()) {
             j["location"] = router.coordinate().value();

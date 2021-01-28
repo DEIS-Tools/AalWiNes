@@ -54,6 +54,11 @@
                 "bidirectional": {
                     "description": "If the bidirectional flag is set, then this link object also encodes the link in the opposite direction.",
                     "const": true
+                },
+                "weight": {
+                    "description": "Optional weight of link. Currently ignored by AalWiNes.",
+                    "type": "integer",
+                    "minimum": 0
                 }
             },
             "required": [
@@ -67,13 +72,16 @@
         "Router": {
             "type": "object",
             "properties": {
-                "names": {
-                    "description": "Router names. Can contain multiple alternative names.",
+                "name": {
+                    "description": "Primary name of the router. ",
+                    "type": "string"
+                },
+                "alias": {
+                    "description": "Alternative names for the router. ",
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "minItems": 1
+                    }
                 },
                 "location": {
                     "$ref": "#/definitions/Location"
@@ -87,7 +95,7 @@
             },
             "required": [
                 "interfaces",
-                "names"
+                "name"
             ],
             "title": "Router"
         },
@@ -112,17 +120,27 @@
             "type": "object",
             "properties": {
                 "name": {
+                    "description": "Name of the interface that use the routing_table",
                     "type": "string"
+                },
+                "names": {
+                    "description": "If multiple interfaces use the same routing_table, the name of each interface can be specified here instead of using the 'name' property.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1
                 },
                 "routing_table": {
                     "$ref": "#/definitions/RoutingTable"
                 }
             },
             "additionalProperties": false,
-            "required": [
-                "name",
-                "routing_table"
+            "oneOf": [
+                {"required": ["name"]},
+                {"required": ["names"]}
             ],
+            "required": ["routing_table"],
             "title": "Interface"
         },
         "RoutingTable": {

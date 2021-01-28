@@ -77,6 +77,9 @@ namespace aalwines {
                     set_value(Query::IP6, 0, 64);
                 } else if(s == "ip") {
                     set_value(Query::ANYIP, 0, 64);
+                } else if(s == "null") {
+                    // TODO: Implement a null label, that matches with an empty stack.
+                    set_value(Query::ANYIP, 0, 0); // Dummy for now...
                 } else {
                     auto i = s.find_first_of(".:");
                     if (i != std::string::npos) {
