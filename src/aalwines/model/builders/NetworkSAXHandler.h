@@ -143,6 +143,7 @@ namespace aalwines {
         using number_unsigned_t = typename json::number_unsigned_t;
         using number_float_t = typename json::number_float_t;
         using string_t = typename json::string_t;
+        using binary_t = typename json::binary_t;
 
         explicit NetworkSAXHandler(std::ostream& errors = std::cerr) : errors(errors) {};
 
@@ -159,6 +160,7 @@ namespace aalwines {
         bool number_unsigned(number_unsigned_t value);
         bool number_float(number_float_t value, const string_t& /*unused*/);
         bool string(string_t& value);
+        bool binary(binary_t& val);
         bool start_object(std::size_t /*unused*/ = std::size_t(-1));
         bool key(string_t& key);
         bool end_object();
