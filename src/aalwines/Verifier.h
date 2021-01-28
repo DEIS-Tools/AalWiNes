@@ -33,7 +33,6 @@
 #include <aalwines/query/QueryBuilder.h>
 #include <aalwines/model/NetworkPDAFactory.h>
 #include <aalwines/model/NetworkWeight.h>
-#include <aalwines/engine/Moped.h>
 #include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 
@@ -51,9 +50,9 @@ namespace aalwines {
     public:
         constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
-        explicit Verifier(Builder& builder, size_t engine = 2, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
+        explicit Verifier(Builder& builder, size_t engine = 1, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
         : Verifier(builder, [](){}, engine, reduction, no_ip_swap, print_timing, print_trace) {};
-        Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 2, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
+        Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 1, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
         : _builder(builder), weight_fn(weight_fn), engine(engine), reduction(reduction), no_ip_swap(no_ip_swap), print_timing(print_timing), print_trace(print_trace) {};
 
         void run(const std::vector<std::string>& query_strings, json_stream& json_output) {
@@ -72,7 +71,7 @@ namespace aalwines {
 
         json run_once(Query& q){
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Moped", "Post*", "Pre*"};
+            static const char *engineTypes[] {"", "Post*", "Pre*"};
             output["engine"] = engineTypes[engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
@@ -105,16 +104,7 @@ namespace aalwines {
                 verification_time.start();
                 bool engine_outcome;
                 switch(engine) {
-                    case 1:
-                        engine_outcome = moped.verify(pda, true);
-                        verification_time.stop();
-                        if(engine_outcome) {
-                            auto trace = moped.get_trace(pda);
-                            if (factory.write_json_trace(proof, trace))
-                                result = utils::outcome_t::YES;
-                        }
-                        break;
-                    case 2: {
+                    case 1: {
                         using W = typename W_FN::result_type;
                         SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
                         if constexpr (is_weighted) {
@@ -136,7 +126,7 @@ namespace aalwines {
                         }
                         break;
                     }
-                    case 3: {
+                    case 2: {
                         auto solver_result = solver.pre_star(pda, true);
                         engine_outcome = solver_result.first;
                         verification_time.stop();
@@ -198,10 +188,7 @@ namespace aalwines {
         bool print_trace;
 
         // Solver engines
-        Moped moped;
         SolverAdapter solver;
-
-
     };
 
 }

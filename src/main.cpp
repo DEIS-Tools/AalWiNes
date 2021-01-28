@@ -33,7 +33,6 @@
 
 #include <aalwines/query/parsererrors.h>
 #include <pdaaal/PDAFactory.h>
-#include <aalwines/engine/Moped.h>
 #include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
@@ -101,7 +100,7 @@ int main(int argc, const char** argv)
             ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup,4=simple+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
+            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=post*,2=pre*")
             ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression")
             ;
 
@@ -124,7 +123,7 @@ int main(int argc, const char** argv)
         exit(-1);
     }
     
-    if(engine > 3)
+    if(engine > 2)
     {
         std::cerr << "Unknown value for --engine : " << engine << std::endl;
         exit(-1);        
@@ -206,8 +205,8 @@ int main(int argc, const char** argv)
 
         std::optional<NetworkWeight::weight_function> weight_fn;
         if (!weight_file.empty()) {
-            if (engine != 2) {
-                std::cerr << "Shortest trace using weights is only implemented for --engine 2 (post*). Not for --engine " << engine << std::endl;
+            if (engine != 1) {
+                std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*). Not for --engine " << engine << std::endl;
                 exit(-1);
             }
             // TODO: Implement parsing of latency info here.

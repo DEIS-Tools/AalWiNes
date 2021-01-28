@@ -117,7 +117,6 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     std::istringstream qstream(query);
     builder.do_parse(qstream);
 
-    pdaaal::Moped moped;
     pdaaal::SolverAdapter solver;
 
     std::vector<Query::mode_t> modes{builder._result[0].approximation()};
@@ -140,13 +139,6 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     factory.write_json_trace(trace_stream, trace);
 
     results << std::endl << "post*-time: " << verification_time_post.duration() << std::endl;
-
-    trace_stream << std::endl << "Moped: " << std::endl;
-    moped.verify(pda, false);
-    trace = moped.get_trace(pda);
-    factory.write_json_trace(trace_stream, trace);
-
-    results << std::endl << "moped-time: " << moped.verification_duration() << std::endl;
 
     BOOST_TEST_MESSAGE(results.str());
 }

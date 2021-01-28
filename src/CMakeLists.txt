@@ -18,8 +18,7 @@ add_library(aalwines ${HEADER_FILES}
 		aalwines/model/builders/NetworkSAXHandler.cpp
 		aalwines/model/Router.cpp aalwines/model/RoutingTable.cpp aalwines/model/Query.cpp aalwines/model/Network.cpp
 		aalwines/model/filter.cpp ${BISON_bparser_OUTPUTS} ${FLEX_flexer_OUTPUTS} aalwines/query/QueryBuilder.cpp
-		aalwines/engine/Moped.cpp aalwines/utils/coordinate.cpp
-		aalwines/utils/parsing.cpp aalwines/utils/system.cpp aalwines/synthesis/RouteConstruction.cpp)
+		aalwines/utils/coordinate.cpp aalwines/utils/parsing.cpp aalwines/utils/system.cpp aalwines/synthesis/RouteConstruction.cpp)
 add_dependencies(aalwines ptrie-ext rapidxml-ext pdaaal-ext)
 target_link_libraries(aalwines PRIVATE ${Boost_LIBRARIES} pdaaal)
 target_include_directories(aalwines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
