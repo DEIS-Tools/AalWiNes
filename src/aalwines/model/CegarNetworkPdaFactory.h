@@ -137,8 +137,11 @@ namespace aalwines {
                 const auto& ops = state._inf->table().entries()[state._eid]._rules[state._rid]._ops;
                 assert(state._opid + 1 < ops.size());
                 for (size_t i = state._opid + 1; i < ops.size(); ++i) {
-                    assert(_abstract_label_lookup(ops[i]._op_label).first);
-                    std::get<2>(result).emplace_back(ops[i]._op, _abstract_label_lookup(ops[i]._op_label).second);
+                    assert(ops[i]._op == RoutingTable::op_t::POP || _abstract_label_lookup(ops[i]._op_label).first);
+                    std::get<2>(result).emplace_back(ops[i]._op,
+                                                     (ops[i]._op == RoutingTable::op_t::POP)
+                                                      ? std::numeric_limits<uint32_t>::max()
+                                                      : _abstract_label_lookup(ops[i]._op_label).second);
                 }
             }
             return result;
