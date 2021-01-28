@@ -36,7 +36,6 @@
 #include "Query.h"
 
 namespace aalwines {
-    class Router;
     class Interface;
     class Network;
     

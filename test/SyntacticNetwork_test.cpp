@@ -36,40 +36,40 @@ Network construct_synthetic_network(size_t nesting = 1){
         _routers.emplace_back(std::make_unique<Router>(i));
         Router &router = *_routers.back().get();
         router.add_name(router_name);
-        router.get_interface(_all_interfaces, "i" + router_names[i]);
+        router.get_interface("i" + router_names[i], _all_interfaces);
         auto res = _mapping.insert(router_name);
         _mapping.get_data(res.second) = &router;
         switch (network_node) {
             case 1:
-                router.get_interface(_all_interfaces, router_names[i - 1]);
-                router.get_interface(_all_interfaces, router_names[i + 2]);
+                router.get_interface(router_names[i - 1], _all_interfaces);
+                router.get_interface(router_names[i + 2], _all_interfaces);
                 links.push_back({router_names[i - 1], router_names[i + 2]} );
                 break;
             case 2:
-                router.get_interface(_all_interfaces, router_names[i + 1]);
-                router.get_interface(_all_interfaces, router_names[i + 2]);
+                router.get_interface(router_names[i + 1], _all_interfaces);
+                router.get_interface(router_names[i + 2], _all_interfaces);
                 links.push_back({router_names[i + 1], router_names[i + 2]});
                 if(nested){
-                    router.get_interface(_all_interfaces, router_names[i + 6]);
+                    router.get_interface(router_names[i + 6], _all_interfaces);
                     links.back().push_back({router_names[i + 6]});
                 } else {
-                    router.get_interface(_all_interfaces, router_names[i - 2]);
+                    router.get_interface(router_names[i - 2], _all_interfaces);
                     links.back().push_back({router_names[i - 2]});
                 }
                 break;
             case 3:
-                router.get_interface(_all_interfaces, router_names[i - 2]);
-                router.get_interface(_all_interfaces, router_names[i + 1]);
-                router.get_interface(_all_interfaces, router_names[i - 1]);
+                router.get_interface(router_names[i - 2], _all_interfaces);
+                router.get_interface(router_names[i + 1], _all_interfaces);
+                router.get_interface(router_names[i - 1], _all_interfaces);
                 links.push_back({router_names[i - 2], router_names[i + 1], router_names[i - 1]});
                 if(i != 3) {
-                    router.get_interface(_all_interfaces, router_names[i - 6]);
+                    router.get_interface(router_names[i - 6], _all_interfaces);
                     links.back().push_back({router_names[i - 6]});
                 }
                 break;
             case 4:
-                router.get_interface(_all_interfaces, router_names[i - 2]);
-                router.get_interface(_all_interfaces, router_names[i - 1]);
+                router.get_interface(router_names[i - 2], _all_interfaces);
+                router.get_interface(router_names[i - 1], _all_interfaces);
                 links.push_back({router_names[i - 2], router_names[i - 1]});
                 break;
             case 5:
@@ -79,17 +79,17 @@ Network construct_synthetic_network(size_t nesting = 1){
                 }
                 fall_through = true;
             case 0:
-                router.get_interface(_all_interfaces, router_names[i + 1]);
+                router.get_interface(router_names[i + 1], _all_interfaces);
                 links.push_back({router_names[i + 1]});
                 if(nested){
-                    router.get_interface(_all_interfaces, router_names[i + 5]);
+                    router.get_interface(router_names[i + 5], _all_interfaces);
                     links.back().push_back({router_names[i + 5]});
                 } else {
-                    router.get_interface(_all_interfaces, router_names[i + 2]);
+                    router.get_interface(router_names[i + 2], _all_interfaces);
                     links.back().push_back({router_names[i + 2]});
                 }
                 if(fall_through){
-                    router.get_interface(_all_interfaces, router_names[i - 5]);
+                    router.get_interface(router_names[i - 5], _all_interfaces);
                     links.back().push_back({router_names[i - 5]});
                     fall_through = false;
                 }

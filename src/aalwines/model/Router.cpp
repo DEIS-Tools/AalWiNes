@@ -98,80 +98,11 @@ namespace aalwines {
         return res.first ? _interface_map.get_data(res.second) : nullptr;
     }
 
-    // Legacy version of get_interface. Only used for Juniper parsing.
-    // TODO: Figure out how to use new get_interface instead without breaking things.
-    Interface* Router::get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected) {
-        auto res = _interface_map.insert(interface_name);
-        if (expected != nullptr && !res.first && _interface_map.get_data(res.second)->target() != expected) {
-            auto tgt = _interface_map.get_data(res.second)->target();
-            auto tname = tgt != nullptr ? tgt->name() : "SINK";
-            std::stringstream e;
-            e << "duplicate interface declaration, got " << tname
-                    << " new target " << expected->name() << " on adjacency of " << name() << std::endl;
-            throw base_error(e.str());
-        }
-        if (!res.first)
-            return _interface_map.get_data(res.second);
-        auto iid = _interfaces.size();
-        auto gid = all_interfaces.size();
-        _interfaces.emplace_back(std::make_unique<Interface>(iid, gid, expected, this));
-        auto interface = _interfaces.back().get();
-        all_interfaces.emplace_back(interface);
-        _interface_map.get_data(res.second) = interface;
-        return interface;
-    }
-
-
     void Interface::make_pairing(Interface* interface) {
         _matching = interface;
         interface->_matching = this;
         interface->_target = _parent;
         _target = interface->_parent;
-    }
-
-    void Interface::make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher) {
-        if (_matching != nullptr)
-            return;
-        if (_target == nullptr)
-            return;
-        if (_target == _parent)
-        {
-            _matching = this;
-            return;
-        }
-        _matching = nullptr;
-        for (auto& i : _target->_interfaces) {
-            if(matcher(this, i.get()))
-            {
-                if(_matching != nullptr)
-                {
-                    std::stringstream e;
-                    e << "Non-unique paring of links between " << _parent->name() << " and " << _target->name() << "\n";
-                    auto n = _parent->interface_name(_id);
-                    auto n2 = _target->interface_name(_matching->_id);
-                    auto n3 = _target->interface_name(i->_id);
-                    e << n << " could be matched with both :\n";
-                    e << n2 << " and\n";
-                    e << n3 << std::endl;
-                    throw base_error(e.str());
-                }
-                _matching = i.get();
-            }            
-        }
-
-
-        if (_matching) {
-            _matching->_matching = this;
-        }
-        else {
-
-            std::stringstream e;
-            auto n = _parent->interface_name(_id);
-            e << _parent->name() << "." << n;
-            auto iface = _target->get_interface(all_interfaces, e.str(), _parent);
-            _matching = iface;
-            iface->_matching = this;
-        }
     }
 
     std::string Interface::get_name() const {
@@ -182,14 +113,8 @@ namespace aalwines {
         return _interface_map.at(i);
     }
 
-    void Router::pair_interfaces(std::vector<const Interface*>& interfaces, std::function<bool(const Interface*, const Interface*)> matcher) {
-        for (auto& i : _interfaces)
-            i->make_pairing(interfaces, matcher);
-    }
-
     void Router::print_dot(std::ostream& out) const {
-        if (_interfaces.empty())
-            return;
+        if (_interfaces.empty()) return;
         std::string n;
         for (auto& i : _interfaces) {
             n = interface_name(i->id());
@@ -197,41 +122,33 @@ namespace aalwines {
             out << "\"" << name() << "\" -> \"" << tgtstring
                     << "\" [ label=\"" << n << "\" ];\n";
         }
-        if (_interfaces.empty())
+        if (_interfaces.empty()) {
             out << "\"" << name() << "\" [shape=triangle];\n";
-        else
+        } else {
             out << "\"" << name() << "\" [shape=circle];\n";
-
+        }
         out << "\n";
-
     }
 
     void Router::print_simple(std::ostream& s) const {
-        for(auto& i : _interfaces)
-        {
+        for(auto& i : _interfaces) {
             auto name = interface_name(i->id());
             s << "\tinterface: \"" << name << "\"\n";
             const RoutingTable& table = i->table();
-            for(auto& e : table.entries())
-            {
+            for(auto& e : table.entries()) {
                 s << "\t\t[" << e._top_label << "] {\n";
-                for(auto& fwd : e._rules)
-                {
+                for(auto& fwd : e._rules) {
                     s << "\t\t\t" << fwd._priority << " |-[";
-                    for(auto& o : fwd._ops)
-                    {
+                    for(auto& o : fwd._ops) {
                         o.print_json(s, false, false);
                     }
                     s << "]-> ";
                     auto via = fwd._via;
-                    if(via)
-                    {
+                    if(via) {
                         s << via->source()->name() << ".";
                         auto tn = fwd._via->source()->interface_name(fwd._via->id());
                         s << tn << "\n";
-                    }
-                    else
-                    {
+                    } else {
                         s << "NULL\n";
                     }
                 }
