@@ -248,20 +248,16 @@ namespace aalwines {
         std::unordered_map<std::string,std::unordered_set<Query::label_t>> interfaces;
         std::set<std::string> targets;
         std::string if_name;
-        for(auto& i : _interfaces)
-        {
+        for(auto& i : _interfaces) {
             if_name = interface_name(i->id());
             auto& label_set = interfaces.try_emplace(if_name).first->second;
 
             const RoutingTable& table = i->table();
-            for(auto& e : table.entries())
-            {
+            for(auto& e : table.entries()) {
                 label_set.emplace(e._top_label);
-                for(auto& fwd : e._rules)
-                {
+                for(auto& fwd : e._rules) {
                     auto via = fwd._via;
-                    if (via)
-                    {
+                    if (via) {
                         auto tn = via->target()->name();
                         targets.insert(tn);
                     }

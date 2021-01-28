@@ -99,7 +99,7 @@ int main(int argc, const char** argv)
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
             ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
-            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup,4=simple+backup")
+            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,1=post*,2=pre*")
             ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression")
             ;

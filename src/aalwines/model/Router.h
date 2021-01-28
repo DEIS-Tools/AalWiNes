@@ -132,7 +132,7 @@ namespace aalwines {
         Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
         Interface* get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected = nullptr);
-        std::string interface_name(size_t i) const;
+        [[nodiscard]] std::string interface_name(size_t i) const;
         void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
 
         void print_simple(std::ostream& s) const;

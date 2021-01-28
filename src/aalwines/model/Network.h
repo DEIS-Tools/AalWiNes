@@ -67,7 +67,7 @@ namespace aalwines {
         Router* add_router(std::vector<std::string> names, Args&&... args) {
             auto id = _routers.size();
             _routers.emplace_back(std::make_unique<Router>(id, names, std::forward<Args>(args)...));
-            auto router = _routers.back().get();;
+            auto router = _routers.back().get();
             for (const auto& router_name : names) {
                 auto res = _mapping.insert(router_name);
                 if (!res.first) {
