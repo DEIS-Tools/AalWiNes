@@ -32,6 +32,8 @@
 #include <aalwines/query/QueryBuilder.h>
 #include <pdaaal/CegarPdaFactory.h>
 
+#include <utility>
+
 namespace aalwines {
 
     struct State {
@@ -533,71 +535,60 @@ namespace aalwines {
         std::vector<size_t> _accepting;
     };
 
-/*
-    template <typename W, typename C>
-    struct ConfigurationRange {
-    private:
-        using label_t = Query::label_t;
-        using header_t = typename pdaaal::wildcard_header<label_t,W,C>::header_t;
-    public:
-        using value_type = std::pair<State, header_t>;
-    private:
-        using predicate_fn = std::function<bool(const State&)>;
-        using transform_fn = std::function<value_type(const State&)>;
 
-        using rule_t = std::tuple<size_t, label_t, size_t, pdaaal::op_t, label_t>; // Copied from factory.
+    struct ConfigurationRange {
+    public:
+        using value_type = std::tuple<pdaaal::Header<Query::label_t>, State, State, size_t, size_t>;
+    private:
+        using rule_t = Rule;
         using rule_range_t = pdaaal::RefinementMapping<rule_t>::concrete_value_range;
+        using transform_fn = std::function<std::optional<value_type>(const rule_t&)>;
     public:
         struct sentinel;
         struct iterator {
-            using state_range_t = pdaaal::RefinementMapping<State>::concrete_value_range;
             using rule_iterator = rule_range_t::iterator;
-            using state_iterator = state_range_t::iterator;
         private:
             rule_iterator _rule_it;
             rule_iterator _rule_end;
-            state_iterator _state_it;
-            state_iterator _state_end;
-            state_iterator::value_type _current;
-            predicate_fn _predicate;
-            transform_fn _transform;
-            const pdaaal::RefinementMapping<State>* _state_abstraction;
-        public:
-            iterator(const rule_iterator& rule_it, const rule_iterator& rule_end, state_range_t state_range, const pdaaal::RefinementMapping<State>* state_abstraction) noexcept
-            : _rule_it(rule_it), _rule_end(rule_end), _state_it(state_range.begin()), _state_end(state_range.end()), _state_abstraction(state_abstraction) {
+            const transform_fn& _transform;
+            value_type _current;
+            bool _singleton = false;
+
+            iterator(const rule_iterator& rule_it, const rule_iterator& rule_end, const transform_fn& transform) noexcept
+            : _rule_it(rule_it), _rule_end(rule_end), _transform(transform) {
                 while(!(is_end() || is_valid())) { // Go forward to the first valid element (or the end).
-                    next();
+                    ++_rule_it;
                 }
             };
-            iterator(const rule_range_t& rule_range, const pdaaal::RefinementMapping<State>* state_abstraction) noexcept
-            : iterator(rule_range.begin(), rule_range.begin(),
-                       state_abstraction->get_concrete_values_range(rule_range.begin() == rule_range.end() ? std::numeric_limits<size_t>::max() : std::get<0>(*rule_range.begin())),
-                       state_abstraction) { };
+        public:
+            iterator(const rule_range_t& rule_range, const transform_fn& transform) noexcept
+            : iterator(rule_range.begin(), rule_range.end(), transform) { };
+
+            iterator(const value_type& elem, const rule_iterator& rule_it, const rule_iterator& rule_end, const transform_fn& transform)
+            : _rule_it(rule_it), _rule_end(rule_end), _transform(transform), _current(elem), _singleton(true) { };
 
             value_type operator*() const {
-                return _transform(_current); // We have already dereferenced _state_it when checking is_valid, so we use the stored value.
+                return _current; // We have already computed it when checking is_valid, so we use the stored value.
             }
             iterator& operator++() noexcept {
-                do {
-                    next();
-                } while(!(is_end() || is_valid()));
+                if (_singleton) {
+                    _rule_it = _rule_end;
+                } else {
+                    do {
+                        ++_rule_it;
+                    } while(!(is_end() || is_valid()));
+                }
                 return *this;
             }
             //iterator operator++(int) noexcept { return iterator(_inner++, _state_abstraction); }
             bool operator==(const sentinel& rhs) const noexcept { return is_end(); }
             bool operator!=(const sentinel& rhs) const noexcept { return !(*this == rhs); }
         private:
-            void next() {
-                if (++_state_it == _state_end) {
-                    if (++_rule_it != _rule_end) {
-                        auto range = _state_abstraction->get_concrete_values_range(std::get<0>(*_rule_it));
-                        _state_it = range.begin();
-                        _state_end = range.end();
-                    }
-                }
-            }
             bool is_valid() {
-                return _state_it != _state_end && _predicate(_current = *_state_it);
+                std::optional<value_type> res = _transform(*_rule_it);
+                if (!res) return false;
+                _current = *std::move(res);
+                return true;
             }
             [[nodiscard]] bool is_end() const {
                 return _rule_it == _rule_end;
@@ -608,34 +599,41 @@ namespace aalwines {
             bool operator!=(const iterator& it) const noexcept { return !(it == *this); }
         };
         using const_iterator = iterator;
-        ConfigurationRange(rule_range_t&& rules, const StateMapping* state_mapping, predicate_fn&& predicate, transform_fn&& transform)
-        : _rules(std::move(rules)), _state_mapping(state_mapping) {};
+
+        ConfigurationRange(rule_range_t&& rules, transform_fn&& transform)
+        : _rules(std::move(rules)), _transform(std::move(transform)) {};
+
+        explicit ConfigurationRange(const value_type& elem) : _elem(elem), _singleton(true) { };
+        explicit ConfigurationRange(value_type&& elem) : _elem(std::move(elem)), _singleton(true) { };
 
         [[nodiscard]] iterator begin() const {
-            return iterator(_rules, _state_mapping);
+            return _singleton ? iterator(_elem, _rules.begin(), _rules.end(), _transform) : iterator(_rules, _transform);
         }
         [[nodiscard]] sentinel end() const {
             return sentinel();
         }
 
     private:
-        rule_range_t _rules;
-        const StateMapping* _state_mapping;
-        predicate_fn _predicate;
-        transform_fn _transform;
+        // TODO: This support for combined singleton range and transform of rules range is quite ugly, and has some overhead.
+        //  The singleton case could maybe be handled by PDAAAL by extending the CEGAR model interface.
+        std::vector<size_t> _dummy_range{1}; // Default used by singleton...
+        rule_range_t _rules = rule_range_t(nullptr, &_dummy_range);
+        transform_fn _transform = [](const rule_t&){ return std::nullopt; };
+        value_type _elem; // For singleton_range.
+        bool _singleton = false;
     };
-    */
+
 
     // For now simple unweighted version.
     template<typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
     class CegarNetworkPdaReconstruction : public pdaaal::CegarPdaReconstruction<
             Query::label_t, // label_t
             const Interface*, // state_t
-            //ConfigurationRange<W,C>,
-            std::vector< // configuration_range_t
-                    std::tuple<typename pdaaal::wildcard_header<Query::label_t,W,C>::header_t, // header_t
+            ConfigurationRange,
+            /*std::vector< // configuration_range_t
+                    std::tuple<pdaaal::Header<Query::label_t>, // header_t
                             State,State,size_t,size_t> // old_state, state, eid, rid   (old_state._inf matches eid, rid).
-            >,
+            >,*/
             json , // concrete_trace_t
             W, C, A> {
         friend class CegarNetworkPdaFactory<W_FN,W,C,A>;
@@ -645,114 +643,74 @@ namespace aalwines {
         using concrete_trace_t = json;
     private:
         using state_t = const Interface*; // This is the 'state' that is refined.
-        using header_wrapper_t = pdaaal::wildcard_header<label_t,W,C>;
-        using header_t = typename header_wrapper_t::header_t;
-        using configuration_t = std::tuple<header_t, State, State, size_t, size_t>; // header, state, entry id, forwarding rule id
-        using configuration_range_t = std::vector<configuration_t>;
-        //using configuration_range_t = ConfigurationRange<W,C>;
-        //using configuration_t = typename configuration_range_t::value_type;
+        using header_t = pdaaal::Header<Query::label_t>;
+        //using configuration_t = std::tuple<header_t, State, State, size_t, size_t>; // header, old_state state, entry id, forwarding rule id
+        //using configuration_range_t = std::vector<configuration_t>;
+        using configuration_range_t = ConfigurationRange;
+        using configuration_t = typename configuration_range_t::value_type;
         using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W, C, A>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         using rule_t = typename factory::rule_t;
+        using solver_instance_t = typename parent_t::solver_instance_t;
     public:
         using refinement_t = typename parent_t::refinement_t;
         using header_refinement_t = typename parent_t::header_refinement_t;
 
-        explicit CegarNetworkPdaReconstruction(const factory& factory)
-        : _interface_abstraction(factory._interface_abstraction), _state_mapping(factory._state_mapping), _rule_mapping(factory._rule_mapping) {};
+        explicit CegarNetworkPdaReconstruction(const factory& factory, const solver_instance_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
+        : parent_t(instance, initial_headers, final_headers),
+          _interface_abstraction(factory._interface_abstraction), _state_mapping(factory._state_mapping), _rule_mapping(factory._rule_mapping) {};
 
     protected:
 
-        const configuration_range_t& initial_concrete_rules(const abstract_rule_t& abstract_rule, const header_wrapper_t& header_handler) override {
-            // TODO: Implement efficient configuration range...
-            _temps.emplace_back();
-            auto header = header_handler.initial_header();
-            for (const auto& rule : _rule_mapping.get_concrete_values_range(abstract_rule)) {
+        configuration_range_t initial_concrete_rules(const abstract_rule_t& abstract_rule) override {
+            return ConfigurationRange(_rule_mapping.get_concrete_values_range(abstract_rule),
+              [header=this->initial_header(),this](const rule_t& rule) -> std::optional<configuration_t> {
                 auto from_state = _state_mapping.get_concrete_value(rule._from_id);
-                if (!from_state._initial) continue;
-                auto [pre_label, op, op_label] = rule.get(_state_mapping);
-                auto to_state = _state_mapping.get_concrete_value(rule._to_id);
-                auto [additional_pops, post] = compute_pop_post(pre_label, op, op_label, to_state);
-                auto new_header = header_handler.update(header, pre_label, post, additional_pops);
-                if (new_header) {
-                    _temps.back().emplace_back(new_header.value(), from_state, to_state, rule._eid, rule._rid);
-                }
-            }
-            return _temps.back();
+                if (!from_state._initial) return std::nullopt;
+                return make_configuration(from_state, rule, header);
+            });
         }
-        refinement_t find_initial_refinement(const abstract_rule_t& abstract_rule, const header_wrapper_t&  header_handler) override {
-            std::vector<std::pair<state_t,label_t>> X, Y;
+        refinement_t find_initial_refinement(const abstract_rule_t& abstract_rule) override {
+            std::vector<std::pair<state_t,label_t>> X;
 
-            auto labels = header_handler.pre_labels(header_handler.initial_header());
+            auto labels = this->pre_labels(this->initial_header());
             for (size_t i = 0; i < _state_mapping.size(); ++i) { // TODO: Make this more efficient.
-                if (!_state_mapping.map_id(i) == abstract_rule._from) continue;
+                if (_state_mapping.map_id(i) != abstract_rule._from) continue;
                 auto state = _state_mapping.get_concrete_value(i);
                 if (!state._initial) continue;
                 for (const auto& label : labels) {
-                    if (header_handler.maps_to(label, abstract_rule._pre)) {
+                    if (this->label_maps_to(label, abstract_rule._pre)) {
                         X.emplace_back(state.interface(), label);
                     }
                 }
             }
-            const Interface* interface = nullptr;
-            for (const auto& rule : _rule_mapping.get_concrete_values(abstract_rule)) {
-                assert(_state_mapping.map_id(rule._from_id) == abstract_rule._from);
-                auto from_state = _state_mapping.get_concrete_value(rule._from_id);
-                interface = from_state.interface();
-                assert(from_state.ops_done());
-                Y.emplace_back(from_state.interface(), rule.entry(_state_mapping)._top_label);
-            }
-            assert(interface != nullptr);
-            auto [found, abstract_interface_id] = _interface_abstraction.exists(interface);
-            assert(found);
-            return make_pair_refinement<state_t,label_t>(X, Y, abstract_interface_id, abstract_rule._pre);
+            return find_refinement_common(X, abstract_rule);
         }
-        const configuration_range_t& search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf, const header_wrapper_t&  header_handler) override {
-            // TODO: Implement efficient configuration range...
-            _temps.emplace_back();
+        configuration_range_t search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf) override {
             const auto& [header, old_state, state, eid, rid] = conf;
             if (state.ops_done()) {
-                for (const auto& rule : _rule_mapping.get_concrete_values(abstract_rule)) {
-                    if (!_state_mapping.match_concrete(state, rule._from_id)) continue;
-                    auto [pre_label, op, op_label] = rule.get(_state_mapping);                                 // | Same as above...
-                    auto to_state = _state_mapping.get_concrete_value(rule._to_id);                            // |
-                    auto[additional_pops, post] = compute_pop_post(pre_label, op, op_label, to_state);         // |
-                    auto new_header = header_handler.update(header, pre_label, post, additional_pops);         // |
-                    if (new_header) {                                                                          // |
-                        _temps.back().emplace_back(new_header.value(), state, to_state, rule._eid, rule._rid); // | ... refactor.
-                    }
-                }
+                return ConfigurationRange(_rule_mapping.get_concrete_values_range(abstract_rule),
+                  [&header,&state,this](const rule_t& rule) -> std::optional<configuration_t> {
+                    if (!_state_mapping.match_concrete(state, rule._from_id)) return std::nullopt;
+                    return make_configuration(state, rule, header);
+                });
             } else {
-                // The new_header is computed by executing all ops, so here we just deterministically go to next state without rule lookup.
-                _temps.back().emplace_back(header, old_state, State::perform_op(state), eid, rid);
+                return ConfigurationRange({header, old_state, State::perform_op(state), eid, rid});
             }
-            return _temps.back();
         }
-        refinement_t find_refinement(const std::vector<configuration_t>& configurations, const abstract_rule_t& abstract_rule, const header_wrapper_t&  header_handler) override {
-            std::vector<std::pair<state_t,label_t>> X, Y;
+        refinement_t find_refinement(const abstract_rule_t& abstract_rule, const std::vector<configuration_t>& configurations) override {
+            std::vector<std::pair<state_t,label_t>> X;
 
             for (const auto& [header, old_state, state, eid, rid] : configurations) {
                 assert(state.ops_done());
-                if (_state_mapping.match_abstract(state, abstract_rule._from)) {
-                    for (const auto& label : header_handler.pre_labels(header)) {
-                        if (header_handler.maps_to(label, abstract_rule._pre)) {
-                            X.emplace_back(state._inf, label);
-                        }
+                if (!_state_mapping.match_abstract(state, abstract_rule._from)) continue;
+                for (const auto& label : this->pre_labels(header)) {
+                    if (this->label_maps_to(label, abstract_rule._pre)) {
+                        X.emplace_back(state._inf, label);
                     }
                 }
             }
-            const Interface* interface = nullptr;
-            for (const auto& rule : _rule_mapping.get_concrete_values(abstract_rule)) {
-                assert(_state_mapping.map_id(rule._from_id) == abstract_rule._from);
-                auto from_state = _state_mapping.get_concrete_value(rule._from_id);
-                interface = from_state.interface();
-                assert(from_state.ops_done());
-                Y.emplace_back(from_state.interface(), rule.entry(_state_mapping)._top_label);
-            }
-            assert(interface != nullptr);
-            auto [found, abstract_interface_id] = _interface_abstraction.exists(interface);
-            assert(found);
-            return make_pair_refinement<state_t,label_t>(X, Y, abstract_interface_id, abstract_rule._pre);
+            return find_refinement_common(X, abstract_rule);
         }
         header_t get_header(const configuration_t& conf) override {
             return std::get<0>(conf);
@@ -828,6 +786,33 @@ namespace aalwines {
             return trace;
         }
     private:
+
+        std::optional<configuration_t> make_configuration(const State& state, const rule_t& rule, const header_t& header) {
+            auto [pre_label, op, op_label] = rule.get(_state_mapping);
+            auto to_state = _state_mapping.get_concrete_value(rule._to_id);
+            auto [additional_pops, post] = compute_pop_post(pre_label, op, op_label, to_state);
+            auto new_header = this->update_header(header, pre_label, post, additional_pops);
+            if (new_header) {
+                return std::make_optional<configuration_t>(new_header.value(), state, to_state, rule._eid, rule._rid);
+            }
+            return std::nullopt;
+        }
+        refinement_t find_refinement_common(const std::vector<std::pair<state_t,label_t>>& X, const abstract_rule_t& abstract_rule) {
+            std::vector<std::pair<state_t,label_t>> Y;
+            const Interface* interface = nullptr;
+            for (const auto& rule : _rule_mapping.get_concrete_values(abstract_rule)) {
+                assert(_state_mapping.map_id(rule._from_id) == abstract_rule._from);
+                auto from_state = _state_mapping.get_concrete_value(rule._from_id);
+                interface = from_state.interface();
+                assert(from_state.ops_done());
+                Y.emplace_back(from_state.interface(), rule.entry(_state_mapping)._top_label);
+            }
+            assert(interface != nullptr);
+            auto [found, abstract_interface_id] = _interface_abstraction.exists(interface);
+            assert(found);
+            return make_pair_refinement<state_t,label_t>(X, Y, abstract_interface_id, abstract_rule._pre);
+        }
+
         std::pair<size_t,std::vector<label_t>> compute_pop_post(const label_t& pre_label, pdaaal::op_t op, const label_t& op_label, const State& to_state) const {
             size_t additional_pops = 0;
             std::vector<label_t> post;
