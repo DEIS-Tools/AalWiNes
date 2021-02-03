@@ -469,6 +469,14 @@ namespace aalwines {
         return true;
     }
 
+    bool NetworkSAXHandler::binary(binary_t& val) {
+        if (last_key == keys::unknown){
+            return true;
+        }
+        errors << "error: Unexpected binary value found after key:" << last_key << std::endl;
+        return false;
+    }
+
     bool NetworkSAXHandler::start_object(std::size_t) {
         if (context_stack.empty()) {
             context_stack.push(initial_context);
