@@ -311,7 +311,7 @@ namespace aalwines {
             if (appmode == std::numeric_limits<int32_t>::max())
                 return false;
         }
-        bool is_virtual = entry._ingoing != nullptr && entry._ingoing->is_virtual();
+        bool is_virtual = s._inf->is_virtual();
         if (_only_mpls_swap && !is_virtual && (
                 entry._top_label.type() == Query::INTERFACE ||
                 entry._top_label.type() == Query::ANYIP ||
@@ -410,9 +410,7 @@ namespace aalwines {
             // all clean! start pushing.
             for (auto &entry : s._inf->table().entries()) {
                 for (auto &forward : entry._rules) {
-                    if (forward._via == nullptr || forward._via->target() == nullptr) {
-                        continue; // drop/discard/lookup
-                    }
+                    assert(forward._via != nullptr && forward._via->target() != nullptr);
                     if (forward._via->is_virtual()) {
                         if (!start_rule(id, s, forward, entry, s._nfastate, result))
                             continue;

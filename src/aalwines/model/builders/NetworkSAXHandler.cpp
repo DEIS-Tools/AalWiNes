@@ -714,7 +714,7 @@ namespace aalwines {
                 break;
             }
             case context::context_type::entry:
-                current_table.back()._rules.emplace_back(RoutingTable::type_t::MPLS, std::move(ops), via, priority, weight);
+                current_table.back()._rules.emplace_back(std::move(ops), via, priority, weight);
                 break;
             default:
                 break;

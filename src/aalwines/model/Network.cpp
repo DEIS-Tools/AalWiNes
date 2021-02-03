@@ -69,7 +69,6 @@ namespace aalwines {
             assert(_all_interfaces[i]->global_id() == i);
         }
 #endif
-
         // Update pairings
         for (auto& router : _routers) {
             for (auto& interface : router->interfaces()) {
@@ -115,8 +114,7 @@ namespace aalwines {
 
     const char* empty_string = "";
 
-    std::unordered_set<Query::label_t> Network::interfaces(filter_t& filter)
-    {
+    std::unordered_set<Query::label_t> Network::interfaces(filter_t& filter) {
         std::unordered_set<Query::label_t> res;
         for (auto& r : _routers) {
             if (filter._from(r->name().c_str())) {
@@ -142,7 +140,7 @@ namespace aalwines {
         return res;
     }
 
-    void Network::move_network(Network&& nested_network){
+    void Network::move_network(Network&& nested_network) {
         // Find NULL router
         auto null_router = _mapping["NULL"];
 
@@ -238,7 +236,7 @@ namespace aalwines {
     }
 
 
-    Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links){
+    Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i];

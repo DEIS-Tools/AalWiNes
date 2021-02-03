@@ -43,7 +43,7 @@ namespace aalwines {
             OVER, UNDER, DUAL, EXACT
         };
 
-        enum type_t {
+        enum type_t { // type_t::INTERFACE is used to store interface id as a label_t, because we use the same types in the regex parser for header and path (label and link).
            ANYIP=2, IP4 = 4, IP6 = 8, MPLS = 16, STICKY = 32, INTERFACE = 64, NONE = 128, STICKY_MPLS = MPLS | STICKY
         };
 

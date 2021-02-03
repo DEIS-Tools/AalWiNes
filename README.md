@@ -16,14 +16,13 @@ sudo apt upgrade
 sudo apt install build-essential flex bison cmake libboost-all-dev libfl-dev
 
 
-# get aalwines (P-Rex v2) and compile
+# get aalwines and compile
 git clone git@github.com:DEIS-Tools/aalwines.git
 cd aalwines
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make 
-#export MOPED_PATH=`pwd`/../bin/moped
 # binary will be in build/bin
 ```
 
@@ -35,11 +34,11 @@ cmake -DAALWINES_BuildBundle=ON -DCMAKE_BUILD_TYPE=Release ..
 
 ## Usage Examples
 
-This will run queryfile `query.txt` and weightfile `weight.json` over the network defined in the P-Rex data files, using Post* implementation as engine and producing a trace:
+This will run queryfile `query.txt` and weightfile `weight.json` over the network defined in the AalWiNes JSON network file, using Post* implementation as engine and producing a trace:
     
 ```bash
 cd bin
-./aalwines --topology ../../example_net/Agis-topo.xml --routing ../../example_net/Agis-routing.xml -w ../../example_net/Agis-weight.json -q ../../example_net/Agis-query.q -t -e 2
+./aalwines --input ../../example_net/Agis-network.json -w ../../example_net/Agis-weight.json -q ../../example_net/Agis-query.q -t -e 1
 ```
 
 An example `query.txt` (syntax see below):

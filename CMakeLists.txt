@@ -58,11 +58,6 @@ if (AALWINES_GetDependencies)
     # we can now include external libraries
     include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
     link_directories(${EXTERNAL_INSTALL_LOCATION}/lib)
-
-    # download moped
-    file(MAKE_DIRECTORY bin)
-    file(DOWNLOAD https://github.com/petergjoel/P-Rex/raw/master/bin/moped bin/moped EXPECTED_HASH SHA512=f8a3bfc1914b425a9272544f639325c7799b76a5e6bf39d0500ae2453c7ccce3ddfb7a6db0d54ed5a84e623fea4002f2c09f2eb42235d3bb7cd7d52d78b73f5a)
-    execute_process(COMMAND chmod +x bin/moped)
 endif (AALWINES_GetDependencies)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/)

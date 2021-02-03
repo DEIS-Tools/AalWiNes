@@ -97,7 +97,7 @@ namespace aalwines {
         auto p = elem.back_pointer;
         assert(p != nullptr);
         // Copy routing table to incoming failover interface.
-        elem.edge->match()->table().simple_merge(failed_inf->match()->table());
+        elem.edge->match()->table().merge(failed_inf->match()->table());
         // POP at last hop of re-route
         auto label = next_label();
         p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::POP, label_t{}), elem.edge);

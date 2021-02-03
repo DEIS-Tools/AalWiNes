@@ -44,7 +44,10 @@
 using json = nlohmann::json;
 
 namespace aalwines {
+    class Router;
+
     class Interface {
+        friend class Router;
     public:
         Interface(size_t id, size_t global_id, Router* target, Router* parent)
         : _id(id), _global_id(global_id), _target(target), _parent(parent) {};
@@ -82,7 +85,6 @@ namespace aalwines {
         }
         [[nodiscard]] std::string get_name() const;
         void make_pairing(Interface* interface);
-        void make_pairing(std::vector<const Interface*>& all_interfaces, std::function<bool(const Interface*, const Interface*)> matcher);
         [[nodiscard]] Interface* match() const { return _matching; }
     private:
         size_t _id = std::numeric_limits<size_t>::max();
@@ -91,10 +93,10 @@ namespace aalwines {
         Router* _parent = nullptr;
         Interface* _matching = nullptr;
         RoutingTable _table;
-        friend class Router;
     };
 
     class Router {
+        friend class Interface;
     public:
         explicit Router(size_t id, bool is_null = false) : _index(id), _is_null(is_null) { };
         Router(size_t id, std::vector<std::string> names, std::optional<Coordinate> coordinate = std::nullopt)
@@ -131,9 +133,7 @@ namespace aalwines {
         std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
-        Interface* get_interface(std::vector<const Interface*>& all_interfaces, const std::string& interface_name, Router* expected = nullptr);
-        std::string interface_name(size_t i) const;
-        void pair_interfaces(std::vector<const Interface*>&, std::function<bool(const Interface*, const Interface*)> matcher);
+        [[nodiscard]] std::string interface_name(size_t i) const;
 
         void print_simple(std::ostream& s) const;
         void print_json(json_stream& json_output) const;
@@ -151,7 +151,6 @@ namespace aalwines {
         bool _is_null = false;
         std::vector<std::unique_ptr<Interface>> _interfaces;
         string_map<Interface*> _interface_map;
-        friend class Interface;
     };
 }
 #endif /* ROUTER_H */

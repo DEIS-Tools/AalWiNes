@@ -45,15 +45,7 @@ namespace aalwines {
             input.add_options()
                 ("input", po::value<std::string>(&json_file),
                  "An json-file defining the network in the AalWiNes MPLS Network format")
-                ("juniper", po::value<std::string>(&junos_config),
-                 "A file containing a network-description; each line is a router in the format \"name,alias1,alias2:adjacency.xml,mpls.xml,pfe.xml\". ")
-                ("topology", po::value<std::string>(&prex_topo),
-                 "An xml-file defining the topology in the P-Rex format")
-                ("routing", po::value<std::string>(&prex_routing),
-                 "An xml-file defining the routing in the P-Rex format")
                  ("gml", po::value<std::string>(&topo_zoo),"A gml-file defining the topology in the format from topology zoo")
-                ("skip-pfe", po::bool_switch(&skip_pfe),
-                 "Skip \"indirect\" cases of juniper-routing as package-drops (compatability with P-Rex semantics).")
                 ;
         }
 
@@ -62,8 +54,7 @@ namespace aalwines {
         Network parse(bool no_warnings = false);
 
     private:
-        std::string json_file, junos_config, prex_topo, prex_routing, topo_zoo;
-        bool skip_pfe = false;
+        std::string json_file, topo_zoo;
         po::options_description input;
         stopwatch parsing_stopwatch{false};
     };
