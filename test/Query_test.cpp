@@ -49,10 +49,36 @@ BOOST_AUTO_TEST_CASE(QueryTest1) {
     builder.do_parse(qstream);
 
     Verifier verifier;
+    verifier.set_print_trace();
     for (auto& q : builder._result) {
         auto output = verifier.run_once(builder, q);
         auto result = output["result"].get<utils::outcome_t>();
         BOOST_CHECK_EQUAL(result, utils::outcome_t::YES);
+        BOOST_TEST_MESSAGE(output["trace"]);
     }
 }
 
+BOOST_AUTO_TEST_CASE(QueryTest2) {
+    std::vector<std::string> routers{"Router0", "Router1"};
+    std::vector<std::vector<std::string>> links{{"Router1"},{"Router0"}};
+
+    auto network = Network::make_network(routers, links);
+    uint64_t i = 42;
+    auto next_label = [&i](){return i++;};
+    RouteConstruction::make_data_flow(network.get_router(0)->find_interface("iRouter0"), network.get_router(1)->find_interface("iRouter1"), next_label);
+
+    Builder builder(network);
+    std::string query("<42 .> [.#Router0] [Router0#Router1] [Router1#.] <44 .> 0 OVER");
+
+    std::istringstream qstream(query);
+    builder.do_parse(qstream);
+
+    Verifier verifier;
+    verifier.set_print_trace();
+    for (auto& q : builder._result) {
+        auto output = verifier.run_once(builder, q);
+        auto result = output["result"].get<utils::outcome_t>();
+        BOOST_CHECK_EQUAL(result, utils::outcome_t::YES);
+        BOOST_TEST_MESSAGE(output["trace"]);
+    }
+}

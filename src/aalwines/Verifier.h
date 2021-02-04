@@ -78,6 +78,7 @@ namespace aalwines {
                 exit(-1);
             }
         }
+        void set_print_trace() { _print_trace = true; }
 
         template<typename W_FN = std::function<void(void)>>
         void run(Builder& builder, const std::vector<std::string>& query_strings, json_stream& json_output, bool print_timing = true, const W_FN& weight_fn = [](){}) {
