@@ -80,7 +80,7 @@ BOOST_AUTO_TEST_CASE(JSON_format_IO_test) {
             "name": "interfaceB",
             "routing_table": {
               "10": [{"out": "interfaceA", "priority": 0, "ops":[{"swap":"11"}], "weight": 42},
-                      {"out": "interfaceA", "priority": 0, "ops":[{"swap":"21"}]},
+                      {"out": "interfaceA", "priority": 0, "ops":[{"swap":21}]},
                       {"out": "interfaceC", "priority": 1, "ops":[{"swap":"12"},{"push":"30"}]},
                       {"out": "interfaceB", "priority": 2, "ops":[{"pop":""}]}
               ]
@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE(JSON_format_IO_test) {
           },
           {
             "name": "interfaceB",
-            "routing_table": {"null": [{"out": "interfaceA", "priority": 0, "ops":[{"push":"1"}], "weight": 42}]}
+            "routing_table": {"null": [{"out": "interfaceA", "priority": 0, "ops":[{"push":1}], "weight": 42}]}
           }
         ]
       },
@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(Fast_JSON_Parser_test) {
             "name": "interfaceB",
             "routing_table": {
               "10": [{"out": "interfaceA", "priority": 0, "ops":[{"swap":"11"}], "weight": 42},
-                      {"out": "interfaceA", "priority": 0, "ops":[{"swap":"21"}]},
+                      {"out": "interfaceA", "priority": 0, "ops":[{"swap":21}]},
                       {"out": "interfaceC", "priority": 1, "ops":[{"swap":"12"},{"push":"30"}]},
                       {"out": "interfaceB", "priority": 2, "ops":[{"pop":""}]}
               ]
@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(Fast_JSON_Parser_test) {
           },
           {
             "name": "interfaceB",
-            "routing_table": {"null": [{"out": "interfaceA", "priority": 0, "ops":[{"push":"1"}], "weight": 42}]}
+            "routing_table": {"null": [{"out": "interfaceA", "priority": 0, "ops":[{"push":1}], "weight": 42}]}
           }
         ]
       },

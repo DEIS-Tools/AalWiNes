@@ -349,6 +349,12 @@ namespace aalwines {
             case keys::longitude:
                 longitude = (double)value;
                 break;
+            case keys::swap:
+                ops.emplace_back(RoutingTable::op_t::SWAP, value);
+                break;
+            case keys::push:
+                ops.emplace_back(RoutingTable::op_t::PUSH, value);
+                break;
             case keys::unknown:
                 break;
             default:
