@@ -63,20 +63,17 @@ namespace aalwines {
 
     class Builder {
     public:
-        explicit Builder(Network& network);
+        explicit Builder(Network& network) : _network(network) { };
+
         // Return 0 on success.
         int do_parse(std::istream &stream);
 
         using labelset_t = std::unordered_set<Query::label_t>;
         labelset_t all_labels();
-        static labelset_t get_labels(const labelset_t& all_labels, uint64_t label, uint64_t mask, Query::type_t type, bool exact = false);
-        labelset_t get_labels(uint64_t label, uint64_t mask, Query::type_t type, bool exact = false) {
-            return Builder::get_labels(all_labels(), label, mask, type, exact);
-        }
 
 	    // Building
-	    void path_mode();
-	    void label_mode();
+	    void path_mode() { _pathmode = true; }
+	    void label_mode() { _pathmode = false; }
         
         // matching on atomics 
         labelset_t filter_and_merge(filter_t&, labelset_t&);
@@ -89,23 +86,10 @@ namespace aalwines {
         
         filter_t match_re(std::string&& re) const;
         filter_t match_exact(const std::string& str) const;
-        filter_t routing_id();
-        filter_t discard_id();
-        labelset_t find_label(uint64_t label, uint64_t mask);
-        labelset_t any_ip();
-        labelset_t any_mpls();
-        labelset_t any_sticky();
-        labelset_t match_ip4(int i1, int i2, int i3, int i4, int mask);
-        labelset_t match_ip6(int i1, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int mask);
-        labelset_t expand_labels(Query::label_t label);
-        void set_sticky() { _sticky = true; }
-        void unset_sticky() { _sticky = false; }
-        void invert(bool val)
-        {
+        void invert(bool val) {
             _inverted = val;
         }
         bool inverted() const { return _inverted; }
-        void expand(bool val) { _expand = val; }
         
         // Error handling.
         void error(const location &l, const std::string &m);
@@ -123,8 +107,6 @@ namespace aalwines {
         bool _post = false;
         bool _link = false;
         bool _inverted = false;
-        bool _expand = false;
-        bool _sticky = false;
 
     private:
         labelset_t _label_cache;

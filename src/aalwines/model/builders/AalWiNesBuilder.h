@@ -107,10 +107,10 @@ namespace aalwines {
                 action._op = RoutingTable::op_t::POP;
             } else if (op_string == "swap") {
                 action._op = RoutingTable::op_t::SWAP;
-                action._op_label.set_value(label_string);
+                action._op_label = label_string.is_number_unsigned() ? label_string.get<size_t>() : static_cast<size_t>(std::stoul(label_string.get<std::string>()));
             } else if (op_string == "push") {
                 action._op = RoutingTable::op_t::PUSH;
-                action._op_label.set_value(label_string);
+                action._op_label = label_string.is_number_unsigned() ? label_string.get<size_t>() : static_cast<size_t>(std::stoul(label_string.get<std::string>()));
             } else {
                 std::stringstream es;
                 es << "error: Unknown operation: \"" << op_string << "\": \"" << label_string << "\"" << std::endl;

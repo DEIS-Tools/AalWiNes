@@ -100,7 +100,7 @@ namespace aalwines {
         elem.edge->match()->table().merge(failed_inf->match()->table());
         // POP at last hop of re-route
         auto label = next_label();
-        p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::POP, label_t{}), elem.edge);
+        p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::POP), elem.edge);
         // SWAP for each intermediate hop during re-route
         auto via = p->edge;
         for (p = p->back_pointer; p != nullptr; via = p->edge, p = p->back_pointer) {
@@ -168,7 +168,7 @@ namespace aalwines {
         for (auto via : path) {
             if (from->source() != via->source()) return false;
             auto swap_label = next_label();
-            from->table().add_rule(pre_label, {RoutingTable::op_t::SWAP, swap_label}, via);
+            from->table().add_rule(pre_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, swap_label), via);
             from = via->match();
             pre_label = swap_label;
         }

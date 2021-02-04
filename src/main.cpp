@@ -66,7 +66,7 @@ int main(int argc, const char** argv)
 
     NetworkParsing parser("Input Options");
     po::options_description output("Output Options");
-    po::options_description verification("Verification Options");    
+    Verifier verifier("Verification Options");
     
     bool print_dot = false;
     bool print_net = false;
@@ -88,25 +88,13 @@ int main(int argc, const char** argv)
 
     std::string query_file;
     std::string weight_file;
-    unsigned int link_failures = 0;
-    size_t tos = 0;
-    size_t engine = 0;
-    bool get_trace = false;
-    bool no_ip_swap = false;
-    verification.add_options()
-            ("query,q", po::value<std::string>(&query_file),
-            "A file containing valid queries over the input network.")
-            ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
-            ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
-            ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
-            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=post*,2=pre*")
-            ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression")
-            ;
+    verifier.add_options()
+            ("query,q", po::value<std::string>(&query_file), "A file containing valid queries over the input network.")
+            ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression");
 
     opts.add(parser.options());
     opts.add(output);
-    opts.add(verification);
+    opts.add(verifier.options());
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, opts), vm);
@@ -116,18 +104,7 @@ int main(int argc, const char** argv)
         std::cout << opts << "\n";
         return 1;
     }
-    
-    if(tos > 4)
-    {
-        std::cerr << "Unknown value for --tos-reduction : " << tos << std::endl;
-        exit(-1);
-    }
-    
-    if(engine > 2)
-    {
-        std::cerr << "Unknown value for --engine : " << engine << std::endl;
-        exit(-1);        
-    }
+    verifier.check_settings();
 
     if(silent) no_parser_warnings = true;
 
@@ -205,11 +182,7 @@ int main(int argc, const char** argv)
 
         std::optional<NetworkWeight::weight_function> weight_fn;
         if (!weight_file.empty()) {
-            if (engine != 1) {
-                std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*). Not for --engine " << engine << std::endl;
-                exit(-1);
-            }
-            // TODO: Implement parsing of latency info here.
+            verifier.check_supports_weight();
             NetworkWeight network_weight;
             {
                 std::ifstream wstream(weight_file);
@@ -236,17 +209,14 @@ int main(int argc, const char** argv)
             json_output.entry("network-parsing-time", parser.duration());
             json_output.entry("query-parsing-time", queryparsingwatch.duration());
         }
+
+        json_output.begin_object("answers");
         if (weight_fn) {
-            Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
-            json_output.begin_object("answers");
-            verifier.run(query_strings, json_output);
-            json_output.end_object();
-        } else { // a void(void) function encodes 'no weight'.
-            Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
-            json_output.begin_object("answers");
-            verifier.run(query_strings, json_output);
-            json_output.end_object();
+            verifier.run(builder, query_strings, json_output, !no_timing, weight_fn.value());
+        } else {
+            verifier.run(builder, query_strings, json_output, !no_timing);
         }
+        json_output.end_object();
     }
 
     return 0;

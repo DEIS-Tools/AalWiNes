@@ -349,6 +349,12 @@ namespace aalwines {
             case keys::longitude:
                 longitude = (double)value;
                 break;
+            case keys::swap:
+                ops.emplace_back(RoutingTable::op_t::SWAP, value);
+                break;
+            case keys::push:
+                ops.emplace_back(RoutingTable::op_t::PUSH, value);
+                break;
             case keys::unknown:
                 break;
             default:
@@ -439,13 +445,13 @@ namespace aalwines {
             }
             case keys::pop:
                 assert(value.empty()); // TODO: Should this be error?
-                ops.emplace_back(RoutingTable::op_t::POP, Query::label_t{});
+                ops.emplace_back(RoutingTable::op_t::POP);
                 break;
             case keys::swap:
-                ops.emplace_back(RoutingTable::op_t::SWAP, Query::label_t(value));
+                ops.emplace_back(RoutingTable::op_t::SWAP, value);
                 break;
             case keys::push:
-                ops.emplace_back(RoutingTable::op_t::PUSH, Query::label_t(value));
+                ops.emplace_back(RoutingTable::op_t::PUSH, value);
                 break;
             case keys::from_interface:
                 current_from_interface_name = value;
@@ -612,7 +618,7 @@ namespace aalwines {
                 break;
             case context::context_type::routing_table:
                 last_key = keys::table_label;
-                current_table.emplace_entry(RoutingTable::label_t(key));
+                current_table.emplace_entry(key);
                 break;
             case context::context_type::entry:
                 if (key == "out") {

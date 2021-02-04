@@ -69,7 +69,7 @@ namespace aalwines
             case op_t::PUSH:
                 if (_ops.back()._op == op_t::POP) {
                     _ops.pop_back();
-                    add_action(action_t{op_t::SWAP, action._op_label});
+                    add_action(action_t(op_t::SWAP, action._op_label));
                     return;
                 }
                 break;
@@ -82,7 +82,7 @@ namespace aalwines
             case op_t::POP:
                 if (_ops.back()._op == op_t::SWAP) {
                     _ops.pop_back();
-                    add_action(action_t{op_t::POP, label_t{}});
+                    add_action(action_t(op_t::POP));
                     return;
                 }
                 break;
@@ -95,7 +95,7 @@ namespace aalwines
             for (const auto& f : e._rules) {
                 if (f._via == failed_inf) {
                     new_rules.emplace_back(f._ops, backup_inf, f._priority + 1);
-                    new_rules.back().add_action(action_t{op_t::PUSH, failover_label});
+                    new_rules.back().add_action(action_t(op_t::PUSH, failover_label));
                 }
             }
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
@@ -218,7 +218,11 @@ namespace aalwines
 
     void RoutingTable::entry_t::print_json(std::ostream& s) const
     {
-        print_label(_top_label, s);
+        if (ignores_label()) {
+            s << "\"null\"";
+        } else {
+            print_label(_top_label, s);
+        }
         s << ":\n";
         s << "\t[";
         for (size_t i = 0; i < _rules.size(); ++i) {
@@ -233,30 +237,7 @@ namespace aalwines
     void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
     {
         if (quote) s << "\"";
-        switch (label.type()) {
-        case Query::STICKY_MPLS:
-            s << "s"; // fall through on purpose
-        case Query::MPLS:
-            if(label == Query::label_t::any_mpls ||
-               label == Query::label_t::any_sticky_mpls)
-                s << "mpls";
-            else
-                s << 'l' << std::dec << label.value() << std::dec;
-            assert(label.mask() == 0);
-            break;
-        case Query::IP4:
-            s << "ip4" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
-            assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
-            break;
-        case Query::IP6:
-            s << "ip6" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
-            assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
-            break;
-        default:
-            assert(false);
-            throw base_error("Interfaces cannot be pushdown-labels.");
-            break;
-        }
+        s << label;
         if (quote) s << "\"";
     }
 
@@ -268,15 +249,13 @@ namespace aalwines
             s << ", \"via\":";
             if (use_hex) {
                 s << _via->id();
-            }
-            else {
-                auto iname = _via->source()->interface_name(_via->id());
-                s << "\"" << iname << "\"";
+            } else {
+                s << "\"" << _via->get_name() << "\"";
             }
         }
         else
             s << ",  \"drop\":true";
-        if (_ops.size() > 0) {
+        if (!_ops.empty()) {
             s << ", \"ops\":[";
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)

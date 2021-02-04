@@ -171,9 +171,6 @@ Every regular expression in the regex-list is built out of following components:
 | regex`?`        | optional: regex must match zero or one time |
 | `[`atom-list`]` | matches the atom_list (see below) |
 | `[^`atom-list`]`| matches everything except the atom_list |
-| `ip`            | matches any ip address |
-| `mpls`          | matches any non-sticky mpls label |
-| `smpls`         | matches any sticky mpls label |
 | `(`regex-list`)`| must match the given sub regex-list |
 
 The atom-list contains a comma separated list of atoms (for `path`) or labels(for `preCondition` and `postCondition`).
@@ -207,9 +204,5 @@ The syntax of a list with labels is:
 
 | syntax          | description |
 | --------------: | ----------- |
-| `[$`label`]`        | A sticky label. Can be used with all following types |
 | `[`label1`,`label2`]`        | A list of labels. Can be used with all following types |
 | `[`number`]`        | A mpls label with number |
-| `[`number`/`mask`]`   | A range of mpls labels, specified by number and a mask in bits |
-| `[`ip`]`            | An ip label. Can be an ipv4 or an ipv6 address |
-| `[`ip`/`mask`]`   | An ip network. An ipv4 or an ipv6 address together with a mask in bits |
