@@ -29,14 +29,15 @@
 
 #include <unordered_set>
 #include <functional>
+#include <string>
 
 namespace aalwines {
     // we are going to use some lazy function-combination here.
     // probably not the fastest or prettiest, but seems to be the easiest.
     struct filter_t {
-        std::function<bool(const char*)> _from = [](const char*){return true;};
-        std::function<bool(const char*, const char*, const char*)> _link = 
-        [](const char*, const char*, const char*){return true;};
+        std::function<bool(const std::string&)> _from = [](const std::string&){ return true; };
+        std::function<bool(const std::string&, const std::string&, const std::string&)> _link =
+        [](const std::string&, const std::string&, const std::string&){ return true; };
         filter_t operator&&(const filter_t& other);
     };
 }

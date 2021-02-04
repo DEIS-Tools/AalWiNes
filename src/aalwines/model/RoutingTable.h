@@ -49,9 +49,18 @@ namespace aalwines {
 
         struct action_t {
             op_t _op = op_t::POP;
-            label_t _op_label;
+            size_t _op_label = std::numeric_limits<size_t>::max();
             action_t() = default;
-            action_t(op_t op, label_t op_label) : _op(op), _op_label(op_label) {};
+            explicit action_t(op_t op) : _op(op) {
+                assert(op == op_t::POP);
+            };
+            action_t(op_t op, size_t op_label) : _op(op), _op_label(op_label) {
+                assert(op == op_t::PUSH || op == op_t::SWAP);
+            };
+            action_t(op_t op, const std::string& op_label) : _op(op) {
+                assert(op == op_t::PUSH || op == op_t::SWAP);
+                _op_label = static_cast<size_t>(std::stoul(op_label));
+            };
             void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
             bool operator==(const action_t& other) const;
             bool operator!=(const action_t& other) const;
@@ -73,11 +82,16 @@ namespace aalwines {
         };
 
         struct entry_t {
-            label_t _top_label;
+            size_t _top_label = std::numeric_limits<size_t>::max();
             std::vector<forward_t> _rules;
 
             entry_t() = default;
-            explicit entry_t(label_t top_label) : _top_label{top_label} { };
+            explicit entry_t(size_t top_label) : _top_label{top_label} { };
+            explicit entry_t(const std::string& label) {
+                if (!label.empty() && label != "null") {
+                    _top_label = static_cast<size_t>(std::stoul(label));
+                }
+            }
 
             bool operator==(const entry_t& other) const;
             bool operator!=(const entry_t& other) const;
@@ -86,6 +100,9 @@ namespace aalwines {
             static void print_label(label_t label, std::ostream& s, bool quote = true);
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
             void add_to_outgoing(const Interface* outgoing, action_t action);
+            [[nodiscard]] bool ignores_label() const {
+                return _top_label == std::numeric_limits<size_t>::max();
+            }
         };
 
     public:
@@ -95,8 +112,8 @@ namespace aalwines {
         [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
-        entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
-        entry_t& emplace_entry(label_t top_label) { _entries.emplace_back(top_label); return _entries.back(); }
+        template <typename... Args>
+        entry_t& emplace_entry(Args... args) { return _entries.emplace_back(std::forward<Args>(args)...); }
         void pop_entry() { _entries.pop_back(); }
         entry_t& back() { return _entries.back(); }
 

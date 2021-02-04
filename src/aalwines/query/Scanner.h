@@ -45,11 +45,9 @@ namespace aalwines {
         };
         using FlexLexer::yylex;
 
-        virtual
-        int yylex();
+        virtual int yylex();
 
-        double last_float;
-        int64_t last_int;
+        size_t last_int;
         std::string last_string;
     };
 

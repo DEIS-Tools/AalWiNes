@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(QueryTest1) {
 
     auto network = Network::make_network(routers, links);
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     RouteConstruction::make_data_flow(network.get_router(0)->find_interface("iRouter0"), network.get_router(1)->find_interface("iRouter1"), next_label);
 
     Builder builder(network);

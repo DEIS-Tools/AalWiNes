@@ -92,12 +92,10 @@ int main(int argc, const char** argv)
     size_t tos = 0;
     size_t engine = 0;
     bool get_trace = false;
-    bool no_ip_swap = false;
     verification.add_options()
             ("query,q", po::value<std::string>(&query_file),
             "A file containing valid queries over the input network.")
             ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
-            ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
             ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
             ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
             ("engine,e", po::value<size_t>(&engine), "0=no verification,1=post*,2=pre*")
@@ -237,12 +235,12 @@ int main(int argc, const char** argv)
             json_output.entry("query-parsing-time", queryparsingwatch.duration());
         }
         if (weight_fn) {
-            Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
+            Verifier verifier(builder, weight_fn.value(), engine, tos, !no_timing, get_trace);
             json_output.begin_object("answers");
             verifier.run(query_strings, json_output);
             json_output.end_object();
         } else { // a void(void) function encodes 'no weight'.
-            Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
+            Verifier verifier(builder, engine, tos, !no_timing, get_trace);
             json_output.begin_object("answers");
             verifier.run(query_strings, json_output);
             json_output.end_object();

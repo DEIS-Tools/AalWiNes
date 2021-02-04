@@ -50,10 +50,10 @@ namespace aalwines {
     public:
         constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
-        explicit Verifier(Builder& builder, size_t engine = 1, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
-        : Verifier(builder, [](){}, engine, reduction, no_ip_swap, print_timing, print_trace) {};
-        Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 1, size_t reduction = 0, bool no_ip_swap = false, bool print_timing = true, bool print_trace = true)
-        : _builder(builder), weight_fn(weight_fn), engine(engine), reduction(reduction), no_ip_swap(no_ip_swap), print_timing(print_timing), print_trace(print_trace) {};
+        explicit Verifier(Builder& builder, size_t engine = 1, size_t reduction = 0, bool print_timing = true, bool print_trace = true)
+        : Verifier(builder, [](){}, engine, reduction, print_timing, print_trace) {};
+        Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 1, size_t reduction = 0, bool print_timing = true, bool print_trace = true)
+        : _builder(builder), weight_fn(weight_fn), engine(engine), reduction(reduction), print_timing(print_timing), print_trace(print_trace) {};
 
         void run(const std::vector<std::string>& query_strings, json_stream& json_output) {
             size_t query_no = 0;
@@ -91,7 +91,7 @@ namespace aalwines {
                 // Construct PDA
                 compilation_time.start();
                 q.set_approximation(m);
-                NetworkPDAFactory factory(q, _builder._network, _builder.all_labels(), no_ip_swap, weight_fn);
+                NetworkPDAFactory factory(q, _builder._network, _builder.all_labels(), weight_fn);
                 auto pda = factory.compile();
                 compilation_time.stop();
 
@@ -183,7 +183,6 @@ namespace aalwines {
         // Settings
         size_t engine;
         size_t reduction;
-        bool no_ip_swap;
         bool print_timing;
         bool print_trace;
 
