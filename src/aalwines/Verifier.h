@@ -36,6 +36,9 @@
 #include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
+
 namespace aalwines {
 
     inline void to_json(json & j, const Query::mode_t& mode) {
@@ -45,23 +48,45 @@ namespace aalwines {
 
     using namespace pdaaal;
 
-    template<typename W_FN = std::function<void(void)>>
     class Verifier {
     public:
-        constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
-        explicit Verifier(Builder& builder, size_t engine = 1, size_t reduction = 0, bool print_timing = true, bool print_trace = true)
-        : Verifier(builder, [](){}, engine, reduction, print_timing, print_trace) {};
-        Verifier(Builder& builder, const W_FN& weight_fn, size_t engine = 1, size_t reduction = 0, bool print_timing = true, bool print_trace = true)
-        : _builder(builder), weight_fn(weight_fn), engine(engine), reduction(reduction), print_timing(print_timing), print_trace(print_trace) {};
+        explicit Verifier(const std::string& caption = "Verification Options") : verification(caption) {
+            verification.add_options()
+                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*")
+                    ("tos-reduction,r", po::value<size_t>(&_reduction), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
+                    ("trace,t", po::bool_switch(&_print_trace), "Get a trace when possible")
+                    ;
+        }
 
-        void run(const std::vector<std::string>& query_strings, json_stream& json_output) {
+        [[nodiscard]] const po::options_description& options() const { return verification; }
+        auto add_options() { return verification.add_options(); }
+
+        void check_settings() const {
+            if(_reduction > 4) {
+                std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
+                exit(-1);
+            }
+            if(_engine > 2) {
+                std::cerr << "Unknown value for --engine : " << _engine << std::endl;
+                exit(-1);
+            }
+        }
+        void check_supports_weight() const {
+            if (_engine != 1) {
+                std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*). Not for --engine " << _engine << std::endl;
+                exit(-1);
+            }
+        }
+
+        template<typename W_FN = std::function<void(void)>>
+        void run(Builder& builder, const std::vector<std::string>& query_strings, json_stream& json_output, bool print_timing = true, const W_FN& weight_fn = [](){}) {
             size_t query_no = 0;
-            for (auto& q : _builder._result) {
+            for (auto& q : builder._result) {
                 std::stringstream qn;
                 qn << "Q" << query_no+1;
 
-                auto res = run_once(q);
+                auto res = run_once(builder, q, print_timing, weight_fn);
                 res["query"] = query_strings[query_no];
                 json_output.entry_object(qn.str(), res);
 
@@ -69,10 +94,13 @@ namespace aalwines {
             }
         }
 
-        json run_once(Query& q){
+        template<typename W_FN = std::function<void(void)>>
+        json run_once(Builder& builder, Query& q, bool print_timing = true, const W_FN& weight_fn = [](){}){
+            constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
+
             json output; // Store output information in this JSON object.
             static const char *engineTypes[] {"", "Post*", "Pre*"};
-            output["engine"] = engineTypes[engine];
+            output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
             std::vector<Query::mode_t> modes = q.approximation() == Query::DUAL ? std::vector<Query::mode_t>{Query::OVER, Query::UNDER} : std::vector<Query::mode_t>{q.approximation()};
@@ -91,19 +119,19 @@ namespace aalwines {
                 // Construct PDA
                 compilation_time.start();
                 q.set_approximation(m);
-                NetworkPDAFactory factory(q, _builder._network, _builder.all_labels(), weight_fn);
+                NetworkPDAFactory factory(q, builder._network, builder.all_labels(), weight_fn);
                 auto pda = factory.compile();
                 compilation_time.stop();
 
                 // Reduce PDA
                 reduction_time.start();
-                output["reduction"] = Reducer::reduce(pda, reduction, pda.initial(), pda.terminal());
+                output["reduction"] = Reducer::reduce(pda, _reduction, pda.initial(), pda.terminal());
                 reduction_time.stop();
 
                 // Choose engine, run verification, and (if relevant) get the trace.
                 verification_time.start();
                 bool engine_outcome;
-                switch(engine) {
+                switch(_engine) {
                     case 1: {
                         using W = typename W_FN::result_type;
                         SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
@@ -156,7 +184,7 @@ namespace aalwines {
 
             output["result"] = result;
 
-            if (print_trace && result == utils::outcome_t::YES) {
+            if (_print_trace && result == utils::outcome_t::YES) {
                 if constexpr (is_weighted) {
                     output["trace-weight"] = trace_weight;
                 }
@@ -174,17 +202,12 @@ namespace aalwines {
         }
 
     private:
-        // Builder contains the network and the queries.
-        Builder& _builder;
-
-        // Weight function
-        const W_FN& weight_fn;
+        po::options_description verification;
 
         // Settings
-        size_t engine;
-        size_t reduction;
-        bool print_timing;
-        bool print_trace;
+        size_t _engine = 1;
+        size_t _reduction = 0;
+        bool _print_trace = false;
 
         // Solver engines
         SolverAdapter solver;

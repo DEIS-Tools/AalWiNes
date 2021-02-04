@@ -123,7 +123,7 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     std::pair<size_t, size_t> reduction;
     std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> trace;
     builder._result[0].set_approximation(modes[0]);
-    NetworkPDAFactory factory(builder._result[0], synthetic_network, builder.all_labels(), false);
+    NetworkPDAFactory factory(builder._result[0], synthetic_network, builder.all_labels());
     auto pda = factory.compile();
     reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
 
@@ -148,9 +148,9 @@ void build_query(const std::string& query, Network& synthetic_network, Builder b
     std::istringstream qstream(query);
     builder.do_parse(qstream);
 
-    Verifier verifier(builder);
+    Verifier verifier;
     for(auto& q : builder._result) {
-        auto output = verifier.run_once(q);
+        auto output = verifier.run_once(builder, q);
         auto result = output["result"].get<utils::outcome_t>();
         BOOST_CHECK_EQUAL(result, utils::outcome_t::YES);
         std::cout << output << std::endl;

@@ -48,9 +48,9 @@ BOOST_AUTO_TEST_CASE(QueryTest1) {
     std::istringstream qstream(query);
     builder.do_parse(qstream);
 
-    Verifier verifier(builder);
+    Verifier verifier;
     for (auto& q : builder._result) {
-        auto output = verifier.run_once(q);
+        auto output = verifier.run_once(builder, q);
         auto result = output["result"].get<utils::outcome_t>();
         BOOST_CHECK_EQUAL(result, utils::outcome_t::YES);
     }
