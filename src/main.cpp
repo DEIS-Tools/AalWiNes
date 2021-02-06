@@ -32,9 +32,6 @@
 #include <aalwines/model/NetworkWeight.h>
 
 #include <aalwines/query/parsererrors.h>
-#include <pdaaal/PDAFactory.h>
-#include <pdaaal/SolverAdapter.h>
-#include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
 #include <aalwines/Verifier.h>

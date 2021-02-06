@@ -31,9 +31,12 @@
 #include <vector>
 #include <map>
 
+#include <json.hpp>
 #include <ptrie/ptrie_map.h>
 
 #include "Query.h"
+
+using json = nlohmann::json;
 
 namespace aalwines {
     class Interface;
@@ -62,6 +65,7 @@ namespace aalwines {
                 _op_label = static_cast<size_t>(std::stoul(op_label));
             };
             void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
+            [[nodiscard]] json to_json() const;
             bool operator==(const action_t& other) const;
             bool operator!=(const action_t& other) const;
         };
@@ -75,6 +79,7 @@ namespace aalwines {
             forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
                 : _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
+            [[nodiscard]] json to_json() const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
             bool operator!=(const forward_t& other) const;

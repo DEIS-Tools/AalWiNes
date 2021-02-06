@@ -128,13 +128,13 @@ namespace aalwines {
         [[nodiscard]] const std::string& name() const;
         [[nodiscard]] const std::vector<std::string>& names() const { return _names; }
 
-        void print_dot(std::ostream& out) const;
         [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
         std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
         [[nodiscard]] std::string interface_name(size_t i) const;
 
+        void print_dot(std::ostream& out) const;
         void print_simple(std::ostream& s) const;
         void print_json(json_stream& json_output) const;
 

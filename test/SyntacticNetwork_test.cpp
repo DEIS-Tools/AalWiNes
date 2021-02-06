@@ -119,13 +119,14 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
 
     pdaaal::SolverAdapter solver;
 
-    std::vector<Query::mode_t> modes{builder._result[0].approximation()};
+    auto& q = builder._result[0];
+    std::vector<Query::mode_t> modes{q.approximation()};
     std::pair<size_t, size_t> reduction;
-    std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> trace;
-    builder._result[0].set_approximation(modes[0]);
-    NetworkPDAFactory factory(builder._result[0], synthetic_network, builder.all_labels());
-    auto pda = factory.compile();
-    reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
+    q.set_approximation(modes[0]);
+    q.compile_nfas();
+    NetworkPDAFactory factory(q, synthetic_network, builder.all_labels());
+    auto problem_instance = factory.compile(q.construction(), q.destruction());
+    //reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
 
     std::stringstream results;
     stopwatch verification_time_post(false);
@@ -133,10 +134,12 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     trace_stream << std::endl << "Post*: " <<std::endl;
 
     verification_time_post.start();
-    auto solver_result1 = solver.post_star<pdaaal::Trace_Type::Any>(pda);
+    auto solver_result1 = pdaaal::Solver::post_star_accepts<pdaaal::Trace_Type::Any>(problem_instance);
+    BOOST_CHECK(solver_result1);
+    auto pda_trace = pdaaal::Solver::get_trace<pdaaal::Trace_Type::Any>(problem_instance);
     verification_time_post.stop();
-    trace = solver.get_trace(pda, std::move(solver_result1.second));
-    factory.write_json_trace(trace_stream, trace);
+    auto json_trace = factory.get_json_trace(pda_trace);
+    trace_stream << json_trace.dump();
 
     results << std::endl << "post*-time: " << verification_time_post.duration() << std::endl;
 

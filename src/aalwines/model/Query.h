@@ -47,11 +47,9 @@ namespace aalwines {
         static constexpr label_t bottom_of_stack() noexcept { return std::numeric_limits<size_t>::max(); }
 
         Query() = default;
-        Query(pdaaal::NFA<label_t>&& pre, pdaaal::NFA<label_t>&& path, pdaaal::NFA<label_t>&& post, int lf, mode_t mode)
+        Query(pdaaal::NFA<label_t>&& pre, pdaaal::NFA<label_t>&& path, pdaaal::NFA<label_t>&& post, size_t lf, mode_t mode)
         : _prestack(std::move(pre)), _poststack(std::move(post)), _path(std::move(path)), _link_failures(lf), _mode(mode) {
-            auto temp = pdaaal::NFA<label_t>(std::unordered_set<label_t>{Query::bottom_of_stack()});
-            std::swap(temp, _prestack);
-            _prestack.concat(std::move(temp));
+            _prestack.concat(pdaaal::NFA<label_t>(std::unordered_set<label_t>{Query::bottom_of_stack()}));
             _poststack.concat(pdaaal::NFA<label_t>(std::unordered_set<label_t>{Query::bottom_of_stack()}));
         };
 
@@ -75,15 +73,22 @@ namespace aalwines {
             return _mode;
         }
 
-        [[nodiscard]] int number_of_failures() const {
+        [[nodiscard]] size_t number_of_failures() const {
             return _link_failures;
         }
+
+        void compile_nfas() {
+            _prestack.compile();
+            _poststack.compile();
+            _path.compile();
+        }
+
         void print_dot(std::ostream& out);
     private:
         pdaaal::NFA<label_t> _prestack;
         pdaaal::NFA<label_t> _poststack;
         pdaaal::NFA<label_t> _path;
-        int _link_failures = 0;
+        size_t _link_failures = 0;
         mode_t _mode;
     };
 }

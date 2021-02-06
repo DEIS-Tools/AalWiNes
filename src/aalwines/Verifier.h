@@ -46,8 +46,6 @@ namespace aalwines {
         j = modeTypes[mode];
     }
 
-    using namespace pdaaal;
-
     class Verifier {
     public:
 
@@ -107,7 +105,7 @@ namespace aalwines {
             std::vector<Query::mode_t> modes = q.approximation() == Query::DUAL ? std::vector<Query::mode_t>{Query::OVER, Query::UNDER} : std::vector<Query::mode_t>{q.approximation()};
             output["mode"] = q.approximation();
 
-            std::stringstream proof;
+            json json_trace;
             std::vector<unsigned int> trace_weight;
             stopwatch compilation_time(false);
             stopwatch reduction_time(false);
@@ -115,18 +113,19 @@ namespace aalwines {
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
             for (auto m : modes) {
-                proof = std::stringstream(); // Clear stream from previous mode.
+                json_trace = json(); // Clear trace from previous mode.
 
                 // Construct PDA
                 compilation_time.start();
                 q.set_approximation(m);
+                q.compile_nfas();
                 NetworkPDAFactory factory(q, builder._network, builder.all_labels(), weight_fn);
-                auto pda = factory.compile();
+                auto problem_instance = factory.compile(q.construction(), q.destruction());
                 compilation_time.stop();
 
                 // Reduce PDA
-                reduction_time.start();
-                output["reduction"] = Reducer::reduce(pda, _reduction, pda.initial(), pda.terminal());
+                reduction_time.start(); // TODO: Implement reduction for solver instance. (Generalised version with multiple initial and final states)
+                //output["reduction"] = pdaaal::Reducer::reduce(pda, _reduction, pda.initial(), pda.terminal());
                 reduction_time.stop();
 
                 // Choose engine, run verification, and (if relevant) get the trace.
@@ -134,36 +133,29 @@ namespace aalwines {
                 bool engine_outcome;
                 switch(_engine) {
                     case 1: {
-                        using W = typename W_FN::result_type;
-                        SolverAdapter::res_type<W,std::less<W>,pdaaal::add<W>> solver_result;
-                        if constexpr (is_weighted) {
-                            solver_result = solver.post_star<pdaaal::Trace_Type::Shortest>(pda);
-                        } else {
-                            solver_result = solver.post_star<pdaaal::Trace_Type::Any>(pda);
-                        }
-                        engine_outcome = solver_result.first;
-                        verification_time.stop();
+                        constexpr pdaaal::Trace_Type trace_type = is_weighted ? pdaaal::Trace_Type::Shortest : pdaaal::Trace_Type::Any;
+                        engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(problem_instance);
                         if (engine_outcome) {
-                            std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > trace;
+                            std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t > pda_trace;
                             if constexpr (is_weighted) {
-                                std::tie(trace, trace_weight) = solver.get_trace<pdaaal::Trace_Type::Shortest>(pda, std::move(solver_result.second));
+                                std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(problem_instance);
                             } else {
-                                trace = solver.get_trace<pdaaal::Trace_Type::Any>(pda, std::move(solver_result.second));
+                                pda_trace = pdaaal::Solver::get_trace<trace_type>(problem_instance);
                             }
-                            if (factory.write_json_trace(proof, trace))
-                                result = utils::outcome_t::YES;
+                            json_trace = factory.get_json_trace(pda_trace);
+                            if (!json_trace.is_null()) result = utils::outcome_t::YES;
                         }
+                        verification_time.stop();
                         break;
                     }
                     case 2: {
-                        auto solver_result = solver.pre_star(pda, true);
-                        engine_outcome = solver_result.first;
-                        verification_time.stop();
+                        engine_outcome = pdaaal::Solver::pre_star_accepts(problem_instance);
                         if (engine_outcome) {
-                            auto trace = solver.get_trace(pda, std::move(solver_result.second));
-                            if (factory.write_json_trace(proof, trace))
-                                result = utils::outcome_t::YES;
+                            auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                            json_trace = factory.get_json_trace(pda_trace);
+                            if (!json_trace.is_null()) result = utils::outcome_t::YES;
                         }
+                        verification_time.stop();
                         break;
                     }
                     default:
@@ -189,9 +181,7 @@ namespace aalwines {
                 if constexpr (is_weighted) {
                     output["trace-weight"] = trace_weight;
                 }
-                std::stringstream trace;
-                trace << "[" << proof.str() << "]"; // TODO: Make NetworkPDAFactory::write_json_trace return a json object instead of ad-hoc formatting to a stringstream.
-                output["trace"] = json::parse(trace.str());
+                output["trace"] = json_trace;
             }
             if (print_timing) {
                 output["compilation-time"] = compilation_time.duration();
@@ -209,9 +199,6 @@ namespace aalwines {
         size_t _engine = 1;
         size_t _reduction = 0;
         bool _print_trace = false;
-
-        // Solver engines
-        SolverAdapter solver;
     };
 
 }

@@ -131,7 +131,7 @@ query_list
         | END// empty 
         ;
 query
-    : LT { builder.label_mode(); builder.invert(true) ; } cregex
+    : LT { builder.label_mode(); builder.invert(false); } cregex
       GT { builder.path_mode();  builder.invert(false); } cregex
       LT { builder.label_mode(); builder.invert(false); } cregex GT number mode
     {
