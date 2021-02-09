@@ -23,7 +23,7 @@
 //
 
 #include <cerrno>
-#include <climits>
+#include <limits>
 #include <cstdlib>
 #include <string>
 #include <sstream>
@@ -44,7 +44,6 @@ using token = aalwines::Parser::token;
 id    [a-zA-Z\_\-][a-zA-Z0-9\_\-]*
 hex   [0-9a-fA-F]
 int   [0-9]+
-float {int}*\.{int}+
 blank [ \t]
 literal  \"(\\.|[^\\"])*\"
 
@@ -98,30 +97,10 @@ literal  \"(\\.|[^\\"])*\"
 "UNDER" return token::UNDER;
 "DUAL"  return token::DUAL;
 "EXACT" return token::EXACT;
-"⊙"     return token::ANYIP;
-"@"     return token::ANYIP;
-"ip"    return token::ANYIP;
-"⊕"     return token::ANYMPLS;
-"¤"     return token::ANYMPLS;
-"$"     return token::STICKY;
-"mpls"  return token::ANYMPLS;
-"smpls" return token::ANYSTICKYMPLS;
-"$mpls" return token::ANYSTICKYMPLS;
-
-s[0-9]+ {
-  long int n = strtol (yytext + 1, NULL, 10);
-    if (! (INT_MIN <= n && n <= INT_MAX)) {
-        last_string = yytext;
-        return token::IDENTIFIER;
-    }
-    last_string = yytext;
-    last_int = n;
-    return token::SNUMBER;
-}
 
 {int}      {
-  long int n = strtol (yytext, NULL, 10);
-  if (! (INT_MIN <= n && n <= INT_MAX))
+  unsigned long long n = strtoull(yytext, NULL, 10);
+  if (! (n < std::numeric_limits<size_t>::max())) // Yes strictly less than, since we reserve std::numeric_limits<size_t>::max() for other use.
     throw aalwines::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
   last_int = n;
@@ -129,8 +108,8 @@ s[0-9]+ {
 }
 
 {hex}     {
-  long int n = strtol (yytext, NULL, 16);
-  if (! (INT_MIN <= n && n <= INT_MAX))
+  unsigned long long n = strtoull(yytext, NULL, 16);
+  if (! (n < std::numeric_limits<size_t>::max()))
     throw aalwines::syntax_error (builder._location, "integer is out of range: " + std::string(yytext));
 
   last_int = n;

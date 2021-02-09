@@ -69,7 +69,6 @@ namespace aalwines {
             assert(_all_interfaces[i]->global_id() == i);
         }
 #endif
-
         // Update pairings
         for (auto& router : _routers) {
             for (auto& interface : router->interfaces()) {
@@ -115,26 +114,14 @@ namespace aalwines {
 
     const char* empty_string = "";
 
-    std::unordered_set<Query::label_t> Network::interfaces(filter_t& filter)
-    {
-        std::unordered_set<Query::label_t> res;
-        for (auto& r : _routers) {
-            if (filter._from(r->name().c_str())) {
-                for (auto& i : r->interfaces()) {
+    std::unordered_set<size_t> Network::interfaces(filter_t& filter) {
+        std::unordered_set<size_t> res;
+        for (const auto& r : _routers) {
+            if (filter._from(r->name())) {
+                for (const auto& i : r->interfaces()) {
                     if (i->is_virtual()) continue;
-                    // can we have empty interfaces??
-                    assert(i);
-                    auto fname = r->interface_name(i->id());
-                    std::string tname;
-                    const char* tr = empty_string;
-                    if (i->target() != nullptr) {
-                        if (i->match() != nullptr) {
-                            tname = i->target()->interface_name(i->match()->id());
-                        }
-                        tr = i->target()->name().c_str();
-                    }
-                    if (filter._link(fname.c_str(), tname.c_str(), tr)) {
-                        res.insert(Query::label_t{Query::INTERFACE, 0, i->global_id()}); // TODO: little hacksy, but we have uniform types in the parser
+                    if (filter._link(r->interface_name(i->id()), i->match()->get_name(), i->target()->name())) {
+                        res.insert(i->global_id());
                     }
                 }
             }
@@ -142,7 +129,7 @@ namespace aalwines {
         return res;
     }
 
-    void Network::move_network(Network&& nested_network){
+    void Network::move_network(Network&& nested_network) {
         // Find NULL router
         auto null_router = _mapping["NULL"];
 
@@ -198,7 +185,7 @@ namespace aalwines {
         for (auto&& interface : link->source()->interfaces()) {
             interface->table().add_to_outgoing(link, {RoutingTable::op_t::PUSH, pre_label});
         }
-        virtual_guard->table().add_rule(post_label, {RoutingTable::op_t::POP, RoutingTable::label_t{}}, nested_end_link);
+        virtual_guard->table().add_rule(post_label, RoutingTable::action_t(RoutingTable::op_t::POP), nested_end_link);
     }
 
     void Network::concat_network(Interface* link, Network&& nested_network, Interface* nested_ingoing, RoutingTable::label_t post_label) {
@@ -238,7 +225,7 @@ namespace aalwines {
     }
 
 
-    Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links){
+    Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i];

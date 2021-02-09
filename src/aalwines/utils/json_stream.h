@@ -71,7 +71,6 @@ public:
             }
             end_object();
         }
-
     }
 
     void close() {

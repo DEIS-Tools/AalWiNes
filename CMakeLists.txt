@@ -55,7 +55,7 @@ if (AALWINES_GetDependencies)
     )
     ExternalProject_add(pdaaal-ext
         GIT_REPOSITORY git@github.com:MortenSchou/PDAAAL.git
-        GIT_TAG 21586051ce7455dde4f1e7a6566f48b883dc7626
+        GIT_TAG 5091f704ceeb6e9011b5887213c180d78a8fddec
         #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.5.zip
         #URL_HASH SHA512=7c9e1418c491f693b1dbcfac8b20aa10cc0ecc8db1456000d1b8ea3c1376d9dbe545abbfe550d7d5020631c4dcb44fe2b6205654337c68a16227f0810e0f32a6
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include
@@ -64,11 +64,6 @@ if (AALWINES_GetDependencies)
     # we can now include external libraries
     include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
     link_directories(${EXTERNAL_INSTALL_LOCATION}/lib)
-
-    # download moped
-    file(MAKE_DIRECTORY bin)
-    file(DOWNLOAD https://github.com/petergjoel/P-Rex/raw/master/bin/moped bin/moped EXPECTED_HASH SHA512=f8a3bfc1914b425a9272544f639325c7799b76a5e6bf39d0500ae2453c7ccce3ddfb7a6db0d54ed5a84e623fea4002f2c09f2eb42235d3bb7cd7d52d78b73f5a)
-    execute_process(COMMAND chmod +x bin/moped)
 endif (AALWINES_GetDependencies)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/)

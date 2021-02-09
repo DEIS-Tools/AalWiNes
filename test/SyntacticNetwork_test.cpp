@@ -36,40 +36,40 @@ Network construct_synthetic_network(size_t nesting = 1){
         _routers.emplace_back(std::make_unique<Router>(i));
         Router &router = *_routers.back().get();
         router.add_name(router_name);
-        router.get_interface(_all_interfaces, "i" + router_names[i]);
+        router.get_interface("i" + router_names[i], _all_interfaces);
         auto res = _mapping.insert(router_name);
         _mapping.get_data(res.second) = &router;
         switch (network_node) {
             case 1:
-                router.get_interface(_all_interfaces, router_names[i - 1]);
-                router.get_interface(_all_interfaces, router_names[i + 2]);
+                router.get_interface(router_names[i - 1], _all_interfaces);
+                router.get_interface(router_names[i + 2], _all_interfaces);
                 links.push_back({router_names[i - 1], router_names[i + 2]} );
                 break;
             case 2:
-                router.get_interface(_all_interfaces, router_names[i + 1]);
-                router.get_interface(_all_interfaces, router_names[i + 2]);
+                router.get_interface(router_names[i + 1], _all_interfaces);
+                router.get_interface(router_names[i + 2], _all_interfaces);
                 links.push_back({router_names[i + 1], router_names[i + 2]});
                 if(nested){
-                    router.get_interface(_all_interfaces, router_names[i + 6]);
+                    router.get_interface(router_names[i + 6], _all_interfaces);
                     links.back().push_back({router_names[i + 6]});
                 } else {
-                    router.get_interface(_all_interfaces, router_names[i - 2]);
+                    router.get_interface(router_names[i - 2], _all_interfaces);
                     links.back().push_back({router_names[i - 2]});
                 }
                 break;
             case 3:
-                router.get_interface(_all_interfaces, router_names[i - 2]);
-                router.get_interface(_all_interfaces, router_names[i + 1]);
-                router.get_interface(_all_interfaces, router_names[i - 1]);
+                router.get_interface(router_names[i - 2], _all_interfaces);
+                router.get_interface(router_names[i + 1], _all_interfaces);
+                router.get_interface(router_names[i - 1], _all_interfaces);
                 links.push_back({router_names[i - 2], router_names[i + 1], router_names[i - 1]});
                 if(i != 3) {
-                    router.get_interface(_all_interfaces, router_names[i - 6]);
+                    router.get_interface(router_names[i - 6], _all_interfaces);
                     links.back().push_back({router_names[i - 6]});
                 }
                 break;
             case 4:
-                router.get_interface(_all_interfaces, router_names[i - 2]);
-                router.get_interface(_all_interfaces, router_names[i - 1]);
+                router.get_interface(router_names[i - 2], _all_interfaces);
+                router.get_interface(router_names[i - 1], _all_interfaces);
                 links.push_back({router_names[i - 2], router_names[i - 1]});
                 break;
             case 5:
@@ -79,17 +79,17 @@ Network construct_synthetic_network(size_t nesting = 1){
                 }
                 fall_through = true;
             case 0:
-                router.get_interface(_all_interfaces, router_names[i + 1]);
+                router.get_interface(router_names[i + 1], _all_interfaces);
                 links.push_back({router_names[i + 1]});
                 if(nested){
-                    router.get_interface(_all_interfaces, router_names[i + 5]);
+                    router.get_interface(router_names[i + 5], _all_interfaces);
                     links.back().push_back({router_names[i + 5]});
                 } else {
-                    router.get_interface(_all_interfaces, router_names[i + 2]);
+                    router.get_interface(router_names[i + 2], _all_interfaces);
                     links.back().push_back({router_names[i + 2]});
                 }
                 if(fall_through){
-                    router.get_interface(_all_interfaces, router_names[i - 5]);
+                    router.get_interface(router_names[i - 5], _all_interfaces);
                     links.back().push_back({router_names[i - 5]});
                     fall_through = false;
                 }
@@ -117,16 +117,16 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     std::istringstream qstream(query);
     builder.do_parse(qstream);
 
-    pdaaal::Moped moped;
     pdaaal::SolverAdapter solver;
 
-    std::vector<Query::mode_t> modes{builder._result[0].approximation()};
+    auto& q = builder._result[0];
+    std::vector<Query::mode_t> modes{q.approximation()};
     std::pair<size_t, size_t> reduction;
-    std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> trace;
-    builder._result[0].set_approximation(modes[0]);
-    NetworkPDAFactory factory(builder._result[0], synthetic_network, builder.all_labels(), false);
-    auto pda = factory.compile();
-    reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
+    q.set_approximation(modes[0]);
+    q.compile_nfas();
+    NetworkPDAFactory factory(q, synthetic_network, builder.all_labels());
+    auto problem_instance = factory.compile(q.construction(), q.destruction());
+    //reduction = pdaaal::Reducer::reduce(pda, 0, pda.initial(), pda.terminal());
 
     std::stringstream results;
     stopwatch verification_time_post(false);
@@ -134,19 +134,14 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     trace_stream << std::endl << "Post*: " <<std::endl;
 
     verification_time_post.start();
-    auto solver_result1 = solver.post_star<pdaaal::Trace_Type::Any>(pda);
+    auto solver_result1 = pdaaal::Solver::post_star_accepts<pdaaal::Trace_Type::Any>(problem_instance);
+    BOOST_CHECK(solver_result1);
+    auto pda_trace = pdaaal::Solver::get_trace<pdaaal::Trace_Type::Any>(problem_instance);
     verification_time_post.stop();
-    trace = solver.get_trace(pda, std::move(solver_result1.second));
-    factory.write_json_trace(trace_stream, trace);
+    auto json_trace = factory.get_json_trace(pda_trace);
+    trace_stream << json_trace.dump();
 
     results << std::endl << "post*-time: " << verification_time_post.duration() << std::endl;
-
-    trace_stream << std::endl << "Moped: " << std::endl;
-    moped.verify(pda, false);
-    trace = moped.get_trace(pda);
-    factory.write_json_trace(trace_stream, trace);
-
-    results << std::endl << "moped-time: " << moped.verification_duration() << std::endl;
 
     BOOST_TEST_MESSAGE(results.str());
 }
@@ -156,9 +151,9 @@ void build_query(const std::string& query, Network& synthetic_network, Builder b
     std::istringstream qstream(query);
     builder.do_parse(qstream);
 
-    Verifier verifier(builder);
+    Verifier verifier;
     for(auto& q : builder._result) {
-        auto output = verifier.run_once(q);
+        auto output = verifier.run_once(builder, q);
         auto result = output["result"].get<utils::outcome_t>();
         BOOST_CHECK_EQUAL(result, utils::outcome_t::YES);
         std::cout << output << std::endl;
@@ -173,7 +168,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace) {
                                      synthetic_network.get_router(7),
                                      synthetic_network.get_router(9)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(9)->find_interface("iRouter9"),
@@ -195,8 +190,8 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace) {
             std::move(synthetic_network2),
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
-            {Query::MPLS, 0, (uint64_t)47},
-            {Query::MPLS, 0, (uint64_t)50});
+            47,
+            50);
 
     BOOST_TEST_MESSAGE("After: ");
     std::stringstream s_after;
@@ -222,7 +217,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace1) {
                                      synthetic_network.get_router(2),
                                      synthetic_network.get_router(4)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(4)->find_interface("iRouter4"),
@@ -249,8 +244,8 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace1) {
             std::move(synthetic_network2),
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
-            {Query::MPLS, 0, (uint64_t)46},
-            {Query::MPLS, 0, (uint64_t)49});
+            46,
+            49);
 
     BOOST_TEST_MESSAGE("After: ");
     std::stringstream s_after;
@@ -278,7 +273,7 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace2) {
                                      synthetic_network.get_router(22),
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
@@ -304,8 +299,8 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace2) {
             std::move(synthetic_network2),
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
-            {Query::MPLS, 0, (uint64_t)50},
-            {Query::MPLS, 0, (uint64_t)56});
+            50,
+            56);
 
     BOOST_TEST_MESSAGE("After: ");
     std::stringstream s_after;
@@ -332,7 +327,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace) {
                                      synthetic_network.get_router(4),
                                      synthetic_network.get_router(3)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(3)->find_interface("iRouter3"),
@@ -356,7 +351,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace) {
 
     synthetic_network.concat_network(
             synthetic_network.get_router(3)->find_interface("iRouter3"), std::move(synthetic_network2),
-            synthetic_network2.get_router(0)->find_interface("iRouter0"), {Query::MPLS, 0, (uint64_t)48});
+            synthetic_network2.get_router(0)->find_interface("iRouter0"), 48);
 
     BOOST_TEST_MESSAGE("After: ");
     std::stringstream s_after;
@@ -384,7 +379,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace1) {
                                      synthetic_network.get_router(22),
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
@@ -408,7 +403,7 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace1) {
 
     synthetic_network.concat_network(
             synthetic_network.get_router(24)->find_interface("iRouter24"), std::move(synthetic_network2),
-            synthetic_network2.get_router(0)->find_interface("iRouter0"), {Query::MPLS, 0, (uint64_t)48});
+            synthetic_network2.get_router(0)->find_interface("iRouter0"), 48);
 
     Builder builder(synthetic_network);
     {
@@ -427,7 +422,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance) {
                                      synthetic_network.get_router(2),
                                      synthetic_network.get_router(4)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(4)->find_interface("iRouter4"),
@@ -454,7 +449,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance1) {
                                      synthetic_network.get_router(22),
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
@@ -481,7 +476,7 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
                                      synthetic_network.get_router(22),
                                      synthetic_network.get_router(24)};
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
     auto success = RouteConstruction::make_data_flow(
             synthetic_network.get_router(0)->find_interface("iRouter0"),
             synthetic_network.get_router(24)->find_interface("iRouter24"),
@@ -507,8 +502,8 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
             std::move(synthetic_network2),
             synthetic_network2.get_router(0)->find_interface("iRouter0"),
             synthetic_network2.get_router(3)->find_interface("iRouter3"),
-            {Query::MPLS, 0, (uint64_t)50},
-            {Query::MPLS, 0, (uint64_t)56});
+            50,
+            56);
 
     std::stringstream trace;
     Builder builder(synthetic_network);
@@ -523,7 +518,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithQueryTest) {
     Network network = construct_synthetic_network(1);
 
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
 
     std::vector<const Router*> path {network.get_router(0),
                                      network.get_router(1),
@@ -533,7 +528,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithQueryTest) {
     auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter0"),
             network.get_router(4)->find_interface("iRouter4"),
-            [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
+            [&i](){return i++;}, path);
     BOOST_CHECK_EQUAL(success, true);
 
     auto fail_interface = network.get_router(3)->find_interface(network.get_router(4)->name());

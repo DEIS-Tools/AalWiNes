@@ -195,11 +195,11 @@
                     "maxLength": 0
                 },
                 "swap": {
-                    "type": "string",
+                    "type": ["string", "integer"],
                     "description": "Label for the swap operation."
                 },
                 "push": {
-                    "type": "string",
+                    "type": ["string", "integer"],
                     "description": "Label for the push operation."
                 }
             },

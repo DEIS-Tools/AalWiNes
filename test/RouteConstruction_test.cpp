@@ -44,16 +44,16 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
 
     auto interface = network.get_router(1)->find_interface(names[4]);
     network.get_router(0)->find_interface(names[1])->match()->table().add_rule(
-            {Query::type_t::MPLS, 0, 1},
-            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, 2}},
+            1,
+            {RoutingTable::op_t::SWAP, 2},
             interface);
     network.get_router(1)->find_interface(names[4])->match()->table().add_rule(
-            {Query::type_t::MPLS, 0, 2},
-            {RoutingTable::op_t::SWAP, {Query::type_t::MPLS, 0, 3}},
+            2,
+            {RoutingTable::op_t::SWAP, 3},
             network.get_router(4)->find_interface(names[5]));
 
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
 
     BOOST_TEST_MESSAGE("Before: ");
     std::stringstream s_before;
@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithDataFlowTest) {
                                      network.get_router(5)};
     auto fail_interface = network.get_router(1)->find_interface(names[4]);
     uint64_t i = 42;
-    auto next_label = [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);};
+    auto next_label = [&i](){return i++;};
 
     BOOST_TEST_MESSAGE("Before: ");
     std::stringstream s_before;
@@ -140,7 +140,7 @@ BOOST_AUTO_TEST_CASE(DataFlowTest) {
     auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(5)->find_interface("iRouter6"),
-            [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
+            [&i](){return i++;}, path);
 
     BOOST_CHECK_EQUAL(success, true);
 
@@ -169,7 +169,7 @@ BOOST_AUTO_TEST_CASE(DataFlowWithDijkstraTest) {
     auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(5)->find_interface("iRouter6"),
-            [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);});
+            [&i](){return i++;});
 
     BOOST_CHECK_EQUAL(success, true);
 
@@ -196,7 +196,7 @@ BOOST_AUTO_TEST_CASE(ShortDataFlowTest) {
     auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(1)->find_interface("iRouter2"),
-            [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
+            [&i](){return i++;}, path);
 
     BOOST_CHECK_EQUAL(success, true);
 
@@ -222,7 +222,7 @@ BOOST_AUTO_TEST_CASE(ShortestDataFlowTest) {
     auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(0)->find_interface("oRouter1"),
-            [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);}, path);
+            [&i](){return i++;}, path);
 
     BOOST_CHECK_EQUAL(success, true);
 
@@ -246,7 +246,7 @@ BOOST_AUTO_TEST_CASE(ShortestDataFlowWithDijkstraTest) {
     auto success = RouteConstruction::make_data_flow(
             network.get_router(0)->find_interface("iRouter1"),
             network.get_router(0)->find_interface("oRouter1"),
-            [&i](){return Query::label_t(Query::type_t::MPLS, 0, i++);});
+            [&i](){return i++;});
 
     BOOST_CHECK_EQUAL(success, true);
 

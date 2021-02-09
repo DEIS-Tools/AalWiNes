@@ -22,22 +22,13 @@
 
 namespace aalwines {
 
-    filter_t filter_t::operator&&(const filter_t& other)
-    {
+    filter_t filter_t::operator&&(const filter_t& other) {
         filter_t ret;
-        auto tf = _from;
-        auto of = other._from;
-        ret._from = [of,tf](const char* f)
-        {
-            return tf(f) && 
-                   of(f);
+        ret._from = [tf=_from,of=other._from](const std::string& f) {
+            return tf(f) && of(f);
         };
-        auto ol = other._link;
-        auto tl = _link;
-        ret._link = [tl,ol](const char* fn, const char* tn, const char* tr)
-        {
-            return tl(fn, tn, tr) && 
-                   ol(fn, tn, tr);
+        ret._link = [tl=_link,ol=other._link](const std::string& fn, const std::string& tn, const std::string& tr) {
+            return tl(fn, tn, tr) && ol(fn, tn, tr);
         };
         return ret;
     }

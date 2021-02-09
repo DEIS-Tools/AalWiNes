@@ -16,14 +16,13 @@ sudo apt upgrade
 sudo apt install build-essential flex bison cmake libboost-all-dev libfl-dev
 
 
-# get aalwines (P-Rex v2) and compile
+# get aalwines and compile
 git clone git@github.com:DEIS-Tools/aalwines.git
 cd aalwines
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make 
-#export MOPED_PATH=`pwd`/../bin/moped
 # binary will be in build/bin
 ```
 
@@ -35,11 +34,11 @@ cmake -DAALWINES_BuildBundle=ON -DCMAKE_BUILD_TYPE=Release ..
 
 ## Usage Examples
 
-This will run queryfile `query.txt` and weightfile `weight.json` over the network defined in the P-Rex data files, using Post* implementation as engine and producing a trace:
+This will run queryfile `query.txt` and weightfile `weight.json` over the network defined in the AalWiNes JSON network file, using Post* implementation as engine and producing a trace:
     
 ```bash
 cd bin
-./aalwines --topology ../../example_net/Agis-topo.xml --routing ../../example_net/Agis-routing.xml -w ../../example_net/Agis-weight.json -q ../../example_net/Agis-query.q -t -e 2
+./aalwines --input ../../example_net/Agis-network.json -w ../../example_net/Agis-weight.json -q ../../example_net/Agis-query.q -t -e 1
 ```
 
 An example `query.txt` (syntax see below):
@@ -172,9 +171,6 @@ Every regular expression in the regex-list is built out of following components:
 | regex`?`        | optional: regex must match zero or one time |
 | `[`atom-list`]` | matches the atom_list (see below) |
 | `[^`atom-list`]`| matches everything except the atom_list |
-| `ip`            | matches any ip address |
-| `mpls`          | matches any non-sticky mpls label |
-| `smpls`         | matches any sticky mpls label |
 | `(`regex-list`)`| must match the given sub regex-list |
 
 The atom-list contains a comma separated list of atoms (for `path`) or labels(for `preCondition` and `postCondition`).
@@ -208,9 +204,5 @@ The syntax of a list with labels is:
 
 | syntax          | description |
 | --------------: | ----------- |
-| `[$`label`]`        | A sticky label. Can be used with all following types |
 | `[`label1`,`label2`]`        | A list of labels. Can be used with all following types |
 | `[`number`]`        | A mpls label with number |
-| `[`number`/`mask`]`   | A range of mpls labels, specified by number and a mask in bits |
-| `[`ip`]`            | An ip label. Can be an ipv4 or an ipv6 address |
-| `[`ip`/`mask`]`   | An ip network. An ipv4 or an ipv6 address together with a mask in bits |

@@ -93,7 +93,7 @@ namespace aalwines {
                     auto interface = router->find_interface(interface_name);
                     // TODO: This construction can be optimized. Currently we copy shared routing tables onto each interface.
                     for (const auto& [label_string, json_routing_entries] : json_routing_table.items()) {
-                        auto& entry = interface->table().emplace_entry(RoutingTable::label_t(label_string));
+                        auto& entry = interface->table().emplace_entry(label_string);
 
                         if (!json_routing_entries.is_array()) {
                             es << "error: Value of routing table entry \"" << label_string << "\" is not an array. In interface \"" << interface_name << "\" of router \"" << names.back() << "\"." << std::endl;
@@ -104,7 +104,7 @@ namespace aalwines {
                             auto ops = json_routing_entry.at("ops").get<std::vector<RoutingTable::action_t>>();
                             auto priority = json_routing_entry.at("priority").get<size_t>();
                             auto weight = json_routing_entry.contains("weight") ? json_routing_entry.at("weight").get<uint32_t>() : 0;
-                            entry._rules.emplace_back(RoutingTable::type_t::MPLS, std::move(ops), via, priority, weight);
+                            entry._rules.emplace_back(std::move(ops), via, priority, weight);
                         }
                     }
                 }

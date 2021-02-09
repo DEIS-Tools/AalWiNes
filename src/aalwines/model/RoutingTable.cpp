@@ -57,8 +57,8 @@ namespace aalwines
     void RoutingTable::add_rule(label_t top_label, forward_t&& rule) {
         insert_entry(top_label)->_rules.emplace_back(std::move(rule));
     }
-    void RoutingTable::add_rule(label_t top_label, action_t op, Interface* via, size_t weight, type_t type) {
-        add_rule(top_label, forward_t(type, {op}, via, weight));
+    void RoutingTable::add_rule(label_t top_label, action_t op, Interface* via, size_t weight) {
+        add_rule(top_label, forward_t({op}, via, weight));
     }
     void RoutingTable::forward_t::add_action(action_t action) { // This function applies reductions to the operation list when adding new actions.
         if (_ops.empty()) {
@@ -69,7 +69,7 @@ namespace aalwines
             case op_t::PUSH:
                 if (_ops.back()._op == op_t::POP) {
                     _ops.pop_back();
-                    add_action(action_t{op_t::SWAP, action._op_label});
+                    add_action(action_t(op_t::SWAP, action._op_label));
                     return;
                 }
                 break;
@@ -82,7 +82,7 @@ namespace aalwines
             case op_t::POP:
                 if (_ops.back()._op == op_t::SWAP) {
                     _ops.pop_back();
-                    add_action(action_t{op_t::POP, label_t{}});
+                    add_action(action_t(op_t::POP));
                     return;
                 }
                 break;
@@ -94,8 +94,8 @@ namespace aalwines
             std::vector<forward_t> new_rules;
             for (const auto& f : e._rules) {
                 if (f._via == failed_inf) {
-                    new_rules.emplace_back(f._type, f._ops, backup_inf, f._priority + 1);
-                    new_rules.back().add_action(action_t{op_t::PUSH, failover_label});
+                    new_rules.emplace_back(f._ops, backup_inf, f._priority + 1);
+                    new_rules.back().add_action(action_t(op_t::PUSH, failover_label));
                 }
             }
             e._rules.insert(e._rules.end(), new_rules.begin(), new_rules.end());
@@ -114,7 +114,7 @@ namespace aalwines
         }
     }
 
-    void RoutingTable::simple_merge(const RoutingTable& other) {
+    void RoutingTable::merge(const RoutingTable& other) {
         assert(std::is_sorted(other._entries.begin(), other._entries.end()));
         assert(std::is_sorted(_entries.begin(), _entries.end()));
         auto iit = _entries.begin();
@@ -123,9 +123,6 @@ namespace aalwines
             if (iit == std::end(_entries)) {
                 iit = _entries.insert(iit, e);
             } else if ((*iit) == e) {
-                if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
-                    e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
-                    continue;
                 bool legal_merge = true;
                 for (const auto& rule : e._rules) { // TODO: Consider sorted rules for faster merge.
                     // Already exists
@@ -151,68 +148,6 @@ namespace aalwines
         assert(std::is_sorted(_entries.begin(), _entries.end()));
     }
 
-    bool RoutingTable::merge(const RoutingTable& other, Interface& parent, std::ostream& warnings)
-    {
-        assert(std::is_sorted(other._entries.begin(), other._entries.end()));
-        bool all_fine = true;
-
-        assert(std::is_sorted(other._entries.begin(), other._entries.end()));
-        assert(std::is_sorted(_entries.begin(), _entries.end()));
-        auto iit = _entries.begin();
-        for (auto oit = other._entries.begin(); oit != other._entries.end(); ++oit) {
-            if (oit->_ingoing != nullptr && oit->_ingoing != &parent) continue;
-            auto& e = (*oit);
-            while (iit != std::end(_entries) && (*iit) < e)
-                ++iit;
-            if (iit == std::end(_entries)) {
-                iit = _entries.insert(iit, e);
-                iit->_ingoing = &parent;
-            }
-            else if ((*iit) == e) {
-                if (e._rules.size() == 1 && iit->_rules.size() == 1 &&
-                    e._rules[0]._type == iit->_rules[0]._type && iit->_rules[0]._type != MPLS)
-                    continue;
-                warnings << "\t\tOverlap on label ";
-                entry_t::print_label(e._top_label, warnings);
-                warnings << " for router " << parent.source()->name() << std::endl;
-                all_fine = false;
-                iit->_rules.insert(iit->_rules.end(), e._rules.begin(), e._rules.end());
-            }
-            else {
-                assert(e < (*iit));
-                iit = _entries.insert(iit, e);
-                iit->_ingoing = &parent;
-            }
-        }
-#ifndef NDEBUG
-        for(auto& e : _entries) assert(e._ingoing == &parent);
-#endif
-        assert(std::is_sorted(_entries.begin(), _entries.end()));
-        return all_fine;
-    }
-
-    bool RoutingTable::overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const
-    {
-        auto oit = other._entries.begin();
-        for (auto& e : _entries) {
-
-            while (oit != std::end(other._entries) && (*oit) < e)
-                ++oit;
-            if (oit == std::end(other._entries))
-                return false;
-            if ((*oit) == e) {
-                if (e._rules.size() == 1 && oit->_rules.size() == 1 &&
-                    e._rules[0]._type == oit->_rules[0]._type && oit->_rules[0]._type != MPLS)
-                    continue;
-                warnings << "\t\tOverlap on label ";
-                entry_t::print_label(e._top_label, warnings);
-                warnings << " for router " << parent.name() << std::endl;
-                return true;
-            }
-        }
-        return false;
-    }
-
     bool RoutingTable::entry_t::operator<(const entry_t& other) const
     {
         return _top_label < other._top_label;
@@ -227,7 +162,7 @@ namespace aalwines
         return !(*this == other);
     }
     bool RoutingTable::forward_t::operator==(const forward_t& other) const {
-        return _type == other._type && _via == other._via && _priority == other._priority
+        return _via == other._via && _priority == other._priority
                && _ops.size() == other._ops.size() && std::equal(_ops.begin(), _ops.end(), other._ops.begin());
     }
     bool RoutingTable::forward_t::operator!=(const forward_t& other) const {
@@ -303,9 +238,36 @@ namespace aalwines
         return result;
     }
 
+    json RoutingTable::action_t::to_json() const {
+        json result;
+        switch (_op) {
+            case op_t::SWAP: {
+                std::stringstream s;
+                s << _op_label;
+                result["swap"] = s.str();
+                return result;
+            }
+            case op_t::PUSH: {
+                std::stringstream s;
+                s << _op_label;
+                result["push"] = s.str();
+                break;
+            }
+            case op_t::POP: {
+                result = "pop";
+                break;
+            }
+        }
+        return result;
+    }
+
     void RoutingTable::entry_t::print_json(std::ostream& s) const
     {
-        print_label(_top_label, s);
+        if (ignores_label()) {
+            s << "\"null\"";
+        } else {
+            print_label(_top_label, s);
+        }
         s << ":\n";
         s << "\t[";
         for (size_t i = 0; i < _rules.size(); ++i) {
@@ -320,30 +282,7 @@ namespace aalwines
     void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
     {
         if (quote) s << "\"";
-        switch (label.type()) {
-        case Query::STICKY_MPLS:
-            s << "s"; // fall through on purpose
-        case Query::MPLS:
-            if(label == Query::label_t::any_mpls ||
-               label == Query::label_t::any_sticky_mpls)
-                s << "mpls";
-            else
-                s << 'l' << std::dec << label.value() << std::dec;
-            assert(label.mask() == 0);
-            break;
-        case Query::IP4:
-            s << "ip4" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
-            assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
-            break;
-        case Query::IP6:
-            s << "ip6" << std::hex << label.value() << "M" << (uint32_t) label.mask() << std::dec;
-            assert(label.mask() == 0 || label.value() == std::numeric_limits<uint64_t>::max());
-            break;
-        default:
-            assert(false);
-            throw base_error("Interfaces cannot be pushdown-labels.");
-            break;
-        }
+        s << label;
         if (quote) s << "\"";
     }
 
@@ -355,15 +294,13 @@ namespace aalwines
             s << ", \"via\":";
             if (use_hex) {
                 s << _via->id();
-            }
-            else {
-                auto iname = _via->source()->interface_name(_via->id());
-                s << "\"" << iname << "\"";
+            } else {
+                s << "\"" << _via->get_name() << "\"";
             }
         }
         else
             s << ",  \"drop\":true";
-        if (_ops.size() > 0) {
+        if (!_ops.empty()) {
             s << ", \"ops\":[";
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)
@@ -401,18 +338,6 @@ namespace aalwines
         s << "\n\t}";
     }
 
-    bool RoutingTable::check_nondet(std::ostream& e)
-    {
-        bool some = false;
-        for (size_t i = 1; i < _entries.size(); ++i) {
-            if (_entries[i - 1] == _entries[i]) {
-                some = true;
-                e << "nondeterministic routing-table found, dual matches on " << _entries[i]._top_label << std::endl;
-            }
-        }
-        return !some;
-    }
-
     void RoutingTable::sort()
     {
         std::sort(std::begin(_entries), std::end(_entries));
@@ -437,7 +362,6 @@ namespace aalwines
     std::ostream& operator<<(std::ostream& s, const RoutingTable::entry_t& entry)
     {
         s << entry._top_label << " ";
-        s << entry._ingoing << " ";
         entry.print_json(s);
         return s;
     }

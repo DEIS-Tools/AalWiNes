@@ -25,8 +25,6 @@
 #include <aalwines/utils/json_stream.h>
 #include <aalwines/query/QueryBuilder.h>
 
-#include <aalwines/model/builders/JuniperBuilder.h>
-#include <aalwines/model/builders/PRexBuilder.h>
 #include <aalwines/model/builders/AalWiNesBuilder.h>
 #include <aalwines/model/builders/TopologyBuilder.h>
 
@@ -34,10 +32,6 @@
 #include <aalwines/model/NetworkWeight.h>
 
 #include <aalwines/query/parsererrors.h>
-#include <pdaaal/PDAFactory.h>
-#include <aalwines/engine/Moped.h>
-#include <pdaaal/SolverAdapter.h>
-#include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
 #include <aalwines/Verifier.h>
@@ -69,15 +63,14 @@ int main(int argc, const char** argv)
 
     NetworkParsing parser("Input Options");
     po::options_description output("Output Options");
-    po::options_description verification("Verification Options");    
+    Verifier verifier("Verification Options");
     
     bool print_dot = false;
     bool print_net = false;
     bool no_parser_warnings = false;
     bool silent = false;
-    bool dump_to_moped = false;
     bool no_timing = false;
-    std::string topology_destination, routing_destination, json_destination, json_pretty_destination, json_topo_destination;
+    std::string json_destination, json_pretty_destination, json_topo_destination;
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
@@ -85,9 +78,6 @@ int main(int argc, const char** argv)
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
-            ("dump-for-moped", po::bool_switch(&dump_to_moped), "Dump the constructed PDA in a MOPED format (expects a singleton query-file).")
-            ("write-topology", po::value<std::string>(&topology_destination), "Write the topology in the P-Rex format to the given file.")
-            ("write-routing", po::value<std::string>(&routing_destination), "Write the Routing in the P-Rex format to the given file.")
             ("write-json", po::value<std::string>(&json_destination), "Write the network in the AalWiNes MPLS Network format to the given file.")
             ("write-json-pretty", po::value<std::string>(&json_pretty_destination), "Pretty print the network in the AalWiNes MPLS Network format to the given file.")
             ("write-json-topology", po::value<std::string>(&json_topo_destination), "Write the topology of the network in the AalWiNes MPLS Network format to the given file.")
@@ -95,25 +85,13 @@ int main(int argc, const char** argv)
 
     std::string query_file;
     std::string weight_file;
-    unsigned int link_failures = 0;
-    size_t tos = 0;
-    size_t engine = 0;
-    bool get_trace = false;
-    bool no_ip_swap = false;
-    verification.add_options()
-            ("query,q", po::value<std::string>(&query_file),
-            "A file containing valid queries over the input network.")
-            ("trace,t", po::bool_switch(&get_trace), "Get a trace when possible")
-            ("no-ip-route", po::bool_switch(&no_ip_swap), "Disable encoding of routing via IP")
-            ("link,l", po::value<unsigned int>(&link_failures), "Number of link-failures to model.")
-            ("tos-reduction,r", po::value<size_t>(&tos), "0=none,1=simple,2=dual-stack,3=dual-stack+backup,4=simple+backup")
-            ("engine,e", po::value<size_t>(&engine), "0=no verification,1=moped,2=post*,3=pre*")
-            ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression")
-            ;
+    verifier.add_options()
+            ("query,q", po::value<std::string>(&query_file), "A file containing valid queries over the input network.")
+            ("weight,w", po::value<std::string>(&weight_file), "A file containing the weight function expression");
 
     opts.add(parser.options());
     opts.add(output);
-    opts.add(verification);
+    opts.add(verifier.options());
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, opts), vm);
@@ -123,24 +101,7 @@ int main(int argc, const char** argv)
         std::cout << opts << "\n";
         return 1;
     }
-    
-    if(tos > 4)
-    {
-        std::cerr << "Unknown value for --tos-reduction : " << tos << std::endl;
-        exit(-1);
-    }
-    
-    if(engine > 7)
-    {
-        std::cerr << "Unknown value for --engine : " << engine << std::endl;
-        exit(-1);        
-    }
-
-    if(engine != 0 && dump_to_moped)
-    {
-        std::cerr << "Cannot both verify (--engine > 0) and dump model (--dump-for-moped) to stdout" << std::endl;
-        exit(-1);
-    }
+    verifier.check_settings();
 
     if(silent) no_parser_warnings = true;
 
@@ -149,25 +110,7 @@ int main(int argc, const char** argv)
     if (print_dot) {
         network.print_dot(std::cout);
     }
-    
-    if(!topology_destination.empty()) {
-        std::ofstream out(topology_destination);
-        if(out.is_open()) {
-            PRexBuilder::write_prex_topology(network, out);
-        } else {
-            std::cerr << "Could not open --write-topology\"" << topology_destination << "\" for writing" << std::endl;
-            exit(-1);
-        }
-    }
-    if(!routing_destination.empty()) {
-        std::ofstream out(routing_destination);
-        if(out.is_open()) {
-            PRexBuilder::write_prex_routing(network, out);
-        } else {
-            std::cerr << "Could not open --write-routing\"" << topology_destination << "\" for writing" << std::endl;
-            exit(-1);
-        }
-    }
+
     if (!json_destination.empty()) {
         std::ofstream out(json_destination);
         if(out.is_open()) {
@@ -202,7 +145,7 @@ int main(int argc, const char** argv)
         }
     }
     json_stream json_output;
-    if (!dump_to_moped && print_net) {
+    if (print_net) {
         network.print_json(json_output);
     }
     std::vector<std::string> query_strings;
@@ -236,11 +179,7 @@ int main(int argc, const char** argv)
 
         std::optional<NetworkWeight::weight_function> weight_fn;
         if (!weight_file.empty()) {
-            if (engine != 2 && engine != 4) {
-                std::cerr << "Shortest trace using weights is only implemented for --engine 2 (post*). Not for --engine " << engine << std::endl;
-                exit(-1);
-            }
-            // TODO: Implement parsing of latency info here.
+            verifier.check_supports_weight();
             NetworkWeight network_weight;
             {
                 std::ifstream wstream(weight_file);
@@ -263,31 +202,18 @@ int main(int argc, const char** argv)
             weight_fn = std::nullopt;
         }
 
-        if(dump_to_moped) {
-            for(auto& q : builder._result) {
-                if (dump_to_moped) {
-                    NetworkPDAFactory factory(q, network, builder.all_labels(), no_ip_swap);
-                    auto pda = factory.compile();
-                    Moped::dump_pda(pda, std::cout);
-                }
-            }
-        } else {
-            if(!no_timing) {
-                json_output.entry("network-parsing-time", parser.duration());
-                json_output.entry("query-parsing-time", queryparsingwatch.duration());
-            }
-            if (weight_fn) {
-                Verifier verifier(builder, weight_fn.value(), engine, tos, no_ip_swap, !no_timing, get_trace);
-                json_output.begin_object("answers");
-                verifier.run(query_strings, json_output);
-                json_output.end_object();
-            } else { // a void(void) function encodes 'no weight'.
-                Verifier verifier(builder, engine, tos, no_ip_swap, !no_timing, get_trace);
-                json_output.begin_object("answers");
-                verifier.run(query_strings, json_output);
-                json_output.end_object();
-            }
+        if(!no_timing) {
+            json_output.entry("network-parsing-time", parser.duration());
+            json_output.entry("query-parsing-time", queryparsingwatch.duration());
         }
+
+        json_output.begin_object("answers");
+        if (weight_fn) {
+            verifier.run(builder, query_strings, json_output, !no_timing, weight_fn.value());
+        } else {
+            verifier.run(builder, query_strings, json_output, !no_timing);
+        }
+        json_output.end_object();
     }
 
     return 0;

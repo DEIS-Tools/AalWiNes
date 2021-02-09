@@ -39,17 +39,11 @@
 using json = nlohmann::json;
 
 namespace aalwines {
-    class Router;
     class Interface;
     class Network;
     
     class RoutingTable {
     public:
-
-        enum type_t { // TODO: Deprecate (?)
-            DISCARD, RECEIVE, ROUTE, MPLS
-        };
-
         enum class op_t {
             PUSH, POP, SWAP
         };
@@ -58,9 +52,18 @@ namespace aalwines {
 
         struct action_t {
             op_t _op = op_t::POP;
-            label_t _op_label;
+            size_t _op_label = std::numeric_limits<size_t>::max();
             action_t() = default;
-            action_t(op_t op, label_t op_label) : _op(op), _op_label(op_label) {};
+            explicit action_t(op_t op) : _op(op) {
+                assert(op == op_t::POP);
+            };
+            action_t(op_t op, size_t op_label) : _op(op), _op_label(op_label) {
+                assert(op == op_t::PUSH || op == op_t::SWAP);
+            };
+            action_t(op_t op, const std::string& op_label) : _op(op) {
+                assert(op == op_t::PUSH || op == op_t::SWAP);
+                _op_label = static_cast<size_t>(std::stoul(op_label));
+            };
             void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
             [[nodiscard]] json to_json() const;
             bool operator==(const action_t& other) const;
@@ -68,14 +71,13 @@ namespace aalwines {
         };
 
         struct forward_t {
-            type_t _type = MPLS; // TODO: Remove when burning the JuniperBuilder.
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
             size_t _priority = 0;
             uint32_t _weight = 0;
             forward_t() = default;
-            forward_t(type_t type, std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
-                : _type(type), _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
+            forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
+                : _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
             void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
             [[nodiscard]] json to_json() const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
@@ -85,12 +87,16 @@ namespace aalwines {
         };
 
         struct entry_t {
-            label_t _top_label;
-            const Interface* _ingoing = nullptr; // TODO: this needs to be removed, it is only really used during merges of Routingtables for filtering
+            size_t _top_label = std::numeric_limits<size_t>::max();
             std::vector<forward_t> _rules;
 
             entry_t() = default;
-            explicit entry_t(label_t top_label) : _top_label{top_label} { };
+            explicit entry_t(size_t top_label) : _top_label{top_label} { };
+            explicit entry_t(const std::string& label) {
+                if (!label.empty() && label != "null") {
+                    _top_label = static_cast<size_t>(std::stoul(label));
+                }
+            }
 
             bool operator==(const entry_t& other) const;
             bool operator!=(const entry_t& other) const;
@@ -99,30 +105,30 @@ namespace aalwines {
             static void print_label(label_t label, std::ostream& s, bool quote = true);
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
             void add_to_outgoing(const Interface* outgoing, action_t action);
+            [[nodiscard]] bool ignores_label() const {
+                return _top_label == std::numeric_limits<size_t>::max();
+            }
         };
 
     public:
         [[nodiscard]] bool empty() const;
-        bool overlaps(const RoutingTable& other, Router& parent, std::ostream& warnings) const;
-        bool merge(const RoutingTable& other, Interface& parent, std::ostream& warnings);
         void print_json(std::ostream&) const;
 
         [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
-        bool check_nondet(std::ostream& e);
-        entry_t& push_entry() { _entries.emplace_back(); return _entries.back(); }
-        entry_t& emplace_entry(label_t top_label) { _entries.emplace_back(top_label); return _entries.back(); }
+        template <typename... Args>
+        entry_t& emplace_entry(Args... args) { return _entries.emplace_back(std::forward<Args>(args)...); }
         void pop_entry() { _entries.pop_back(); }
         entry_t& back() { return _entries.back(); }
 
         void add_rules(label_t top_label, const std::vector<forward_t>& rules);
         void add_rule(label_t top_label, const forward_t& rule);
         void add_rule(label_t top_label, forward_t&& rule);
-        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0, type_t = MPLS);
+        void add_rule(label_t top_label, action_t op, Interface* via, size_t weight = 0);
         void add_failover_entries(const Interface* failed_inf, Interface* backup_inf, label_t failover_label);
         void add_to_outgoing(const Interface* outgoing, action_t action);
-        void simple_merge(const RoutingTable& other);
+        void merge(const RoutingTable& other);
 
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
         

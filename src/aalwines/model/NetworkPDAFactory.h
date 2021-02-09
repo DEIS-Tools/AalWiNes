@@ -29,547 +29,329 @@
 
 #include "Query.h"
 #include "Network.h"
-#include <pdaaal/PDAFactory.h>
+#include <pdaaal/NewPDAFactory.h>
 
 
 namespace aalwines {
 
     template<typename W_FN = std::function<void(void)>, typename W = void>
-    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W> {
+    class NetworkPDAFactory : public pdaaal::NewPDAFactory<Query::label_t, W> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
         using weight_type = typename W_FN::result_type;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type>;
+        using PDAFactory = pdaaal::NewPDAFactory<label_t, weight_type>;
         using PDA = pdaaal::TypedPDA<label_t>;
-        using rule_t = typename pdaaal::PDAFactory<label_t, weight_type>::rule_t;
+        using rule_t = typename PDAFactory::rule_t;
+        using nfa_state_t = NFA::state_t;
     private:
-        struct nstate_t {
-            bool _initial = false;
-            int32_t _appmode = 0; // mode of approximation
-            int32_t _opid = -1; // which operation is the first in the rule (-1=cleaned up).
-            int32_t _eid = 0; // which entry we are going for
-            int32_t _rid = 0; // which rule in that entry
-            NFA::state_t *_nfastate = nullptr;
+        struct State {
+            using nfa_state_t = typename pdaaal::NFA<Query::label_t>::state_t;
+            size_t _eid = 0; // which entry we are going for
+            size_t _rid = 0; // which rule in that entry
+            size_t _opid = std::numeric_limits<size_t>::max(); // which operation is the first in the rule (max = no operations left).
+            size_t _appmode = 0; // mode of approximation
             const Interface *_inf = nullptr;
+            const nfa_state_t* _nfa_state = nullptr;
+            State() = default;
+            State(size_t eid, size_t rid, size_t opid, size_t appmode, const Interface* inf, const nfa_state_t* nfa_state)
+                    : _eid(eid), _rid(rid), _opid(opid), _appmode(appmode), _inf(inf), _nfa_state(nfa_state) { };
+            State(const Interface* inf, const nfa_state_t* nfa_state, size_t appmode = 0)
+                    : _appmode(appmode), _inf(inf), _nfa_state(nfa_state) { };
+            bool operator==(const State& other) const {
+                return _eid == other._eid && _rid == other._rid && _opid == other._opid
+                    && _appmode == other._appmode && _inf == other._inf && _nfa_state == other._nfa_state;
+            }
+            bool operator!=(const State& other) const {
+                return !(*this == other);
+            }
+            [[nodiscard]] const Interface* interface() const {
+                return _inf;
+            }
+            [[nodiscard]] bool ops_done() const {
+                return _opid == std::numeric_limits<size_t>::max();
+            }
+            [[nodiscard]] bool accepting() const {
+                return ops_done() && (_inf == nullptr || !_inf->is_virtual()) && _nfa_state->_accepting;
+            }
+            static State perform_op(const State& state) {
+                assert(!state.ops_done());
+                return perform_op(state, state._inf->table().entries()[state._eid]._rules[state._rid]);
+            }
+            static State perform_op(const State& state, const RoutingTable::forward_t& forward) {
+                assert(!state.ops_done());
+                if (state._opid + 2 == forward._ops.size()) {
+                    return State(forward._via->match(), state._nfa_state, state._appmode);
+                } else {
+                    return State(state._eid, state._rid, state._opid + 1, state._appmode, state._inf, state._nfa_state);
+                }
+            }
         } __attribute__((packed)); // packed is needed to make this work fast with ptries
     public:
-        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap)
-        : NetworkPDAFactory(query, network, std::move(all_labels), only_mpls_swap, [](){}) {};
+        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels)
+        : NetworkPDAFactory(query, network, std::move(all_labels), [](){}) {};
 
-        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap, const W_FN& weight_f)
-        :PDAFactory(query.construction(), query.destruction(), std::move(all_labels), Query::label_t::unused_mpls), _network(network),
-        _query(query), _path(query.path()), _only_mpls_swap(only_mpls_swap), _weight_f(weight_f){
-            NFA::state_t *ns = nullptr;
-            Interface *nr = nullptr;
-            add_state(ns, nr);
-            add_state(ns, nr, -1); // Add a second (different) NULL state.
-            _path.compile();
+        NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
+        :PDAFactory(std::move(all_labels)), _network(network),
+        _query(query), _path(query.path()), _weight_f(weight_f){
             construct_initial();
         };
 
-        [[nodiscard]] std::function<void(std::ostream &, const Query::label_t &)> label_writer() const;
-
-        bool write_json_trace(std::ostream &stream, std::vector<PDA::tracestate_t> &trace);
-
+        json get_json_trace(std::vector<PDA::tracestate_t> &trace) {
+            std::vector<const RoutingTable::entry_t *> entries;
+            std::vector<const RoutingTable::forward_t *> rules;
+            if (!concreterize_trace(trace, entries, rules)) {
+                return json();
+            }
+            // Do the printing
+            return write_concrete_trace(trace, entries, rules);
+        }
 
     protected:
-        const std::vector<size_t> &initial() override;
+        const std::vector<size_t>& initial() override { return _initial; }
 
-        [[nodiscard]] bool empty_accept() const override;
+        bool accepting(size_t i) override { return _states.get_data(i); }
 
-        bool accepting(size_t) override;
+        std::vector<rule_t> rules(size_t from_id) override {
+            if (_query.approximation() == Query::EXACT ||
+                _query.approximation() == Query::DUAL) {
+                throw base_error("Exact and Dual analysis method not yet supported");
+            }
+            State from_state;
+            _states.unpack(from_id, &from_state);
+            std::vector<rule_t> result;
+            if (from_state.ops_done()) {
+                const auto& entries = from_state._inf->table().entries();
+                for (size_t eid = 0; eid < entries.size(); ++eid) {
+                    const auto& entry = entries[eid];
+                    for (size_t rid = 0; rid < entry._rules.size(); ++rid) {
+                        const auto& forward = entry._rules[rid];
+                        auto appmode = forward._via->is_virtual() ? set_approximation(from_state, forward) : from_state._appmode;
+                        if (appmode == std::numeric_limits<size_t>::max()) continue;
+                        rule_t rule;
+                        rule._from = from_id;
+                        std::tie(rule._op, rule._op_label) = first_action(forward);
+                        if constexpr (is_weighted) {
+                            rule._weight = _weight_f(forward, entry);
+                        }
+                        auto apply_per_nfastate = [&](const nfa_state_t* n) {
+                            rule._to = (forward._ops.size() <= 1)
+                                       ? add_state(State(forward._via->match(), n, appmode)).second
+                                       : add_state(State(eid, rid, 0, appmode, from_state._inf, n)).second;
+                            result.push_back(rule);
+                            if (entry.ignores_label()) {
+                                expand_back(result); // TODO: Implement wildcard pre label in PDA instead of this.
+                            } else {
+                                result.back()._pre = entry._top_label;
+                            }
+                        };
 
-        std::vector<rule_t> rules(size_t) override;
+                        if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
+                            apply_per_nfastate(from_state._nfa_state);
+                        } else { // Follow NFA edges matching forward._via
+                            for (const auto& e : from_state._nfa_state->_edges) {
+                                if (!e.contains(forward._via->global_id())) continue;
+                                for (const auto& n : e.follow_epsilon()) {
+                                    apply_per_nfastate(n);
+                                }
+                            }
+                        }
 
-        void expand_back(std::vector<rule_t> &rules, const Query::label_t &pre);
-
-        bool
-        start_rule(size_t id, nstate_t &s, const RoutingTable::forward_t &forward, const RoutingTable::entry_t &entry,
-                   NFA::state_t *destination, std::vector<rule_t> &result);
+                    }
+                }
+            } else {
+                const auto& forward = from_state._inf->table().entries()[from_state._eid]._rules[from_state._rid];
+                assert(from_state._opid + 1 < forward._ops.size()); // Otherwise we would already have moved to the next interface.
+                rule_t rule;
+                rule._from = from_id;
+                std::tie(rule._op, rule._op_label) = convert_action(forward._ops[from_state._opid + 1]);
+                rule._to = add_state(State::perform_op(from_state, forward)).second;
+                result.push_back(rule);
+                if (forward._ops[from_state._opid]._op == RoutingTable::op_t::POP) {
+                    expand_back(result); // TODO: Implement wildcard pre label in PDA instead of this.
+                } else {
+                    assert(forward._ops[from_state._opid]._op == RoutingTable::op_t::SWAP || forward._ops[from_state._opid]._op == RoutingTable::op_t::PUSH);
+                    result.back()._pre = forward._ops[from_state._opid]._op_label;
+                }
+            }
+            return result;
+        }
 
     private:
-        bool
-        add_interfaces(std::unordered_set<const Interface *> &disabled, std::unordered_set<const Interface *> &active,
-                       const RoutingTable::entry_t &entry, const RoutingTable::forward_t &fwd) const;
-
-        void print_trace_rule(std::ostream &stream, const Interface *router, const RoutingTable::entry_t &entry,
-                              const RoutingTable::forward_t &rule) const;
-
-        void construct_initial();
-
-        std::pair<bool, size_t>
-        add_state(NFA::state_t *state, const Interface *inf, int32_t mode = 0, int32_t eid = 0, int32_t fid = 0,
-                  int32_t op = -1, bool initial = false);
-
-        int32_t set_approximation(const nstate_t &state, const RoutingTable::forward_t &forward);
-
-        bool concreterize_trace(std::ostream &stream, const std::vector<PDA::tracestate_t> &trace,
-                                std::vector<const RoutingTable::entry_t *> &entries,
-                                std::vector<const RoutingTable::forward_t *> &rules);
-
-        void write_concrete_trace(std::ostream &stream, const std::vector<PDA::tracestate_t> &trace,
-                                  std::vector<const RoutingTable::entry_t *> &entries,
-                                  std::vector<const RoutingTable::forward_t *> &rules);
-
-        void substitute_wildcards(std::vector<PDA::tracestate_t> &trace,
-                                  std::vector<const RoutingTable::entry_t *> &entries,
-                                  std::vector<const RoutingTable::forward_t *> &rules);
-
-        Network &_network;
-        Query &_query;
-        NFA &_path;
-        std::vector<size_t> _initial;
-        ptrie::map<nstate_t, bool> _states;
-        bool _only_mpls_swap = false;
-        const W_FN &_weight_f;
-    };
-
-    template<typename W_FN>
-    NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, bool only_mpls_swap, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
-
-    template<typename W_FN, typename W>
-    void NetworkPDAFactory<W_FN, W>::construct_initial() {
-        // there is potential for some serious pruning here!
-        auto add_initial = [&, this](NFA::state_t *state, const Interface *inf) {
-            if (inf != nullptr && inf->is_virtual()) // don't start on a virtual interface.
-                return;
-            std::vector<NFA::state_t *> next{state};
-            NFA::follow_epsilon(next);
-            for (auto &n : next) {
-                auto res = add_state(n, inf, 0, 0, 0, -1, true);
-                if (res.first)
-                    _initial.push_back(res.second);
+        // Construction (factory)
+        std::pair<bool,size_t> add_state(State&& state) {
+            auto res = _states.insert(state);
+            if (res.first) {
+                _states.get_data(res.second) = state.accepting();
             }
-        };
+            return res;
+        }
 
-        for (auto i : _path.initial()) {
-            // the path is one behind, we are coming from an unknown router via an OK interface
-            // i.e. we have to move straight to the next state
-            for (auto &e : i->_edges) {
-                if (e.wildcard(_network.all_interfaces().size())) {
-                    for (auto inf : _network.all_interfaces()) {
-
-                        add_initial(e._destination, inf->match());
-                    }
-                } else if (!e._negated) {
-                    for (auto s : e._symbols) {
-                        assert(s.type() == Query::INTERFACE);
-                        auto inf = _network.all_interfaces()[s.value()];
-                        add_initial(e._destination, inf->match());
-                    }
-                } else {
-                    for (auto inf : _network.all_interfaces()) {
-                        auto iid = Query::label_t{Query::INTERFACE, 0, inf->global_id()};
-                        auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
-                        assert(std::is_sorted(e._symbols.begin(), e._symbols.end()));
-                        if (lb == std::end(e._symbols) || *lb != iid) {
-                            add_initial(e._destination, inf->match());
+        void construct_initial() {
+            auto add_initial = [this](const std::vector<nfa_state_t*>& next, const Interface* inf) {
+                if (inf != nullptr && inf->is_virtual()) return; // don't start on a virtual interface.
+                for (const auto& n : next) {
+                    auto res = add_state(State(inf, n));
+                    if (res.first) _initial.push_back(res.second);
+                }
+            };
+            for (const auto& i : _path.initial()) {
+                for (const auto& e : i->_edges) {
+                    auto next = e.follow_epsilon();
+                    if (e.wildcard(_network.all_interfaces().size())) {
+                        for (const auto& inf : _network.all_interfaces()) {
+                            add_initial(next, inf->match());
                         }
-                    }
-                }
-            }
-        }
-        std::sort(_initial.begin(), _initial.end());
-    }
-
-    template<typename W_FN, typename W>
-    std::pair<bool, size_t>
-    NetworkPDAFactory<W_FN, W>::add_state(NFA::state_t *state, const Interface *inf, int32_t mode, int32_t eid,
-                                       int32_t fid, int32_t op, bool initial) {
-        nstate_t ns;
-        ns._appmode = mode;
-        ns._nfastate = state;
-        ns._opid = op;
-        ns._inf = inf;
-        ns._rid = fid;
-        ns._eid = eid;
-        ns._initial = initial && _only_mpls_swap; // only need for this when restricting labels
-        auto res = _states.insert(ns);
-        if (res.first) {
-            if (res.second > 1) {
-                // don't check null-state
-                auto &d = _states.get_data(res.second);
-                d = op == -1 && (inf == nullptr || !inf->is_virtual()) ? state->_accepting : false;
-            }
-        }
-        /*if(res.first) std::cerr << "## NEW " << std::endl;
-            std::string rn;
-            if(inf)
-                rn = inf->source()->name();
-            else
-                rn = "SINK";
-            std::cerr << "ADDED STATE " << state << " R " << rn << "(" << inf << ")" << " M" << mode << " F" << fid << " O" << op << " E" << eid << std::endl;
-            std::cerr << "\tID " << res.second << std::endl;
-            if(_states.get_data(res.second))
-            std::cerr << "\t\tACCEPTING !" << std::endl;*/
-
-        return res;
-    }
-
-    template<typename W_FN, typename W>
-    const std::vector<size_t> &NetworkPDAFactory<W_FN, W>::initial() {
-        return _initial;
-    }
-
-    template<typename W_FN, typename W>
-    bool NetworkPDAFactory<W_FN, W>::empty_accept() const {
-        for (auto s : _path.initial()) {
-            if (s->_accepting)
-                return true;
-        }
-        return false;
-    }
-
-    template<typename W_FN, typename W>
-    bool NetworkPDAFactory<W_FN, W>::accepting(size_t i) {
-        return _states.get_data(i);
-    }
-
-    template<typename W_FN, typename W>
-    int32_t NetworkPDAFactory<W_FN, W>::set_approximation(const nstate_t &state, const RoutingTable::forward_t &forward) {
-        auto num_fail = _query.number_of_failures();
-        auto err = std::numeric_limits<int32_t>::max();
-        switch (_query.approximation()) {
-            case Query::OVER:
-                if ((int) forward._priority > num_fail)
-                    return err;
-                else
-                    return 0;
-            case Query::UNDER: {
-                auto nm = state._appmode + forward._priority;
-                if ((int) nm > num_fail)
-                    return err;
-                else
-                    return nm;
-            }
-            case Query::EXACT:
-            case Query::DUAL:
-            default:
-                return err;
-        }
-    }
-
-    template<typename W_FN, typename W>
-    void NetworkPDAFactory<W_FN, W>::expand_back(std::vector<rule_t> &rules, const Query::label_t &pre) {
-        rule_t cpy;
-        std::swap(rules.back(), cpy);
-        rules.pop_back();
-        auto val = pre.value();
-        auto mask = pre.mask();
-
-        switch (pre.type()) {
-            case Query::STICKY_MPLS:
-            case Query::MPLS: {
-                if (mask == 0) {
-                    rules.push_back(cpy);
-                    rules.back()._pre = pre;
-                    assert(rules.back()._pre.mask() == 0);
-                } else {
-                    for (auto &l : Builder::get_labels(this->_all_labels, val, mask,
-                                                       (Query::type_t) (Query::MPLS | (pre.type() & Query::STICKY)))) {
-                        rules.push_back(cpy);
-                        rules.back()._pre = l;
-                        assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::MPLS);
-                    }
-                }
-                break;
-            }
-            case Query::ANYIP:
-                mask = 64;
-                val = 0;
-                // fall through to IP
-            case Query::IP4:
-                for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP4)) {
-                    rules.push_back(cpy);
-                    rules.back()._pre = l;
-                    assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP4 ||
-                           rules.back()._pre == Query::label_t::any_ip4);
-                }
-                if (pre.type() != Query::ANYIP) break; // fall through to IP6 if any
-            case Query::IP6:
-                for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP6)) {
-                    rules.push_back(cpy);
-                    rules.back()._pre = l;
-                    assert(rules.back()._pre.mask() == 0 || rules.back()._pre.type() != Query::IP6 ||
-                           rules.back()._pre == Query::label_t::any_ip6);
-                }
-                break;
-            default:
-                throw base_error("Unknown label-type");
-        }
-    }
-
-    template<typename W_FN, typename W>
-    bool NetworkPDAFactory<W_FN, W>::start_rule(size_t id, nstate_t &s, const RoutingTable::forward_t &forward,
-                                             const RoutingTable::entry_t &entry, NFA::state_t *destination,
-                                             std::vector<NetworkPDAFactory::rule_t> &result) {
-        rule_t nr;
-        auto appmode = s._appmode;
-        if (!forward._via->is_virtual()) {
-            appmode = set_approximation(s, forward);
-            if (appmode == std::numeric_limits<int32_t>::max())
-                return false;
-        }
-        bool is_virtual = entry._ingoing != nullptr && entry._ingoing->is_virtual();
-        if (_only_mpls_swap && !is_virtual && (
-                entry._top_label.type() == Query::INTERFACE ||
-                entry._top_label.type() == Query::ANYIP ||
-                entry._top_label.type() == Query::IP4 ||
-                entry._top_label.type() == Query::IP6)) {
-            auto lb = std::lower_bound(_initial.begin(), _initial.end(), id);
-            if (lb == std::end(_initial) || *lb != id) // allow for IP-routing on initial
-            {
-                return false;
-            }
-        }
-        if (!forward._ops.empty()) {
-            // check if no-ip-swap is set
-
-            if (_only_mpls_swap && !is_virtual && (
-                    forward._ops[0]._op_label.type() == Query::ANYIP ||
-                    forward._ops[0]._op_label.type() == Query::IP4 ||
-                    forward._ops[0]._op_label.type() == Query::IP6)) {
-                return false;
-            }
-
-            switch (forward._ops[0]._op) {
-                case RoutingTable::op_t::POP:
-                    nr._op = pdaaal::POP;
-                    assert(entry._top_label.type() == Query::MPLS ||
-                           entry._top_label.type() == Query::STICKY_MPLS);
-                    break;
-                case RoutingTable::op_t::PUSH:
-                    nr._op = pdaaal::PUSH;
-                    assert(forward._ops[0]._op_label.type() == Query::MPLS ||
-                           forward._ops[0]._op_label.type() == Query::STICKY_MPLS);
-                    nr._op_label = forward._ops[0]._op_label;
-                    break;
-                case RoutingTable::op_t::SWAP:
-                    nr._op = pdaaal::SWAP;
-                    nr._op_label = forward._ops[0]._op_label;
-                    break;
-            }
-        } else {
-            // recheck here; no IP-IP swap.
-            if (_only_mpls_swap && !is_virtual && (
-                    entry._top_label.type() == Query::ANYIP ||
-                    entry._top_label.type() == Query::IP4 ||
-                    entry._top_label.type() == Query::IP6)) {
-                return false;
-            }
-            if (entry._top_label.type() != Query::ANYIP) {
-                nr._op = pdaaal::SWAP;
-                nr._op_label = entry._top_label;
-                assert(entry._top_label.mask() == 0);
-                assert(entry._top_label.type() == Query::MPLS ||
-                       entry._top_label.type() == Query::STICKY_MPLS);
-            } else {
-                nr._op = pdaaal::NOOP;
-            }
-        }
-
-        std::vector<NFA::state_t *> next{destination};
-        if (forward._via->is_virtual())
-            next = {s._nfastate};
-        else
-            NFA::follow_epsilon(next);
-        for (auto &n : next) {
-            result.emplace_back(nr);
-            auto &ar = result.back();
-            std::pair<bool, size_t> res;
-            if (forward._ops.size() <= 1) {
-                res = add_state(n, forward._via->match(), appmode);
-                if constexpr (is_weighted) {
-                    ar._weight = _weight_f(forward, entry);
-                }
-            } else {
-                auto eid = ((&entry) - s._inf->table().entries().data());
-                auto rid = ((&forward) - entry._rules.data());
-                res = add_state(n, s._inf, appmode, eid, rid, 0);
-            }
-            ar._dest = res.second;
-
-            expand_back(result, entry._top_label);
-        }
-        return true;
-    }
-
-    template<typename W_FN, typename W>
-    std::vector<typename NetworkPDAFactory<W_FN, W>::rule_t> NetworkPDAFactory<W_FN, W>::rules(size_t id) {
-        if (_query.approximation() == Query::EXACT ||
-            _query.approximation() == Query::DUAL) {
-            throw base_error("Exact and Dual analysis method not yet supported");
-        }
-        nstate_t s;
-        _states.unpack(id, &s);
-        std::vector<typename NetworkPDAFactory<W_FN, W>::rule_t> result;
-        if (s._opid < 0) {
-            if (s._inf == nullptr)
-                return result;
-            // all clean! start pushing.
-            for (auto &entry : s._inf->table().entries()) {
-                for (auto &forward : entry._rules) {
-                    if (forward._via == nullptr || forward._via->target() == nullptr) {
-                        continue; // drop/discard/lookup
-                    }
-                    if (forward._via->is_virtual()) {
-                        if (!start_rule(id, s, forward, entry, s._nfastate, result))
-                            continue;
+                    } else if (!e._negated) {
+                        for (const auto& s : e._symbols) {
+                            auto inf = _network.all_interfaces()[s];
+                            add_initial(next, inf->match());
+                        }
                     } else {
-                        for (auto &e : s._nfastate->_edges) {
-                            if (e.empty(_network.all_interfaces().size())) {
-                                continue;
-                            }
-                            auto iid = Query::label_t{Query::INTERFACE, 0, forward._via->global_id()};
-                            auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
-                            bool found = lb != std::end(e._symbols) && *lb == iid;
-
-                            if (found != (!e._negated)) {
-                                continue;
-                            } else {
-                                if (!start_rule(id, s, forward, entry, e._destination, result))
-                                    continue;
+                        for (const auto& inf : _network.all_interfaces()) {
+                            if (e.contains(inf->global_id())) {
+                                add_initial(next, inf->match());
                             }
                         }
                     }
                 }
             }
-        } else {
-            auto &r = s._inf->table().entries()[s._eid]._rules[s._rid];
-            result.emplace_back();
-            auto &nr = result.back();
-            auto &act = r._ops[s._opid + 1];
-            nr._pre = s._inf->table().entries()[s._eid]._top_label;
-            for (auto pid = 0; pid <= s._opid; ++pid) {
-                switch (r._ops[pid]._op) {
-                    case RoutingTable::op_t::SWAP:
-                    case RoutingTable::op_t::PUSH:
-                        nr._pre = r._ops[pid]._op_label;
-                        break;
-                    case RoutingTable::op_t::POP:
-                    default:
-                        throw base_error("Unexpected pop!");
-                        assert(false);
-                }
+            std::sort(_initial.begin(), _initial.end());
+        }
+
+        void expand_back(std::vector<rule_t> &rules) {
+            rule_t cpy;
+            std::swap(rules.back(), cpy);
+            rules.pop_back();
+            for (const auto& label : this->_all_labels) {
+                rules.push_back(cpy);
+                rules.back()._pre = label;
             }
-            switch (act._op) {
+        }
+
+        size_t set_approximation(const State& state, const RoutingTable::forward_t& forward) {
+            auto num_fail = _query.number_of_failures();
+            auto err = std::numeric_limits<size_t>::max();
+            switch (_query.approximation()) {
+                case Query::OVER:
+                    return (forward._priority > num_fail) ? err : 0;
+                case Query::UNDER: {
+                    auto nm = state._appmode + forward._priority;
+                    return (nm > num_fail) ? err : nm;
+                }
+                case Query::EXACT:
+                case Query::DUAL:
+                default:
+                    return err;
+            }
+        }
+
+        static std::pair<pdaaal::op_t,label_t> first_action(const RoutingTable::forward_t& forward) {
+            if (forward._ops.empty()) {
+                return std::make_pair(pdaaal::NOOP, label_t());
+            } else {
+                return convert_action(forward._ops[0]);
+            }
+        }
+        static std::pair<pdaaal::op_t,label_t> convert_action(const RoutingTable::action_t& action) {
+            pdaaal::op_t op;
+            label_t op_label;
+            switch (action._op) {
                 case RoutingTable::op_t::POP:
-                    nr._op = pdaaal::POP;
-                    throw base_error("Unexpected pop!");
-                    assert(false);
+                    op = pdaaal::POP;
                     break;
                 case RoutingTable::op_t::PUSH:
-                    nr._op = pdaaal::PUSH;
-                    nr._op_label = act._op_label;
+                    op = pdaaal::PUSH;
+                    op_label = action._op_label;
                     break;
                 case RoutingTable::op_t::SWAP:
-                    nr._op = pdaaal::SWAP;
-                    nr._op_label = act._op_label;
+                    op = pdaaal::SWAP;
+                    op_label = action._op_label;
                     break;
             }
-            //Also handle nr  (Routerhop(Latensy), Network Stack Size, traffic engineergroup failiures) (does the implementaion approache work?) (Define MPLS in report)
-            if (s._opid + 2 == (int) r._ops.size()) {
-                auto res = add_state(s._nfastate, r._via->match(), s._appmode);
-                nr._dest = res.second;
-                if constexpr (is_weighted) {
-                    nr._weight = _weight_f(r, s._inf->table().entries()[s._eid]);
+            return std::make_pair(op, op_label);
+        }
+
+        // Trace reconstruction
+
+        bool add_interfaces(std::unordered_set<const Interface* >& disabled, std::unordered_set<const Interface*>& active,
+                            const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) const {
+            if (disabled.count(forward._via) > 0) {
+                return false; // should be down!
+            }
+            // find all rules with a "covered" pre but lower weight.
+            // these must have been disabled!
+            if (forward._priority == 0)
+                return true;
+            std::unordered_set<const Interface *> tmp = disabled;
+
+            // find failing rule and disable _via interface
+            for(auto &rule : entry._rules){
+                if (rule._priority < forward._priority) {
+                    if (active.count(rule._via) > 0) return false;
+                    tmp.insert(rule._via);
+                    if (tmp.size() > _query.number_of_failures()) {
+                        return false;
+                    }
+                    break;
                 }
+            }
+            if (tmp.size() > _query.number_of_failures()) {
+                return false;
             } else {
-                auto res = add_state(s._nfastate, s._inf, s._appmode, s._eid, s._rid, s._opid + 1);
-                nr._dest = res.second;
+                disabled.swap(tmp);
+                active.insert(forward._via);
+                return true;
             }
-            //or/andHere
         }
-        return result;
-    }
 
-    template<typename W_FN, typename W>
-    void NetworkPDAFactory<W_FN, W>::print_trace_rule(std::ostream &stream, const Interface* inf,
-                                                  const RoutingTable::entry_t &entry,
-                                                  const RoutingTable::forward_t &rule) const {
-        stream << "{";
-
-        auto name = inf->source()->interface_name(inf->id());
-        stream << "\"ingoing\":\"" << name << "\"";
-        stream << ",\"pre\":";
-        if (entry._top_label.type() == Query::INTERFACE) {
-            assert(false);
-        } else {
-            stream << "\"" << entry._top_label;
-            stream << "\"";
+        void add_link_to_trace(json& trace, const State& state, const std::vector<label_t>& final_header) const {
+            trace.emplace_back();
+            trace.back()["from_router"] = state._inf->target()->name();
+            trace.back()["from_interface"] = state._inf->match()->get_name();
+            trace.back()["to_router"] = state._inf->source()->name();
+            trace.back()["to_interface"] = state._inf->get_name();
+            trace.back()["stack"] = json::array();
+            std::for_each(final_header.rbegin(), final_header.rend(), [&stack=trace.back()["stack"]](const auto& label){
+                if (label == Query::bottom_of_stack()) return;
+                std::stringstream s;
+                s << label;
+                stack.emplace_back(s.str());
+            });
         }
-        stream << ",\"rule\":";
-        rule.print_json(stream, false);
-
-        if constexpr (is_weighted) {
-            stream << ", \"priority-weight\": [";
-            auto weights = _weight_f(rule, entry);
-            for (size_t v = 0; v < weights.size(); v++){
-                if (v != 0) stream << ", ";
-                stream << "\"" << std::to_string(weights[v]) << "\"";
+        void add_rule_to_trace(json& trace, const Interface* inf, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
+            trace.emplace_back();
+            trace.back()["ingoing"] = inf->get_name();
+            std::stringstream s;
+            if (entry.ignores_label()) {
+                s << "null";
+            } else {
+                s << entry._top_label;
             }
-            stream << "]";
-        }
-        stream << "}";
-    }
-
-    template<typename W_FN, typename W>
-    bool NetworkPDAFactory<W_FN, W>::add_interfaces(std::unordered_set<const Interface *> &disabled,
-                                                 std::unordered_set<const Interface *> &active,
-                                                 const RoutingTable::entry_t &entry,
-                                                 const RoutingTable::forward_t &fwd) const {
-        auto *inf = fwd._via;
-        if (disabled.count(inf) > 0) {
-            return false; // should be down!
-        }
-        // find all rules with a "covered" pre but lower weight.
-        // these must have been disabled!
-        if (fwd._priority == 0)
-            return true;
-        std::unordered_set<const Interface *> tmp = disabled;
-
-        // find failing rule and disable _via interface
-        for(auto &rule : entry._rules){
-            if (rule._priority < fwd._priority) {
-                if (active.count(rule._via) > 0) return false;
-                tmp.insert(rule._via);
-                if (tmp.size() > (uint32_t) _query.number_of_failures()) {
-                    return false;
+            trace.back()["pre"] = s.str();
+            trace.back()["rule"] = rule.to_json();
+            if constexpr (is_weighted) {
+                trace.back()["priority-weight"] = json::array();
+                auto weights = _weight_f(rule, entry);
+                for (const auto& w : weights){
+                    trace.back()["priority-weight"].push_back(std::to_string(w));
                 }
-                break;
             }
         }
-        if (tmp.size() > (uint32_t) _query.number_of_failures()) {
-            return false;
-        } else {
-            disabled.swap(tmp);
-            active.insert(fwd._via);
-            return true;
-        }
-    }
 
-    template<typename W_FN, typename W>
-    bool NetworkPDAFactory<W_FN, W>::concreterize_trace(std::ostream &stream, const std::vector<PDA::tracestate_t> &trace,
-                                                     std::vector<const RoutingTable::entry_t *> &entries,
-                                                     std::vector<const RoutingTable::forward_t *> &rules) {
-        std::unordered_set<const Interface *> disabled, active;
+        bool concreterize_trace(const std::vector<PDA::tracestate_t>& trace, std::vector<const RoutingTable::entry_t*>& entries, std::vector<const RoutingTable::forward_t*>& rules) {
+            std::unordered_set<const Interface *> disabled, active;
 
-        for (size_t sno = 0; sno < trace.size(); ++sno) {
-            auto &step = trace[sno];
-            if (step._pdastate > 1 && step._pdastate < this->_num_pda_states) {
-                // handle, lookup right states
-                nstate_t s;
+            for (size_t sno = 0; sno < trace.size(); ++sno) {
+                auto &step = trace[sno];
+                State s;
                 _states.unpack(step._pdastate, &s);
-                if (s._opid >= 0) {
-                    // Skip, we are just doing a bunch of ops here, printed elsewhere.
-                } else {
-                    if (sno != trace.size() - 1 && trace[sno + 1]._pdastate > 1 &&
-                        trace[sno + 1]._pdastate < this->_num_pda_states && !step._stack.empty()) {
+                if (s.ops_done()) {
+                    if (sno != trace.size() - 1 && !step._stack.empty()) {
                         // peek at next element, we want to write the ops here
-                        nstate_t next;
+                        State next;
                         _states.unpack(trace[sno + 1]._pdastate, &next);
-                        if (next._opid != -1) {
+                        if (!next.ops_done()) {
                             // we get the rule we use, print
                             auto &entry = next._inf->table().entries()[next._eid];
                             if (!add_interfaces(disabled, active, entry, entry._rules[next._rid])) {
@@ -584,17 +366,17 @@ namespace aalwines {
                             bool found = false;
                             for (auto &entry : s._inf->table().entries()) {
                                 if (found) break;
-                                if (!entry._top_label.overlaps(step._stack.front()))
+                                if (entry._top_label != step._stack.front())
                                     continue; // not matching on pre
                                 for (auto &r : entry._rules) {
                                     bool ok = false;
                                     switch (_query.approximation()) {
                                         case Query::UNDER:
                                             assert(next._appmode >= s._appmode);
-                                            ok = ((ssize_t) r._priority) == (next._appmode - s._appmode);
+                                            ok = r._priority == (next._appmode - s._appmode);
                                             break;
                                         case Query::OVER:
-                                            ok = ((ssize_t) r._priority) <= _query.number_of_failures();
+                                            ok = r._priority <= _query.number_of_failures();
                                             break;
                                         case Query::DUAL:
                                             throw base_error("Tracing for DUAL not yet implemented");
@@ -611,7 +393,7 @@ namespace aalwines {
                                                         assert(r._ops[0]._op == RoutingTable::op_t::SWAP);
                                                         if (nstep._stack.front() != r._ops[0]._op_label)
                                                             continue;
-                                                    } else if (!entry._top_label.overlaps(nstep._stack.front())) {
+                                                    } else if (entry._top_label != nstep._stack.front()) {
                                                         continue;
                                                     }
                                                     if (!add_interfaces(disabled, active, entry, r))
@@ -649,152 +431,45 @@ namespace aalwines {
                                     }
                                 }
                             }
-
                             // check if we violate the soundness of the network
                             if (!found) {
-                                stream << "{\"pre\":\"error\"}";
+                                assert(false);
                                 return false;
                             }
                         }
                     }
                 }
-            } else {
-                // construction, destruction, BORRING!
-                // SKIP
             }
+            return true;
         }
-        return true;
-    }
 
-    template<typename W_FN, typename W>
-    void
-    NetworkPDAFactory<W_FN, W>::write_concrete_trace(std::ostream &stream, const std::vector<PDA::tracestate_t> &trace,
-                                                  std::vector<const RoutingTable::entry_t *> &entries,
-                                                  std::vector<const RoutingTable::forward_t *> &rules) {
-        bool first = true;
-        size_t cnt = 0;
-        for (const auto &step : trace) {
-            if (step._pdastate > 1 && step._pdastate < this->_num_pda_states) {
-                nstate_t s;
+        json write_concrete_trace(const std::vector<PDA::tracestate_t>& trace, std::vector<const RoutingTable::entry_t*>& entries, std::vector<const RoutingTable::forward_t*>& rules) {
+            auto result_trace = json::array();
+            size_t cnt = 0;
+            for (const auto &step : trace) {
+                State s;
                 _states.unpack(step._pdastate, &s);
-                if (s._opid >= 0) {
-                    // Skip, we are just doing a bunch of ops here, printed elsewhere.
-                } else {
-                    if (!first)
-                        stream << ",\n";
-                    stream << "\t\t\t{";
-                    assert(s._inf != nullptr);
-                    auto from_inf = s._inf->match();
-                    auto from_router = s._inf->target();
-                    auto to_inf = s._inf;
-                    auto to_router = s._inf->source();
-                    assert(from_inf != nullptr);
-                    assert(from_router != nullptr);
-                    assert(to_router != nullptr);
-                    stream << R"("from_router":")" << from_router->name() << "\""
-                           << R"(,"from_interface":")" << from_router->interface_name(from_inf->id()) << "\""
-                           << R"(,"to_router":")" << to_router->name() << "\""
-                           << R"(,"to_interface":")" << to_router->interface_name(to_inf->id()) << "\"";
-                    stream << ",\"stack\":[";
-                    bool first_symbol = true;
-                    for (auto &symbol : step._stack) {
-                        if (!first_symbol)
-                            stream << ",";
-                        stream << "\"" << symbol;
-                        //if (_network.is_service_label(symbol))
-                        //    stream << "^";
-                        stream << "\"";
-                        first_symbol = false;
-                    }
-                    stream << "]}";
+                if (s.ops_done()) {
+                    add_link_to_trace(result_trace, s, step._stack);
                     if (cnt < entries.size()) {
-                        stream << ",\n\t\t\t";
-                        print_trace_rule(stream, s._inf, *entries[cnt], *rules[cnt]);
-                        ++cnt;
-                    }
-                    first = false;
-                }
-            }
-        }
-    }
-
-    template<typename W_FN, typename W>
-    void NetworkPDAFactory<W_FN, W>::substitute_wildcards(std::vector<PDA::tracestate_t> &trace,
-                                                       std::vector<const RoutingTable::entry_t *> &entries,
-                                                       std::vector<const RoutingTable::forward_t *> &rules) {
-        size_t cnt = 0;
-        for (size_t sno = 0; sno < trace.size(); ++sno) {
-            auto &step = trace[sno];
-            if (step._pdastate > 1 && step._pdastate < this->_num_pda_states) {
-                nstate_t s;
-                _states.unpack(step._pdastate, &s);
-                if (s._opid >= 0) {
-                    // Skip, we are just doing a bunch of ops here, printed elsewhere.
-                } else {
-                    if (cnt < entries.size()) {
-                        Query::label_t concrete;
-                        bool some = false;
-
-                        if (!step._stack.empty()) {
-                            //            ANYMPLS = 1, ANYIP = 2, IP4 = 4, IP6 = 8, MPLS = 16, STICKY = 32, INTERFACE = 64, NONE = 128, ANYSTICKY = ANYMPLS | STICKY, STICKY_MPLS = MPLS | STICKY
-                            switch (step._stack.front().type()) {
-                                case Query::IP4:
-                                case Query::IP6:
-                                case Query::ANYIP:
-                                    if (entries[cnt]->_top_label != Query::label_t::any_ip &&
-                                        entries[cnt]->_top_label.mask() < step._stack.front().mask()) {
-                                        concrete = entries[cnt]->_top_label;
-                                        some = true;
-                                    }
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                        if (some) {
-                            for (size_t upd = 0; upd <= sno; ++upd) {
-                                for (auto &s : trace[upd]._stack) {
-                                    if (s.type() == Query::ANYIP ||
-                                        s.type() == Query::IP4 ||
-                                        s.type() == Query::IP6) {
-                                        s = concrete;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        add_rule_to_trace(result_trace, s._inf, *entries[cnt], *rules[cnt]);
                         ++cnt;
                     }
                 }
             }
-        }
-    }
-
-    template<typename W_FN, typename W>
-    bool NetworkPDAFactory<W_FN, W>::write_json_trace(std::ostream &stream, std::vector<PDA::tracestate_t> &trace) {
-
-        std::vector<const RoutingTable::entry_t *> entries;
-        std::vector<const RoutingTable::forward_t *> rules;
-
-        if (!concreterize_trace(stream, trace, entries, rules)) {
-            return false;
+            return result_trace;
         }
 
-        // Fix trace
-        substitute_wildcards(trace, entries, rules);
+        Network& _network;
+        Query& _query;
+        NFA& _path;
+        std::vector<size_t> _initial;
+        ptrie::map<State,bool> _states;
+        const W_FN& _weight_f;
+    };
 
-        // Do the printing
-        write_concrete_trace(stream, trace, entries, rules);
-        return true;
-    }
-
-    template<typename W_FN, typename W>
-    std::function<void(std::ostream &, const Query::label_t &)> NetworkPDAFactory<W_FN, W>::label_writer() const {
-        return [](std::ostream &s, const Query::label_t &label) {
-            RoutingTable::entry_t::print_label(label, s, false);
-        };
-    }
-
+    template<typename W_FN>
+    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
 
 }
 
