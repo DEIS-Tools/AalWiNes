@@ -92,8 +92,7 @@ namespace aalwines {
         : NetworkPDAFactory(query, network, std::move(all_labels), [](){}) {};
 
         NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
-        :PDAFactory(std::move(all_labels)), _network(network),
-        _query(query), _path(query.path()), _weight_f(weight_f){
+        : PDAFactory(std::move(all_labels)), _network(network), _query(query), _path(query.path()), _weight_f(weight_f) {
             construct_initial();
         };
 

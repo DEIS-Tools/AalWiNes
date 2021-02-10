@@ -389,16 +389,12 @@ namespace aalwines {
                         }
                     } else if (!e._negated) {
                         for (const auto& s : e._symbols) {
-                            assert(s.type() == Query::INTERFACE);
-                            auto inf = _network.all_interfaces()[s.value()];
+                            auto inf = _network.all_interfaces()[s];
                             add_initial(next, inf->match());
                         }
                     } else {
                         for (const auto& inf : _network.all_interfaces()) {
-                            auto iid = Query::label_t{Query::INTERFACE, 0, inf->global_id()};
-                            auto lb = std::lower_bound(e._symbols.begin(), e._symbols.end(), iid);
-                            assert(std::is_sorted(e._symbols.begin(), e._symbols.end()));
-                            if (lb == std::end(e._symbols) || *lb != iid) {
+                            if (e.contains(inf->global_id())) {
                                 add_initial(next, inf->match());
                             }
                         }
@@ -428,7 +424,7 @@ namespace aalwines {
                                 apply_per_nfastate(from_state._nfa_state);
                             } else { // Follow NFA edges matching forward._via
                                 for (const auto& e : from_state._nfa_state->_edges) {
-                                    if (!e.contains(Query::label_t{Query::INTERFACE, 0, forward._via->global_id()})) continue;
+                                    if (!e.contains(forward._via->global_id())) continue;
                                     for (const auto& n : e.follow_epsilon()) {
                                         apply_per_nfastate(n);
                                     }
@@ -684,7 +680,7 @@ namespace aalwines {
                     }
                 }
             }
-            return find_refinement_common(X, abstract_rule);
+            return find_refinement_common(std::move(X), abstract_rule);
         }
         configuration_range_t search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf) override {
             const auto& [header, old_state, state, eid, rid] = conf;
@@ -710,7 +706,7 @@ namespace aalwines {
                     }
                 }
             }
-            return find_refinement_common(X, abstract_rule);
+            return find_refinement_common(std::move(X), abstract_rule);
         }
         header_t get_header(const configuration_t& conf) override {
             return std::get<0>(conf);
@@ -797,7 +793,7 @@ namespace aalwines {
             }
             return std::nullopt;
         }
-        refinement_t find_refinement_common(const std::vector<std::pair<state_t,label_t>>& X, const abstract_rule_t& abstract_rule) {
+        refinement_t find_refinement_common(std::vector<std::pair<state_t,label_t>>&& X, const abstract_rule_t& abstract_rule) {
             std::vector<std::pair<state_t,label_t>> Y;
             const Interface* interface = nullptr;
             for (const auto& rule : _rule_mapping.get_concrete_values(abstract_rule)) {
@@ -810,7 +806,7 @@ namespace aalwines {
             assert(interface != nullptr);
             auto [found, abstract_interface_id] = _interface_abstraction.exists(interface);
             assert(found);
-            return make_pair_refinement<state_t,label_t>(X, Y, abstract_interface_id, abstract_rule._pre);
+            return make_pair_refinement<state_t,label_t>(std::move(X), std::move(Y), abstract_interface_id, abstract_rule._pre);
         }
 
         std::pair<size_t,std::vector<label_t>> compute_pop_post(const label_t& pre_label, pdaaal::op_t op, const label_t& op_label, const State& to_state) const {

@@ -66,7 +66,7 @@ namespace aalwines {
                 std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
                 exit(-1);
             }
-            if(_engine > 2) {
+            if(_engine > 4) {
                 std::cerr << "Unknown value for --engine : " << _engine << std::endl;
                 exit(-1);
             }
@@ -99,7 +99,7 @@ namespace aalwines {
             constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Post*", "Pre*"};
+            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_NoAbstraction_Post*"};
             output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
