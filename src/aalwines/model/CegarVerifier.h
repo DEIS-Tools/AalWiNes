@@ -34,20 +34,21 @@ namespace aalwines {
 
     class CegarVerifier {
     public:
-        template<bool no_abstraction = false>
-        static std::optional<json> verify(const Network &network, Query& query, std::unordered_set<Query::label_t>&& all_labels, size_t failures) {
+        template<bool no_abstraction = false, pdaaal::refinement_option_t refinement_option = pdaaal::refinement_option_t::best_refinement>
+        static std::optional<json> verify(const Network &network, Query& query, std::unordered_set<Query::label_t>&& all_labels, size_t failures, json& json_output) {
+            query.compile_nfas();
             // TODO: Weights
             if constexpr (no_abstraction) {
-                CegarNetworkPdaFactory<> factory(network, query.path(), failures, std::move(all_labels),
+                CegarNetworkPdaFactory<> factory(json_output, network, query.path(), failures, std::move(all_labels),
                                                  [](const Query::label_t& label) -> Query::label_t { return label; },
                                                  [](const Interface* inf){ return inf->global_id();});
-                pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<>> cegar;
+                pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
                 return cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
             } else {
-                CegarNetworkPdaFactory<> factory(network, query.path(), failures, std::move(all_labels),
+                CegarNetworkPdaFactory<> factory(json_output, network, query.path(), failures, std::move(all_labels),
                                                  [](const auto& label) -> uint32_t { return 0; },
                                                  [](const Interface* inf){ return 0;});
-                pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<>> cegar;
+                pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
                 return cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
             }
         }

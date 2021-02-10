@@ -34,6 +34,9 @@
 
 #include <utility>
 
+#include <json.hpp>
+using json = nlohmann::json;
+
 namespace aalwines {
 
     struct State {
@@ -197,9 +200,6 @@ namespace aalwines {
             pdaaal::op_t op;
             label_t op_label;
             switch (action._op) {
-                case RoutingTable::op_t::POP:
-                    op = pdaaal::POP;
-                    break;
                 case RoutingTable::op_t::PUSH:
                     op = pdaaal::PUSH;
                     op_label = action._op_label;
@@ -207,6 +207,10 @@ namespace aalwines {
                 case RoutingTable::op_t::SWAP:
                     op = pdaaal::SWAP;
                     op_label = action._op_label;
+                    break;
+                case RoutingTable::op_t::POP:
+                default:
+                    op = pdaaal::POP;
                     break;
             }
             return std::make_pair(op, op_label);
@@ -266,12 +270,13 @@ namespace aalwines {
 
 
 
-    template <typename W_FN, typename W, typename C, typename A> class CegarNetworkPdaReconstruction;
+    template <pdaaal::refinement_option_t refinement_option, typename W_FN, typename W, typename C, typename A> class CegarNetworkPdaReconstruction;
 
     // FIXME: For now simple unweighted version.
     template<typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
     class CegarNetworkPdaFactory : public pdaaal::CegarPdaFactory<Query::label_t, W, C, A> {
-        friend class CegarNetworkPdaReconstruction<W_FN,W,C,A>;
+        template <pdaaal::refinement_option_t refinement_option, typename W_FN_, typename W_, typename C_, typename A_>
+        friend class CegarNetworkPdaReconstruction;
     public:
         using label_t = Query::label_t;
     private:
@@ -283,13 +288,14 @@ namespace aalwines {
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         using rule_t = Rule; //std::tuple<size_t, label_t, size_t, pdaaal::op_t, label_t>; // From and to state is concrete_id (size_t), not abstract_id!
     public:
+        json& json_output;
 
         template<typename label_abstraction_fn_t>
-        CegarNetworkPdaFactory(const Network &network, const NFA& path, size_t failures,
+        CegarNetworkPdaFactory(json& json_output, const Network &network, const NFA& path, size_t failures,
                                std::unordered_set<label_t>&& all_labels,
                                label_abstraction_fn_t&& label_abstraction_fn,
                                std::function<size_t(const Interface*)>&& interface_abstraction_fn)
-        : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)),
+        : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)), json_output(json_output),
           _all_labels(std::move(all_labels)), _network(network), _path(path), _failures(failures),
           _rule_mapping([this](const rule_t& rule){ return this->abstract_rule(rule, _state_mapping); }) /* use of _state_mapping here is just dummy, overwritten in initialize(). */
         {
@@ -297,16 +303,17 @@ namespace aalwines {
                     std::function<decltype(std::declval<label_abstraction_fn_t>()(std::declval<const label_t&>()))(const label_t&)>>);
             std::cout << std::endl; // FIXME: Remove...
             initialize(std::move(interface_abstraction_fn));
+            json_output["cegar_iterations"] = 0;
         }
 
         // Forward declaration of refinement constructors
-        void refine(std::pair<Refinement<const Interface*>, Refinement<label_t>>&& refinement) {
+        void refine(std::pair<pdaaal::Refinement<const Interface*>, pdaaal::Refinement<label_t>>&& refinement) {
             _interface_abstraction.refine(refinement.first);
             // TODO: Optimization: Find a way to refine and reuse states and rules...
             reinitialize();
 
         }
-        void refine(HeaderRefinement<label_t>&& refinement) {
+        void refine(pdaaal::HeaderRefinement<label_t>&& refinement) {
             // TODO: Optimization: Find a way to refine and reuse states and rules...
             reinitialize();
         }
@@ -317,7 +324,11 @@ namespace aalwines {
             for (size_t i = 0; i < _rule_mapping.size(); ++i) {
                 this->add_rule(_rule_mapping.get_abstract_value(i));
             }
-            std::cout << "; rules: " << _rule_mapping.size() << "; labels: " << this->number_of_labels() << "; (interfaces: " << _interface_abstraction.size() << ")" << std::endl; // FIXME: Remove...
+            json_output["rules"] = _rule_mapping.size();
+            json_output["labels"] = this->number_of_labels();
+            json_output["interfaces"] = _interface_abstraction.size();
+            json_output["cegar_iterations"] = json_output["cegar_iterations"].get<int>() + 1;
+            //std::cout << "; rules: " << _rule_mapping.size() << "; labels: " << this->number_of_labels() << "; (interfaces: " << _interface_abstraction.size() << ")" << std::endl; // FIXME: Remove...
         }
         const std::vector<size_t>& initial() override {
             return _initial;
@@ -460,7 +471,8 @@ namespace aalwines {
             std::sort(_initial.begin(), _initial.end());
             std::sort(_accepting.begin(), _accepting.end());
 
-            std::cout << "states: " << state_abstraction.size_abstract(); // FIXME: Remove...
+            json_output["states"] = state_abstraction.size_abstract();
+            //std::cout << "states: " << state_abstraction.size_abstract(); // FIXME: Remove...
             _state_mapping = std::move(state_abstraction);
         }
 
@@ -621,7 +633,7 @@ namespace aalwines {
 
 
     // For now simple unweighted version.
-    template<typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
+    template<pdaaal::refinement_option_t refinement_option, typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
     class CegarNetworkPdaReconstruction : public pdaaal::CegarPdaReconstruction<
             Query::label_t, // label_t
             const Interface*, // state_t
@@ -806,7 +818,7 @@ namespace aalwines {
             assert(interface != nullptr);
             auto [found, abstract_interface_id] = _interface_abstraction.exists(interface);
             assert(found);
-            return make_pair_refinement<state_t,label_t>(std::move(X), std::move(Y), abstract_interface_id, abstract_rule._pre);
+            return pdaaal::make_refinement<refinement_option>(std::move(X), std::move(Y), abstract_interface_id, abstract_rule._pre);
         }
 
         std::pair<size_t,std::vector<label_t>> compute_pop_post(const label_t& pre_label, pdaaal::op_t op, const label_t& op_label, const State& to_state) const {
@@ -866,7 +878,6 @@ namespace aalwines {
         const pdaaal::RefinementMapping<const Interface*>& _interface_abstraction;
         const StateMapping& _state_mapping;
         const pdaaal::AbstractionMapping<rule_t,abstract_rule_t>& _rule_mapping;
-        std::vector<configuration_range_t> _temps;
     };
 
 }

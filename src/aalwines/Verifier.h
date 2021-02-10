@@ -52,7 +52,7 @@ namespace aalwines {
 
         explicit Verifier(const std::string& caption = "Verification Options") : verification(caption) {
             verification.add_options()
-                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*")
+                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*,3=post*CEGAR,4=post*CEGARwithSimpleRefinement,5=post*NoAbstraction")
                     ("tos-reduction,r", po::value<size_t>(&_reduction), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
                     ("trace,t", po::bool_switch(&_print_trace), "Get a trace when possible")
                     ;
@@ -66,7 +66,7 @@ namespace aalwines {
                 std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
                 exit(-1);
             }
-            if(_engine > 4) {
+            if(_engine > 5) {
                 std::cerr << "Unknown value for --engine : " << _engine << std::endl;
                 exit(-1);
             }
@@ -99,7 +99,7 @@ namespace aalwines {
             constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_NoAbstraction_Post*"};
+            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*"};
             output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
@@ -113,10 +113,24 @@ namespace aalwines {
             stopwatch verification_time(false);
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
-            if (_engine == 4) {
+            if (_engine == 5) {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
-                q.compile_nfas();
-                auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), q.number_of_failures());
+                output["no_abstraction"] = json::object();
+                verification_time.start();
+                auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["no_abstraction"]);
+                verification_time.stop();
+                if (res) {
+                    result = utils::outcome_t::YES;
+                    json_trace = res.value();
+                } else {
+                    result = utils::outcome_t::NO;
+                }
+            } else if (_engine == 4) {
+                assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
+                output["abstraction"] = json::object();
+                verification_time.start();
+                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["abstraction"]);
+                verification_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
                     json_trace = res.value();
@@ -125,8 +139,10 @@ namespace aalwines {
                 }
             } else if (_engine == 3) {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
-                q.compile_nfas();
-                auto res = CegarVerifier::verify<false>(builder._network, q, builder.all_labels(), q.number_of_failures());
+                output["abstraction"] = json::object();
+                verification_time.start();
+                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["abstraction"]);
+                verification_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
                     json_trace = res.value();
