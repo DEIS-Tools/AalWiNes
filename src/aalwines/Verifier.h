@@ -108,17 +108,15 @@ namespace aalwines {
 
             json json_trace;
             std::vector<unsigned int> trace_weight;
-            stopwatch compilation_time(false);
-            stopwatch reduction_time(false);
-            stopwatch verification_time(false);
+            stopwatch full_time(false);
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
             if (_engine == 5) {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["no_abstraction"] = json::object();
-                verification_time.start();
+                full_time.start();
                 auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["no_abstraction"]);
-                verification_time.stop();
+                full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
                     json_trace = res.value();
@@ -128,9 +126,9 @@ namespace aalwines {
             } else if (_engine == 4) {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["abstraction"] = json::object();
-                verification_time.start();
+                full_time.start();
                 auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["abstraction"]);
-                verification_time.stop();
+                full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
                     json_trace = res.value();
@@ -140,9 +138,9 @@ namespace aalwines {
             } else if (_engine == 3) {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["abstraction"] = json::object();
-                verification_time.start();
+                full_time.start();
                 auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["abstraction"]);
-                verification_time.stop();
+                full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
                     json_trace = res.value();
@@ -150,6 +148,11 @@ namespace aalwines {
                     result = utils::outcome_t::NO;
                 }
             } else {
+                stopwatch compilation_time(false);
+                stopwatch reduction_time(false);
+                stopwatch reachability_time(false);
+                stopwatch trace_making_time(false);
+                full_time.start();
                 for (auto m : modes) {
                     json_trace = json(); // Clear trace from previous mode.
 
@@ -167,13 +170,15 @@ namespace aalwines {
                     reduction_time.stop();
 
                     // Choose engine, run verification, and (if relevant) get the trace.
-                    verification_time.start();
+                    reachability_time.start();
                     bool engine_outcome;
                     switch (_engine) {
                         case 1: {
                             constexpr pdaaal::Trace_Type trace_type = is_weighted ? pdaaal::Trace_Type::Shortest
                                                                                   : pdaaal::Trace_Type::Any;
                             engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(problem_instance);
+                            reachability_time.stop();
+                            trace_making_time.start();
                             if (engine_outcome) {
                                 std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> pda_trace;
                                 if constexpr (is_weighted) {
@@ -185,17 +190,19 @@ namespace aalwines {
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
-                            verification_time.stop();
+                            trace_making_time.stop();
                             break;
                         }
                         case 2: {
                             engine_outcome = pdaaal::Solver::pre_star_accepts(problem_instance);
+                            reachability_time.stop();
+                            trace_making_time.start();
                             if (engine_outcome) {
                                 auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
-                            verification_time.stop();
+                            trace_making_time.stop();
                             break;
                         }
                         default:
@@ -214,6 +221,13 @@ namespace aalwines {
                         break;
                     }
                 }
+                full_time.stop();
+                if (print_timing) {
+                    output["compilation-time"] = compilation_time.duration();
+                    output["reduction-time"] = reduction_time.duration();
+                    output["reachability-time"] = reachability_time.duration();
+                    output["trace-making-time"] = trace_making_time.duration();
+                }
             }
 
             output["result"] = result;
@@ -225,9 +239,7 @@ namespace aalwines {
                 output["trace"] = json_trace;
             }
             if (print_timing) {
-                output["compilation-time"] = compilation_time.duration();
-                output["reduction-time"] = reduction_time.duration();
-                output["verification-time"] = verification_time.duration();
+                output["full-time"] = full_time.duration();
             }
 
             return output;
