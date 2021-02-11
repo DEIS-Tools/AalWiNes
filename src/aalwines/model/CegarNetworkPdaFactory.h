@@ -31,6 +31,7 @@
 #include <aalwines/model/Network.h>
 #include <aalwines/query/QueryBuilder.h>
 #include <pdaaal/CegarPdaFactory.h>
+#include <aalwines/model/NetworkTranslation.h>
 
 #include <utility>
 
@@ -38,49 +39,6 @@
 using json = nlohmann::json;
 
 namespace aalwines {
-
-    struct State {
-        using nfa_state_t = typename pdaaal::NFA<Query::label_t>::state_t;
-        bool _initial = false;
-        size_t _eid = 0; // which entry we are going for
-        size_t _rid = 0; // which rule in that entry
-        size_t _opid = std::numeric_limits<size_t>::max(); // which operation is the first in the rule (max = no operations left).
-        const Interface *_inf = nullptr;
-        const nfa_state_t* _nfa_state = nullptr;
-        State() = default;
-        State(size_t eid, size_t rid, size_t opid, const Interface* inf, const nfa_state_t* nfa_state)
-        : _eid(eid), _rid(rid), _opid(opid), _inf(inf), _nfa_state(nfa_state) { };
-        State(const Interface* inf, const nfa_state_t* nfa_state, bool initial = false)
-                : _initial(initial), _inf(inf), _nfa_state(nfa_state) { };
-        bool operator==(const State& other) const {
-            return _initial == other._initial && _eid == other._eid && _rid == other._rid &&
-                   _opid == other._opid && _inf == other._inf && _nfa_state == other._nfa_state;
-        }
-        bool operator!=(const State& other) const {
-            return !(*this == other);
-        }
-        [[nodiscard]] const Interface* interface() const {
-            return _inf;
-        }
-        [[nodiscard]] bool ops_done() const {
-            return _opid == std::numeric_limits<size_t>::max();
-        }
-        [[nodiscard]] bool accepting() const {
-            return ops_done() && (_inf == nullptr || !_inf->is_virtual()) && _nfa_state->_accepting;
-        }
-        static State perform_op(const State& state) {
-            assert(!state.ops_done());
-            return perform_op(state, state._inf->table().entries()[state._eid]._rules[state._rid]);
-        }
-        static State perform_op(const State& state, const RoutingTable::forward_t& forward) {
-            assert(!state.ops_done());
-            if (state._opid + 2 == forward._ops.size()) {
-                return State(forward._via->match(), state._nfa_state);
-            } else {
-                return State(state._eid, state._rid, state._opid + 1, state._inf, state._nfa_state);
-            }
-        }
-    } __attribute__((packed)); // packed is needed to make this work fast with ptries
 
     class StateMapping {
     protected:
@@ -120,10 +78,10 @@ namespace aalwines {
 
         // concrete_fresh, concrete_id, abstract_fresh, abstract_id
         std::tuple<bool,size_t,bool,size_t> insert(const state_t& state) {
-            auto [concrete_fresh, concrete_id] = _state_map.insert(state);
-            if (!concrete_fresh) return {false, concrete_id, false, _state_map.get_data(concrete_id)};
+            auto [concrete_fresh, concrete_id] = this->_state_map.insert(state);
+            if (!concrete_fresh) return {false, concrete_id, false, this->_state_map.get_data(concrete_id)};
             auto [abstract_fresh, abstract_id] = _abstract_states.insert(abstract_state(state));
-            _state_map.get_data(concrete_id) = abstract_id;
+            this->_state_map.get_data(concrete_id) = abstract_id;
             return {true, concrete_id, abstract_fresh, abstract_id};
         }
 
@@ -184,36 +142,10 @@ namespace aalwines {
             return entry._rules[_rid];
         }
         [[nodiscard]] std::pair<pdaaal::op_t,label_t> first_action(const StateMapping& state_map) const {
-            return first_action(forward(state_map));
+            return NetworkTranslation::first_action(forward(state_map));
         }
         [[nodiscard]] std::pair<pdaaal::op_t,label_t> first_action(const RoutingTable::entry_t& entry) const {
-            return first_action(forward(entry));
-        }
-        static std::pair<pdaaal::op_t,label_t> first_action(const RoutingTable::forward_t& forward) {
-            if (forward._ops.empty()) {
-                return std::make_pair(pdaaal::NOOP, label_t());
-            } else {
-                return convert_action(forward._ops[0]);
-            }
-        }
-        static std::pair<pdaaal::op_t,label_t> convert_action(const RoutingTable::action_t& action) {
-            pdaaal::op_t op;
-            label_t op_label;
-            switch (action._op) {
-                case RoutingTable::op_t::PUSH:
-                    op = pdaaal::PUSH;
-                    op_label = action._op_label;
-                    break;
-                case RoutingTable::op_t::SWAP:
-                    op = pdaaal::SWAP;
-                    op_label = action._op_label;
-                    break;
-                case RoutingTable::op_t::POP:
-                default:
-                    op = pdaaal::POP;
-                    break;
-            }
-            return std::make_pair(op, op_label);
+            return NetworkTranslation::first_action(forward(entry));
         }
     };
 
@@ -280,6 +212,7 @@ namespace aalwines {
     public:
         using label_t = Query::label_t;
     private:
+        using Translation = NetworkTranslationW<W_FN>;
         using state_t = State;
         using NFA = pdaaal::NFA<label_t>; // TODO: Make link NFA different type from header NFA. (low priority...)
         using nfa_state_t = typename NFA::state_t;
@@ -291,17 +224,16 @@ namespace aalwines {
         json& json_output;
 
         template<typename label_abstraction_fn_t>
-        CegarNetworkPdaFactory(json& json_output, const Network &network, const NFA& path, size_t failures,
-                               std::unordered_set<label_t>&& all_labels,
+        CegarNetworkPdaFactory(json& json_output, const Network &network, const Query& query, std::unordered_set<label_t>&& all_labels,
                                label_abstraction_fn_t&& label_abstraction_fn,
                                std::function<size_t(const Interface*)>&& interface_abstraction_fn)
         : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)), json_output(json_output),
-          _all_labels(std::move(all_labels)), _network(network), _path(path), _failures(failures),
+          _all_labels(std::move(all_labels)), _translation(query, [](){}), _network(network), _failures(query.number_of_failures()),
           _rule_mapping([this](const rule_t& rule){ return this->abstract_rule(rule, _state_mapping); }) /* use of _state_mapping here is just dummy, overwritten in initialize(). */
         {
             static_assert(std::is_convertible_v<label_abstraction_fn_t,
                     std::function<decltype(std::declval<label_abstraction_fn_t>()(std::declval<const label_t&>()))(const label_t&)>>);
-            std::cout << std::endl; // FIXME: Remove...
+            //std::cout << std::endl; // FIXME: Remove...
             initialize(std::move(interface_abstraction_fn));
             json_output["cegar_iterations"] = 0;
         }
@@ -352,6 +284,7 @@ namespace aalwines {
             // TODO: Optimization: Find a way to refine and reuse states and rules...
             _initial.clear();
             _accepting.clear();
+            _concrete_initial.clear();
             make_rules(StateAbstraction(
                     [this](const label_t& label) { return this->abstract_label(label); },
                     [this](const Interface* i){
@@ -366,11 +299,11 @@ namespace aalwines {
             // TODO: Add support for k>0.
             if (_failures > 0) throw base_error("CEGAR for k>0 not yet implemented.");
 
-            std::vector<std::pair<State,size_t>> waiting;
-            auto add_state = [&waiting,&state_abstraction,this](State&& state){
+            std::vector<std::pair<state_t,size_t>> waiting;
+            auto add_state = [&waiting,&state_abstraction,this](state_t&& state, bool initial = false) -> size_t {
                 auto [concrete_fresh, concrete_id, abstract_fresh, abstract_id] = state_abstraction.insert(state);
                 if (abstract_fresh) {
-                    if (state._initial) {
+                    if (initial) {
                         _initial.push_back(abstract_id);
                     }
                     if (state.accepting()) {
@@ -379,135 +312,50 @@ namespace aalwines {
                 }
                 if (concrete_fresh) {
                     waiting.emplace_back(state, concrete_id);
+                    if (initial) {
+                        _concrete_initial.push_back(concrete_id);
+                    }
                 }
                 return concrete_id;
             };
 
-            auto add_initial = [&add_state, this](const std::vector<nfa_state_t*>& next, const Interface* inf) {
-                if (inf != nullptr && inf->is_virtual()) return; // don't start on a virtual interface.
-                for (const auto& n : next) {
-                    add_state(State(inf, n, true));
-                }
-            };
-
             // First make initial states.
-            for (const auto& i : _path.initial()) {
-                for (const auto& e : i->_edges) {
-                    auto next = e.follow_epsilon();
-                    if (e.wildcard(_network.all_interfaces().size())) {
-                        for (const auto& inf : _network.all_interfaces()) {
-                            add_initial(next, inf->match());
-                        }
-                    } else if (!e._negated) {
-                        for (const auto& s : e._symbols) {
-                            auto inf = _network.all_interfaces()[s];
-                            add_initial(next, inf->match());
-                        }
-                    } else {
-                        for (const auto& inf : _network.all_interfaces()) {
-                            if (e.contains(inf->global_id())) {
-                                add_initial(next, inf->match());
-                            }
-                        }
-                    }
-                }
-            }
+            _translation.make_initial_states(_network.all_interfaces(), [&add_state](state_t&& state){
+                add_state(std::move(state), true);
+            });
 
             // Now search through states, adding rules and new states.
             while (!waiting.empty()) {
-                auto [from_state,from_id] = waiting.back(); // Concrete state and id
+                auto from = waiting.back(); // Concrete state and id
                 waiting.pop_back();
 
-                if (from_state.ops_done()) { // No ops left to do, so we generate rules for the routing table at from_state._inf
-                    const auto& entries = from_state._inf->table().entries();
-                    for (size_t eid = 0; eid < entries.size(); ++eid) {
-                        const auto& entry = entries[eid];
-                        for (size_t rid = 0; rid < entry._rules.size(); ++rid) {
-                            const auto& forward = entry._rules[rid];
-                            if (forward._priority > 0) continue; // TODO: This only works for k==0 !!!
-                            auto apply_per_nfastate = [&](const nfa_state_t* n) {
-                                size_t to_id = (forward._ops.size() <= 1)
-                                               ? add_state(State(forward._via->match(), n))
-                                               : add_state(State(eid, rid, 0, from_state._inf, n));
-                                _rule_mapping.insert(rule_t(from_id, eid, rid, to_id));
-                            };
-                            if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
-                                apply_per_nfastate(from_state._nfa_state);
-                            } else { // Follow NFA edges matching forward._via
-                                for (const auto& e : from_state._nfa_state->_edges) {
-                                    if (!e.contains(forward._via->global_id())) continue;
-                                    for (const auto& n : e.follow_epsilon()) {
-                                        apply_per_nfastate(n);
-                                    }
-                                }
-                            }
-
-                        }
-                    }
-                } else {
-                    const auto& entry = from_state._inf->table().entries()[from_state._eid];
-                    const auto& forward = entry._rules[from_state._rid];
-                    assert(from_state._opid + 1 < forward._ops.size()); // Otherwise we would already have moved to the next interface.
-                    const auto& action = forward._ops[from_state._opid + 1];
-
-                    auto pre = forward._ops[from_state._opid]._op_label;
-                    if (forward._ops[from_state._opid]._op != RoutingTable::op_t::SWAP &&
-                        forward._ops[from_state._opid]._op != RoutingTable::op_t::PUSH) {
-                        throw base_error("Unexpected pop!"); // TODO: This is not intended behaviour, but we need wildcard label in PDA to handle it properly.!
-                        assert(false);
-                    }
-                    auto [op, op_label] = Rule::convert_action(action);
-                    size_t to_id = add_state(State::perform_op(from_state, forward));
+                _translation.rules(from.first,
+                [from_id = from.second, inf = from.first._inf, &add_state, this](state_t&& to_state, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) {
+                    size_t eid = ((&entry) - inf->table().entries().data());
+                    size_t rid = ((&forward) - entry._rules.data());
+                    size_t to_id = add_state(std::move(to_state));
+                    _rule_mapping.insert(rule_t(from_id, eid, rid, to_id));
+                },
+                [from_id = from.second, &add_state, &state_abstraction, this](state_t&& to_state, const label_t& pre_label, std::pair<pdaaal::op_t,label_t>&& op) {
+                    size_t to_id = add_state(std::move(to_state));
                     _rule_mapping.insert_abstract(abstract_rule_t(
                         state_abstraction.map_id(from_id),
-                        this->abstract_label(pre).second,
+                        this->abstract_label(pre_label).second,
                         state_abstraction.map_id(to_id),
-                        op,
-                        (op == pdaaal::PUSH || op == pdaaal::SWAP) ? this->abstract_label(op_label).second : std::numeric_limits<uint32_t>::max())
+                        op.first,
+                        (op.first == pdaaal::PUSH || op.first == pdaaal::SWAP) ? this->abstract_label(op.second).second : std::numeric_limits<uint32_t>::max())
                     );
-                }
+                });
             }
 
             std::sort(_initial.begin(), _initial.end());
             std::sort(_accepting.begin(), _accepting.end());
+            std::sort(_concrete_initial.begin(), _concrete_initial.end());
 
             json_output["states"] = state_abstraction.size_abstract();
             //std::cout << "states: " << state_abstraction.size_abstract(); // FIXME: Remove...
             _state_mapping = std::move(state_abstraction);
         }
-
-        /*std::vector<label_t> expand_pre_label(const label_t& pre) {
-            auto val = pre.value();
-            auto mask = pre.mask();
-            std::vector<label_t> result;
-
-            switch (pre.type()) {
-                case Query::STICKY_MPLS:
-                case Query::MPLS:
-                    assert(mask == 0);
-                    result.push_back(pre);
-                    break;
-                case Query::ANYIP:
-                    mask = 64;
-                    val = 0;
-                    // fall through to IP
-                case Query::IP4:
-                    for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP4)) {
-                        assert(l.mask() == 0 || l.type() != Query::IP4 || l == Query::label_t::any_ip4);
-                        result.push_back(l);
-                    }
-                    if (pre.type() != Query::ANYIP) break; // fall through to IP6 if any
-                case Query::IP6:
-                    for (auto &l : Builder::get_labels(this->_all_labels, val, mask, Query::IP6)) {
-                        assert(l.mask() == 0 || l.type() != Query::IP6 || l == Query::label_t::any_ip6);
-                        result.push_back(l);
-                    }
-                    break;
-                default:
-                    throw base_error("Unknown label-type");
-            }
-            return result;
-        }*/
 
         abstract_rule_t abstract_rule(const rule_t& rule, const StateMapping& state_mapping) {
             abstract_rule_t result;
@@ -515,7 +363,8 @@ namespace aalwines {
             const auto& entry = rule.entry(state_mapping);
             const auto& forward = rule.forward(entry);
             auto pre = entry._top_label;
-            auto [op, op_label] = rule_t::first_action(forward);
+            assert(pre != Query::wildcard_label()); // TODO: Wildcard label is not yet implemented.!.
+            auto [op, op_label] = NetworkTranslation::first_action(forward);
             assert(this->abstract_label(pre).first);
             result._pre = this->abstract_label(pre).second;
             result._to = state_mapping.map_id(rule._to_id);
@@ -532,8 +381,8 @@ namespace aalwines {
 
     private:
         std::unordered_set<label_t> _all_labels;
+        Translation _translation;
         const Network& _network;
-        const NFA& _path;
         const size_t _failures;
         pdaaal::RefinementMapping<const Interface*> _interface_abstraction; // This is what gets refined by CEGAR.
         StateMapping _state_mapping;
@@ -541,6 +390,7 @@ namespace aalwines {
         pdaaal::AbstractionMapping<rule_t,abstract_rule_t> _rule_mapping;
         std::vector<size_t> _initial;
         std::vector<size_t> _accepting;
+        std::vector<size_t> _concrete_initial;
     };
 
 
@@ -650,6 +500,7 @@ namespace aalwines {
         using label_t = typename factory::label_t;
         using concrete_trace_t = json;
     private:
+        using Translation = typename factory::Translation;
         using state_t = const Interface*; // This is the 'state' that is refined.
         using header_t = pdaaal::Header<Query::label_t>;
         //using configuration_t = std::tuple<header_t, State, State, size_t, size_t>; // header, old_state state, entry id, forwarding rule id
@@ -665,16 +516,18 @@ namespace aalwines {
         using header_refinement_t = typename parent_t::header_refinement_t;
 
         explicit CegarNetworkPdaReconstruction(const factory& factory, const solver_instance_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
-        : parent_t(instance, initial_headers, final_headers),
-          _interface_abstraction(factory._interface_abstraction), _state_mapping(factory._state_mapping), _rule_mapping(factory._rule_mapping) {};
+        : parent_t(instance, initial_headers, final_headers), _translation(factory._translation),
+          _interface_abstraction(factory._interface_abstraction), _state_mapping(factory._state_mapping),
+          _rule_mapping(factory._rule_mapping), _concrete_initial(factory._concrete_initial) {};
 
     protected:
 
         configuration_range_t initial_concrete_rules(const abstract_rule_t& abstract_rule) override {
             return ConfigurationRange(_rule_mapping.get_concrete_values_range(abstract_rule),
               [header=this->initial_header(),this](const rule_t& rule) -> std::optional<configuration_t> {
+                auto lb = std::lower_bound(_concrete_initial.begin(), _concrete_initial.end(), rule._from_id);
+                if (lb == _concrete_initial.end() || *lb != rule._from_id) return std::nullopt;
                 auto from_state = _state_mapping.get_concrete_value(rule._from_id);
-                if (!from_state._initial) return std::nullopt;
                 return make_configuration(from_state, rule, header);
             });
         }
@@ -682,10 +535,9 @@ namespace aalwines {
             std::vector<std::pair<state_t,label_t>> X;
 
             auto labels = this->pre_labels(this->initial_header());
-            for (size_t i = 0; i < _state_mapping.size(); ++i) { // TODO: Make this more efficient.
+            for (size_t i : _concrete_initial) {
                 if (_state_mapping.map_id(i) != abstract_rule._from) continue;
                 auto state = _state_mapping.get_concrete_value(i);
-                if (!state._initial) continue;
                 for (const auto& label : labels) {
                     if (this->label_maps_to(label, abstract_rule._pre)) {
                         X.emplace_back(state.interface(), label);
@@ -723,43 +575,16 @@ namespace aalwines {
         header_t get_header(const configuration_t& conf) override {
             return std::get<0>(conf);
         }
-        void add_link_to_trace(json& trace, const State& state, const std::vector<label_t>& final_header) const {
-            trace.emplace_back();
-            trace.back()["from_router"] = state._inf->target()->name();
-            trace.back()["from_interface"] = state._inf->match()->get_name();
-            trace.back()["to_router"] = state._inf->source()->name();
-            trace.back()["to_interface"] = state._inf->get_name();
-            trace.back()["stack"] = json::array();
-            std::for_each(final_header.rbegin(), final_header.rend(), [&stack=trace.back()["stack"]](const auto& label){
-                std::stringstream s;
-                s << label;
-                stack.emplace_back(s.str());
-            });
-        }
-        void add_rule_to_trace(json& trace, const Interface* inf, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
-            trace.emplace_back();
-            trace.back()["ingoing"] = inf->get_name();
-            std::stringstream s;
-            s << entry._top_label;
-            trace.back()["pre"] = s.str();
-            trace.back()["rule"] = rule.to_json();
-            /*if constexpr (is_weighted) { // TODO: Weighted...
-                trace.back()["priority-weight"] = json::array();
-                auto weights = _weight_f(rule, entry);
-                for (const auto& w : weights){
-                    trace.back()["priority-weight"].push_back(std::to_string(w));
-                }
-            }*/
-        }
+
         concrete_trace_t get_concrete_trace(std::vector<configuration_t>&& configurations, std::vector<label_t>&& final_header, size_t initial_abstract_state) override {
             concrete_trace_t trace = json::array();
             for (auto it = configurations.crbegin(); it < configurations.crend(); ++it) {
                 const auto& [header, from_state, state, eid, rid] = *it;
                 if (!state.ops_done()) continue;
-                add_link_to_trace(trace, state, final_header);
+                Translation::add_link_to_trace(trace, state, final_header);
                 const auto& entry = from_state._inf->table().entries()[eid];
                 const auto& forward = entry._rules[rid];
-                add_rule_to_trace(trace, from_state._inf, entry, forward);
+                _translation.add_rule_to_trace(trace, from_state._inf, entry, forward);
                 const auto& ops = forward._ops;
                 // FIXME: This only works for operation sequences on the form:  POP | SWAP? PUSH*    (as checked by these asserts)
                 assert(ops.size() <= 1 || !std::any_of(ops.begin(), ops.end(), [](const auto& op){ return op._op == RoutingTable::op_t::POP; }));
@@ -789,7 +614,7 @@ namespace aalwines {
             } else {
                 first_state = std::get<1>(configurations[0]);
             }
-            add_link_to_trace(trace,first_state, final_header);
+            Translation::add_link_to_trace(trace,first_state, final_header);
             std::reverse(trace.begin(), trace.end());
             return trace;
         }
@@ -875,9 +700,11 @@ namespace aalwines {
         }
 
     private:
+        const Translation& _translation;
         const pdaaal::RefinementMapping<const Interface*>& _interface_abstraction;
         const StateMapping& _state_mapping;
         const pdaaal::AbstractionMapping<rule_t,abstract_rule_t>& _rule_mapping;
+        const std::vector<size_t>& _concrete_initial;
     };
 
 }

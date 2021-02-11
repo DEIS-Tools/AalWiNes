@@ -105,6 +105,7 @@ namespace aalwines {
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
             std::vector<Query::mode_t> modes = q.approximation() == Query::DUAL ? std::vector<Query::mode_t>{Query::OVER, Query::UNDER} : std::vector<Query::mode_t>{q.approximation()};
             output["mode"] = q.approximation();
+            q.set_approximation(modes[0]);
 
             json json_trace;
             std::vector<unsigned int> trace_weight;
@@ -115,7 +116,7 @@ namespace aalwines {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["no_abstraction"] = json::object();
                 full_time.start();
-                auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["no_abstraction"]);
+                auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), output["no_abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
@@ -127,7 +128,7 @@ namespace aalwines {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["abstraction"] = json::object();
                 full_time.start();
-                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["abstraction"]);
+                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
@@ -139,7 +140,7 @@ namespace aalwines {
                 assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["abstraction"] = json::object();
                 full_time.start();
-                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), q.number_of_failures(), output["abstraction"]);
+                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;

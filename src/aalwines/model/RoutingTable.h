@@ -87,7 +87,7 @@ namespace aalwines {
         };
 
         struct entry_t {
-            size_t _top_label = std::numeric_limits<size_t>::max();
+            size_t _top_label = Query::wildcard_label();
             std::vector<forward_t> _rules;
 
             entry_t() = default;
@@ -106,7 +106,7 @@ namespace aalwines {
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
             void add_to_outgoing(const Interface* outgoing, action_t action);
             [[nodiscard]] bool ignores_label() const {
-                return _top_label == std::numeric_limits<size_t>::max();
+                return _top_label == Query::wildcard_label();
             }
         };
 

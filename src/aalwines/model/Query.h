@@ -44,8 +44,9 @@ namespace aalwines {
         };
 
         using label_t = size_t;
-        static constexpr label_t unused_label() noexcept { return std::numeric_limits<size_t>::max() - 1; }
-        static constexpr label_t bottom_of_stack() noexcept { return std::numeric_limits<size_t>::max(); }
+        static constexpr label_t unused_label() noexcept { return std::numeric_limits<size_t>::max() - 2; }
+        static constexpr label_t bottom_of_stack() noexcept { return std::numeric_limits<size_t>::max() - 1; }
+        static constexpr label_t wildcard_label() noexcept { return std::numeric_limits<size_t>::max(); }
 
         Query() = default;
         Query(pdaaal::NFA<label_t>&& pre, pdaaal::NFA<label_t>&& path, pdaaal::NFA<label_t>&& post, size_t lf, mode_t mode)
@@ -54,15 +55,18 @@ namespace aalwines {
             _poststack.concat(pdaaal::NFA<label_t>(std::unordered_set<label_t>{Query::bottom_of_stack()}));
         };
 
-        pdaaal::NFA<label_t> & construction() {
+        pdaaal::NFA<label_t>& construction() {
             return _prestack;
         }
 
-        pdaaal::NFA<label_t> & destruction() {
+        pdaaal::NFA<label_t>& destruction() {
             return _poststack;
         }
 
-        pdaaal::NFA<label_t> & path() {
+        pdaaal::NFA<label_t>& path() {
+            return _path;
+        }
+        [[nodiscard]] const pdaaal::NFA<label_t>& path() const {
             return _path;
         }
         

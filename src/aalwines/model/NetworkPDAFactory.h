@@ -27,10 +27,10 @@
 #ifndef NETWORKPDA_H
 #define NETWORKPDA_H
 
-#include "Query.h"
-#include "Network.h"
+#include <aalwines/model/Query.h>
+#include <aalwines/model/Network.h>
 #include <pdaaal/NewPDAFactory.h>
-
+#include <aalwines/model/NetworkTranslation.h>
 
 namespace aalwines {
 
@@ -45,54 +45,14 @@ namespace aalwines {
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
     private:
-        struct State {
-            using nfa_state_t = typename pdaaal::NFA<Query::label_t>::state_t;
-            size_t _eid = 0; // which entry we are going for
-            size_t _rid = 0; // which rule in that entry
-            size_t _opid = std::numeric_limits<size_t>::max(); // which operation is the first in the rule (max = no operations left).
-            size_t _appmode = 0; // mode of approximation
-            const Interface *_inf = nullptr;
-            const nfa_state_t* _nfa_state = nullptr;
-            State() = default;
-            State(size_t eid, size_t rid, size_t opid, size_t appmode, const Interface* inf, const nfa_state_t* nfa_state)
-                    : _eid(eid), _rid(rid), _opid(opid), _appmode(appmode), _inf(inf), _nfa_state(nfa_state) { };
-            State(const Interface* inf, const nfa_state_t* nfa_state, size_t appmode = 0)
-                    : _appmode(appmode), _inf(inf), _nfa_state(nfa_state) { };
-            bool operator==(const State& other) const {
-                return _eid == other._eid && _rid == other._rid && _opid == other._opid
-                    && _appmode == other._appmode && _inf == other._inf && _nfa_state == other._nfa_state;
-            }
-            bool operator!=(const State& other) const {
-                return !(*this == other);
-            }
-            [[nodiscard]] const Interface* interface() const {
-                return _inf;
-            }
-            [[nodiscard]] bool ops_done() const {
-                return _opid == std::numeric_limits<size_t>::max();
-            }
-            [[nodiscard]] bool accepting() const {
-                return ops_done() && (_inf == nullptr || !_inf->is_virtual()) && _nfa_state->_accepting;
-            }
-            static State perform_op(const State& state) {
-                assert(!state.ops_done());
-                return perform_op(state, state._inf->table().entries()[state._eid]._rules[state._rid]);
-            }
-            static State perform_op(const State& state, const RoutingTable::forward_t& forward) {
-                assert(!state.ops_done());
-                if (state._opid + 2 == forward._ops.size()) {
-                    return State(forward._via->match(), state._nfa_state, state._appmode);
-                } else {
-                    return State(state._eid, state._rid, state._opid + 1, state._appmode, state._inf, state._nfa_state);
-                }
-            }
-        } __attribute__((packed)); // packed is needed to make this work fast with ptries
+        using Translation = NetworkTranslationW<W_FN>;
+        using state_t = State;
     public:
         NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels)
         : NetworkPDAFactory(query, network, std::move(all_labels), [](){}) {};
 
         NetworkPDAFactory(Query &query, Network &network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
-        : PDAFactory(std::move(all_labels)), _network(network), _query(query), _path(query.path()), _weight_f(weight_f) {
+        : PDAFactory(std::move(all_labels)), _translation(query, weight_f), _network(network), _query(query), _weight_f(weight_f) {
             construct_initial();
         };
 
@@ -116,108 +76,60 @@ namespace aalwines {
                 _query.approximation() == Query::DUAL) {
                 throw base_error("Exact and Dual analysis method not yet supported");
             }
-            State from_state;
+            state_t from_state;
             _states.unpack(from_id, &from_state);
             std::vector<rule_t> result;
-            if (from_state.ops_done()) {
-                const auto& entries = from_state._inf->table().entries();
-                for (size_t eid = 0; eid < entries.size(); ++eid) {
-                    const auto& entry = entries[eid];
-                    for (size_t rid = 0; rid < entry._rules.size(); ++rid) {
-                        const auto& forward = entry._rules[rid];
-                        auto appmode = forward._via->is_virtual() ? set_approximation(from_state, forward) : from_state._appmode;
-                        if (appmode == std::numeric_limits<size_t>::max()) continue;
-                        rule_t rule;
-                        rule._from = from_id;
-                        std::tie(rule._op, rule._op_label) = first_action(forward);
-                        if constexpr (is_weighted) {
-                            rule._weight = _weight_f(forward, entry);
-                        }
-                        auto apply_per_nfastate = [&](const nfa_state_t* n) {
-                            rule._to = (forward._ops.size() <= 1)
-                                       ? add_state(State(forward._via->match(), n, appmode)).second
-                                       : add_state(State(eid, rid, 0, appmode, from_state._inf, n)).second;
-                            result.push_back(rule);
-                            if (entry.ignores_label()) {
-                                expand_back(result); // TODO: Implement wildcard pre label in PDA instead of this.
-                            } else {
-                                result.back()._pre = entry._top_label;
-                            }
-                        };
 
-                        if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
-                            apply_per_nfastate(from_state._nfa_state);
-                        } else { // Follow NFA edges matching forward._via
-                            for (const auto& e : from_state._nfa_state->_edges) {
-                                if (!e.contains(forward._via->global_id())) continue;
-                                for (const auto& n : e.follow_epsilon()) {
-                                    apply_per_nfastate(n);
-                                }
-                            }
-                        }
-
-                    }
-                }
-            } else {
-                const auto& forward = from_state._inf->table().entries()[from_state._eid]._rules[from_state._rid];
-                assert(from_state._opid + 1 < forward._ops.size()); // Otherwise we would already have moved to the next interface.
+            _translation.rules(from_state,
+            [from_id,&result,this](state_t&& to_state, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) {
                 rule_t rule;
                 rule._from = from_id;
-                std::tie(rule._op, rule._op_label) = convert_action(forward._ops[from_state._opid + 1]);
-                rule._to = add_state(State::perform_op(from_state, forward)).second;
-                result.push_back(rule);
-                if (forward._ops[from_state._opid]._op == RoutingTable::op_t::POP) {
-                    expand_back(result); // TODO: Implement wildcard pre label in PDA instead of this.
-                } else {
-                    assert(forward._ops[from_state._opid]._op == RoutingTable::op_t::SWAP || forward._ops[from_state._opid]._op == RoutingTable::op_t::PUSH);
-                    result.back()._pre = forward._ops[from_state._opid]._op_label;
+                std::tie(rule._op, rule._op_label) = Translation::first_action(forward);
+                rule._to = add_state(to_state);
+                rule._pre = entry._top_label;
+                if constexpr (is_weighted) {
+                    rule._weight = _weight_f(forward, entry);
                 }
-            }
+                result.push_back(rule);
+                if (result.back()._pre == Query::wildcard_label()) {
+                    expand_back(result); // TODO: Implement wildcard pre label in PDA instead of this.
+                }
+            },
+            [from_id,&result,this](state_t&& to_state, const label_t& pre_label, std::pair<pdaaal::op_t,label_t>&& op) {
+                rule_t rule;
+                rule._from = from_id;
+                std::tie(rule._op, rule._op_label) = op;
+                rule._to = add_state(to_state);
+                rule._pre = pre_label;
+                result.push_back(rule);
+                if (result.back()._pre == Query::wildcard_label()) {
+                    expand_back(result); // TODO: Implement wildcard pre label in PDA instead of this.
+                }
+            });
+
             return result;
         }
 
     private:
         // Construction (factory)
-        std::pair<bool,size_t> add_state(State&& state) {
+        template<bool initial = false>
+        size_t add_state(const state_t& state) {
             auto res = _states.insert(state);
             if (res.first) {
                 _states.get_data(res.second) = state.accepting();
+                if constexpr (initial) {
+                    _initial.push_back(res.second);
+                }
             }
-            return res;
+            return res.second;
         }
 
         void construct_initial() {
-            auto add_initial = [this](const std::vector<nfa_state_t*>& next, const Interface* inf) {
-                if (inf != nullptr && inf->is_virtual()) return; // don't start on a virtual interface.
-                for (const auto& n : next) {
-                    auto res = add_state(State(inf, n));
-                    if (res.first) _initial.push_back(res.second);
-                }
-            };
-            for (const auto& i : _path.initial()) {
-                for (const auto& e : i->_edges) {
-                    auto next = e.follow_epsilon();
-                    if (e.wildcard(_network.all_interfaces().size())) {
-                        for (const auto& inf : _network.all_interfaces()) {
-                            add_initial(next, inf->match());
-                        }
-                    } else if (!e._negated) {
-                        for (const auto& s : e._symbols) {
-                            auto inf = _network.all_interfaces()[s];
-                            add_initial(next, inf->match());
-                        }
-                    } else {
-                        for (const auto& inf : _network.all_interfaces()) {
-                            if (e.contains(inf->global_id())) {
-                                add_initial(next, inf->match());
-                            }
-                        }
-                    }
-                }
-            }
+            _translation.make_initial_states(_network.all_interfaces(), [this](state_t&& state) {
+                add_state<true>(state);
+            });
             std::sort(_initial.begin(), _initial.end());
         }
-
         void expand_back(std::vector<rule_t> &rules) {
             rule_t cpy;
             std::swap(rules.back(), cpy);
@@ -228,51 +140,7 @@ namespace aalwines {
             }
         }
 
-        size_t set_approximation(const State& state, const RoutingTable::forward_t& forward) {
-            auto num_fail = _query.number_of_failures();
-            auto err = std::numeric_limits<size_t>::max();
-            switch (_query.approximation()) {
-                case Query::OVER:
-                    return (forward._priority > num_fail) ? err : 0;
-                case Query::UNDER: {
-                    auto nm = state._appmode + forward._priority;
-                    return (nm > num_fail) ? err : nm;
-                }
-                case Query::EXACT:
-                case Query::DUAL:
-                default:
-                    return err;
-            }
-        }
-
-        static std::pair<pdaaal::op_t,label_t> first_action(const RoutingTable::forward_t& forward) {
-            if (forward._ops.empty()) {
-                return std::make_pair(pdaaal::NOOP, label_t());
-            } else {
-                return convert_action(forward._ops[0]);
-            }
-        }
-        static std::pair<pdaaal::op_t,label_t> convert_action(const RoutingTable::action_t& action) {
-            pdaaal::op_t op;
-            label_t op_label;
-            switch (action._op) {
-                case RoutingTable::op_t::POP:
-                    op = pdaaal::POP;
-                    break;
-                case RoutingTable::op_t::PUSH:
-                    op = pdaaal::PUSH;
-                    op_label = action._op_label;
-                    break;
-                case RoutingTable::op_t::SWAP:
-                    op = pdaaal::SWAP;
-                    op_label = action._op_label;
-                    break;
-            }
-            return std::make_pair(op, op_label);
-        }
-
         // Trace reconstruction
-
         bool add_interfaces(std::unordered_set<const Interface* >& disabled, std::unordered_set<const Interface*>& active,
                             const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) const {
             if (disabled.count(forward._via) > 0) {
@@ -304,51 +172,19 @@ namespace aalwines {
             }
         }
 
-        void add_link_to_trace(json& trace, const State& state, const std::vector<label_t>& final_header) const {
-            trace.emplace_back();
-            trace.back()["from_router"] = state._inf->target()->name();
-            trace.back()["from_interface"] = state._inf->match()->get_name();
-            trace.back()["to_router"] = state._inf->source()->name();
-            trace.back()["to_interface"] = state._inf->get_name();
-            trace.back()["stack"] = json::array();
-            std::for_each(final_header.rbegin(), final_header.rend(), [&stack=trace.back()["stack"]](const auto& label){
-                if (label == Query::bottom_of_stack()) return;
-                std::stringstream s;
-                s << label;
-                stack.emplace_back(s.str());
-            });
-        }
-        void add_rule_to_trace(json& trace, const Interface* inf, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
-            trace.emplace_back();
-            trace.back()["ingoing"] = inf->get_name();
-            std::stringstream s;
-            if (entry.ignores_label()) {
-                s << "null";
-            } else {
-                s << entry._top_label;
-            }
-            trace.back()["pre"] = s.str();
-            trace.back()["rule"] = rule.to_json();
-            if constexpr (is_weighted) {
-                trace.back()["priority-weight"] = json::array();
-                auto weights = _weight_f(rule, entry);
-                for (const auto& w : weights){
-                    trace.back()["priority-weight"].push_back(std::to_string(w));
-                }
-            }
-        }
+
 
         bool concreterize_trace(const std::vector<PDA::tracestate_t>& trace, std::vector<const RoutingTable::entry_t*>& entries, std::vector<const RoutingTable::forward_t*>& rules) {
             std::unordered_set<const Interface *> disabled, active;
 
             for (size_t sno = 0; sno < trace.size(); ++sno) {
                 auto &step = trace[sno];
-                State s;
+                state_t s;
                 _states.unpack(step._pdastate, &s);
                 if (s.ops_done()) {
                     if (sno != trace.size() - 1 && !step._stack.empty()) {
                         // peek at next element, we want to write the ops here
-                        State next;
+                        state_t next;
                         _states.unpack(trace[sno + 1]._pdastate, &next);
                         if (!next.ops_done()) {
                             // we get the rule we use, print
@@ -446,12 +282,12 @@ namespace aalwines {
             auto result_trace = json::array();
             size_t cnt = 0;
             for (const auto &step : trace) {
-                State s;
+                state_t s;
                 _states.unpack(step._pdastate, &s);
                 if (s.ops_done()) {
-                    add_link_to_trace(result_trace, s, step._stack);
+                    Translation::add_link_to_trace(result_trace, s, step._stack);
                     if (cnt < entries.size()) {
-                        add_rule_to_trace(result_trace, s._inf, *entries[cnt], *rules[cnt]);
+                        _translation.add_rule_to_trace(result_trace, s._inf, *entries[cnt], *rules[cnt]);
                         ++cnt;
                     }
                 }
@@ -459,11 +295,11 @@ namespace aalwines {
             return result_trace;
         }
 
+        Translation _translation;
         Network& _network;
         Query& _query;
-        NFA& _path;
         std::vector<size_t> _initial;
-        ptrie::map<State,bool> _states;
+        ptrie::map<state_t,bool> _states;
         const W_FN& _weight_f;
     };
 
