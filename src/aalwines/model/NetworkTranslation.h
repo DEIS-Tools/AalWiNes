@@ -82,7 +82,7 @@ namespace aalwines {
         using NFA = pdaaal::NFA<label_t>;
         using nfa_state_t = NFA::state_t;
     public:
-        explicit NetworkTranslation(const Query& query) : _query(query) { };
+        NetworkTranslation(const Query& query, const Network& network) : _query(query), _network(network) { };
 
         static std::pair<pdaaal::op_t,label_t> first_action(const RoutingTable::forward_t& forward) {
             if (forward._ops.empty()) {
@@ -110,7 +110,7 @@ namespace aalwines {
             return std::make_pair(op, op_label);
         }
 
-        void make_initial_states(const std::vector<const Interface*>& all_interfaces, const std::function<void(State&&)>& add_initial) {
+        void make_initial_states(const std::function<void(State&&)>& add_initial) {
             auto add = [&add_initial](const std::vector<nfa_state_t*>& next, const Interface* inf) {
                 if (inf != nullptr && inf->is_virtual()) return; // don't start on a virtual interface.
                 for (const auto& n : next) {
@@ -120,17 +120,17 @@ namespace aalwines {
             for (const auto& i : _query.path().initial()) {
                 for (const auto& e : i->_edges) {
                     auto next = e.follow_epsilon();
-                    if (e.wildcard(all_interfaces.size())) {
-                        for (const auto& inf : all_interfaces) {
+                    if (e.wildcard(_network.all_interfaces().size())) {
+                        for (const auto& inf : _network.all_interfaces()) {
                             add(next, inf->match());
                         }
                     } else if (!e._negated) {
                         for (const auto& s : e._symbols) {
-                            auto inf = all_interfaces[s];
+                            auto inf = _network.all_interfaces()[s];
                             add(next, inf->match());
                         }
                     } else {
-                        for (const auto& inf : all_interfaces) {
+                        for (const auto& inf : _network.all_interfaces()) {
                             if (e.contains(inf->global_id())) {
                                 add(next, inf->match());
                             }
@@ -215,6 +215,7 @@ namespace aalwines {
 
     private:
         const Query& _query;
+        const Network& _network;
     };
 
     template<typename W_FN = std::function<void(void)>>
@@ -222,8 +223,8 @@ namespace aalwines {
         using weight_type = typename W_FN::result_type;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
     public:
-        NetworkTranslationW(const Query& query, const W_FN& weight_f)
-        : NetworkTranslation(query), _weight_f(weight_f) { };
+        NetworkTranslationW(const Query& query, const Network& network, const W_FN& weight_f)
+        : NetworkTranslation(query, network), _weight_f(weight_f) { };
 
         void add_rule_to_trace(json& trace, const Interface* inf, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& rule) const {
             trace.emplace_back();

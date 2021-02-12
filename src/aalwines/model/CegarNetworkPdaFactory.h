@@ -220,15 +220,16 @@ namespace aalwines {
         using parent_t = pdaaal::CegarPdaFactory<label_t, W, C, A>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         using rule_t = Rule; //std::tuple<size_t, label_t, size_t, pdaaal::op_t, label_t>; // From and to state is concrete_id (size_t), not abstract_id!
+        static constexpr uint32_t abstract_wildcard_label() noexcept { return std::numeric_limits<uint32_t>::max(); }
     public:
         json& json_output;
 
         template<typename label_abstraction_fn_t>
-        CegarNetworkPdaFactory(json& json_output, const Network &network, const Query& query, std::unordered_set<label_t>&& all_labels,
+        CegarNetworkPdaFactory(json& json_output, const Network& network, const Query& query, std::unordered_set<label_t>&& all_labels,
                                label_abstraction_fn_t&& label_abstraction_fn,
                                std::function<size_t(const Interface*)>&& interface_abstraction_fn)
         : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)), json_output(json_output),
-          _all_labels(std::move(all_labels)), _translation(query, [](){}), _network(network), _failures(query.number_of_failures()),
+          _all_labels(std::move(all_labels)), _translation(query, network, [](){}), _failures(query.number_of_failures()),
           _rule_mapping([this](const rule_t& rule){ return this->abstract_rule(rule, _state_mapping); }) /* use of _state_mapping here is just dummy, overwritten in initialize(). */
         {
             static_assert(std::is_convertible_v<label_abstraction_fn_t,
@@ -254,7 +255,12 @@ namespace aalwines {
 
         void build_pda() override {
             for (size_t i = 0; i < _rule_mapping.size(); ++i) {
-                this->add_rule(_rule_mapping.get_abstract_value(i));
+                auto rule = _rule_mapping.get_abstract_value(i);
+                if (rule._pre == abstract_wildcard_label()) {
+                    this->add_wildcard_rule(rule);
+                } else {
+                    this->add_rule(rule);
+                }
             }
             json_output["rules"] = _rule_mapping.size();
             json_output["labels"] = this->number_of_labels();
@@ -320,7 +326,7 @@ namespace aalwines {
             };
 
             // First make initial states.
-            _translation.make_initial_states(_network.all_interfaces(), [&add_state](state_t&& state){
+            _translation.make_initial_states([&add_state](state_t&& state){
                 add_state(std::move(state), true);
             });
 
@@ -340,10 +346,10 @@ namespace aalwines {
                     size_t to_id = add_state(std::move(to_state));
                     _rule_mapping.insert_abstract(abstract_rule_t(
                         state_abstraction.map_id(from_id),
-                        this->abstract_label(pre_label).second,
+                        abstract_pre_label(pre_label),
                         state_abstraction.map_id(to_id),
                         op.first,
-                        (op.first == pdaaal::PUSH || op.first == pdaaal::SWAP) ? this->abstract_label(op.second).second : std::numeric_limits<uint32_t>::max())
+                        abstract_op_label(op))
                     );
                 });
             }
@@ -357,32 +363,48 @@ namespace aalwines {
             _state_mapping = std::move(state_abstraction);
         }
 
+        uint32_t abstract_pre_label(const label_t& pre_label) const {
+            assert(pre_label == Query::wildcard_label() || this->abstract_label(pre_label).first);
+            return (pre_label == Query::wildcard_label())
+                    ? abstract_wildcard_label()
+                    : this->abstract_label(pre_label).second;
+        }
+        uint32_t abstract_op_label(const std::pair<pdaaal::op_t,label_t>& op) const {
+            assert(!(op.first == pdaaal::PUSH || op.first == pdaaal::SWAP) || this->abstract_label(op.second).first);
+            return (op.first == pdaaal::PUSH || op.first == pdaaal::SWAP)
+                    ? this->abstract_label(op.second).second
+                    : std::numeric_limits<uint32_t>::max();
+        }
+
         abstract_rule_t abstract_rule(const rule_t& rule, const StateMapping& state_mapping) {
-            abstract_rule_t result;
-            result._from = state_mapping.map_id(rule._from_id);
             const auto& entry = rule.entry(state_mapping);
             const auto& forward = rule.forward(entry);
-            auto pre = entry._top_label;
-            assert(pre != Query::wildcard_label()); // TODO: Wildcard label is not yet implemented.!.
-            auto [op, op_label] = NetworkTranslation::first_action(forward);
-            assert(this->abstract_label(pre).first);
-            result._pre = this->abstract_label(pre).second;
+            auto op = NetworkTranslation::first_action(forward);
+            abstract_rule_t result;
+            result._from = state_mapping.map_id(rule._from_id);
+            result._pre = abstract_pre_label(entry._top_label);
             result._to = state_mapping.map_id(rule._to_id);
-            result._op = op;
-            assert(!(op == pdaaal::PUSH || op == pdaaal::SWAP) || this->abstract_label(op_label).first);
-            result._op_label = (op == pdaaal::PUSH || op == pdaaal::SWAP)
-                               ? this->abstract_label(op_label).second
-                               : std::numeric_limits<uint32_t>::max();
+            result._op = op.first;
+            result._op_label = abstract_op_label(op);
             //if constexpr (is_weighted) { // FIXME: Weights...
             //    result._weight = _weight_f(forward, entry);
             //}
             return result;
         }
 
+        auto get_concrete_rules(const abstract_rule_t& abstract_rule) const {
+            auto result = _rule_mapping.get_concrete_values(abstract_rule);
+            auto temp_rule = abstract_rule;
+            temp_rule._pre = abstract_wildcard_label(); // This rule might have been specialized from a wildcard rule, so we need to consider both cases.
+            auto temp = _rule_mapping.get_concrete_values(temp_rule);
+            result.insert(result.end(), temp.begin(), temp.end());
+            return result;
+        }
+
+
     private:
         std::unordered_set<label_t> _all_labels;
         Translation _translation;
-        const Network& _network;
         const size_t _failures;
         pdaaal::RefinementMapping<const Interface*> _interface_abstraction; // This is what gets refined by CEGAR.
         StateMapping _state_mapping;
@@ -495,12 +517,12 @@ namespace aalwines {
             json , // concrete_trace_t
             W, C, A> {
         friend class CegarNetworkPdaFactory<W_FN,W,C,A>;
-        using factory = CegarNetworkPdaFactory<W_FN,W,C,A>;
+        using factory_t = CegarNetworkPdaFactory<W_FN,W,C,A>;
     public:
-        using label_t = typename factory::label_t;
+        using label_t = typename factory_t::label_t;
         using concrete_trace_t = json;
     private:
-        using Translation = typename factory::Translation;
+        using Translation = typename factory_t::Translation;
         using state_t = const Interface*; // This is the 'state' that is refined.
         using header_t = pdaaal::Header<Query::label_t>;
         //using configuration_t = std::tuple<header_t, State, State, size_t, size_t>; // header, old_state state, entry id, forwarding rule id
@@ -509,25 +531,23 @@ namespace aalwines {
         using configuration_t = typename configuration_range_t::value_type;
         using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W, C, A>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
-        using rule_t = typename factory::rule_t;
+        using rule_t = typename factory_t::rule_t;
         using solver_instance_t = typename parent_t::solver_instance_t;
     public:
         using refinement_t = typename parent_t::refinement_t;
         using header_refinement_t = typename parent_t::header_refinement_t;
 
-        explicit CegarNetworkPdaReconstruction(const factory& factory, const solver_instance_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
-        : parent_t(instance, initial_headers, final_headers), _translation(factory._translation),
-          _interface_abstraction(factory._interface_abstraction), _state_mapping(factory._state_mapping),
-          _rule_mapping(factory._rule_mapping), _concrete_initial(factory._concrete_initial) {};
+        explicit CegarNetworkPdaReconstruction(const factory_t& factory, const solver_instance_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
+        : parent_t(instance, initial_headers, final_headers), _factory(factory) {};
 
     protected:
 
         configuration_range_t initial_concrete_rules(const abstract_rule_t& abstract_rule) override {
-            return ConfigurationRange(_rule_mapping.get_concrete_values_range(abstract_rule),
+            return ConfigurationRange(_factory._rule_mapping.get_concrete_values_range(abstract_rule),
               [header=this->initial_header(),this](const rule_t& rule) -> std::optional<configuration_t> {
-                auto lb = std::lower_bound(_concrete_initial.begin(), _concrete_initial.end(), rule._from_id);
-                if (lb == _concrete_initial.end() || *lb != rule._from_id) return std::nullopt;
-                auto from_state = _state_mapping.get_concrete_value(rule._from_id);
+                auto lb = std::lower_bound(_factory._concrete_initial.begin(), _factory._concrete_initial.end(), rule._from_id);
+                if (lb == _factory._concrete_initial.end() || *lb != rule._from_id) return std::nullopt;
+                auto from_state = _factory._state_mapping.get_concrete_value(rule._from_id);
                 return make_configuration(from_state, rule, header);
             });
         }
@@ -535,9 +555,9 @@ namespace aalwines {
             std::vector<std::pair<state_t,label_t>> X;
 
             auto labels = this->pre_labels(this->initial_header());
-            for (size_t i : _concrete_initial) {
-                if (_state_mapping.map_id(i) != abstract_rule._from) continue;
-                auto state = _state_mapping.get_concrete_value(i);
+            for (size_t i : _factory._concrete_initial) {
+                if (_factory._state_mapping.map_id(i) != abstract_rule._from) continue;
+                auto state = _factory._state_mapping.get_concrete_value(i);
                 for (const auto& label : labels) {
                     if (this->label_maps_to(label, abstract_rule._pre)) {
                         X.emplace_back(state.interface(), label);
@@ -549,9 +569,9 @@ namespace aalwines {
         configuration_range_t search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf) override {
             const auto& [header, old_state, state, eid, rid] = conf;
             if (state.ops_done()) {
-                return ConfigurationRange(_rule_mapping.get_concrete_values_range(abstract_rule),
+                return ConfigurationRange(_factory._rule_mapping.get_concrete_values_range(abstract_rule),
                   [&header,&state,this](const rule_t& rule) -> std::optional<configuration_t> {
-                    if (!_state_mapping.match_concrete(state, rule._from_id)) return std::nullopt;
+                    if (!_factory._state_mapping.match_concrete(state, rule._from_id)) return std::nullopt;
                     return make_configuration(state, rule, header);
                 });
             } else {
@@ -563,7 +583,7 @@ namespace aalwines {
 
             for (const auto& [header, old_state, state, eid, rid] : configurations) {
                 assert(state.ops_done());
-                if (!_state_mapping.match_abstract(state, abstract_rule._from)) continue;
+                if (!_factory._state_mapping.match_abstract(state, abstract_rule._from)) continue;
                 for (const auto& label : this->pre_labels(header)) {
                     if (this->label_maps_to(label, abstract_rule._pre)) {
                         X.emplace_back(state._inf, label);
@@ -584,7 +604,7 @@ namespace aalwines {
                 Translation::add_link_to_trace(trace, state, final_header);
                 const auto& entry = from_state._inf->table().entries()[eid];
                 const auto& forward = entry._rules[rid];
-                _translation.add_rule_to_trace(trace, from_state._inf, entry, forward);
+                _factory._translation.add_rule_to_trace(trace, from_state._inf, entry, forward);
                 const auto& ops = forward._ops;
                 // FIXME: This only works for operation sequences on the form:  POP | SWAP? PUSH*    (as checked by these asserts)
                 assert(ops.size() <= 1 || !std::any_of(ops.begin(), ops.end(), [](const auto& op){ return op._op == RoutingTable::op_t::POP; }));
@@ -606,11 +626,11 @@ namespace aalwines {
             State first_state;
             if (configurations.empty()) {
                 size_t concrete_id;
-                for (concrete_id = 0; concrete_id < _state_mapping.size(); ++concrete_id) {
-                    if (_state_mapping.map_id(concrete_id) == initial_abstract_state) break;
+                for (concrete_id = 0; concrete_id < _factory._state_mapping.size(); ++concrete_id) {
+                    if (_factory._state_mapping.map_id(concrete_id) == initial_abstract_state) break;
                 }
-                assert(concrete_id < _state_mapping.size());
-                first_state = _state_mapping.get_concrete_value(concrete_id);
+                assert(concrete_id < _factory._state_mapping.size());
+                first_state = _factory._state_mapping.get_concrete_value(concrete_id);
             } else {
                 first_state = std::get<1>(configurations[0]);
             }
@@ -621,8 +641,8 @@ namespace aalwines {
     private:
 
         std::optional<configuration_t> make_configuration(const State& state, const rule_t& rule, const header_t& header) {
-            auto [pre_label, op, op_label] = rule.get(_state_mapping);
-            auto to_state = _state_mapping.get_concrete_value(rule._to_id);
+            auto [pre_label, op, op_label] = rule.get(_factory._state_mapping); // TODO: Handle case where pre_label == Query::wildcard_label() !!!
+            auto to_state = _factory._state_mapping.get_concrete_value(rule._to_id);
             auto [additional_pops, post] = compute_pop_post(pre_label, op, op_label, to_state);
             auto new_header = this->update_header(header, pre_label, post, additional_pops);
             if (new_header) {
@@ -633,15 +653,15 @@ namespace aalwines {
         refinement_t find_refinement_common(std::vector<std::pair<state_t,label_t>>&& X, const abstract_rule_t& abstract_rule) {
             std::vector<std::pair<state_t,label_t>> Y;
             const Interface* interface = nullptr;
-            for (const auto& rule : _rule_mapping.get_concrete_values(abstract_rule)) {
-                assert(_state_mapping.map_id(rule._from_id) == abstract_rule._from);
-                auto from_state = _state_mapping.get_concrete_value(rule._from_id);
+            for (const auto& rule : _factory.get_concrete_rules(abstract_rule)) {
+                assert(_factory._state_mapping.map_id(rule._from_id) == abstract_rule._from);
+                auto from_state = _factory._state_mapping.get_concrete_value(rule._from_id);
                 interface = from_state.interface();
                 assert(from_state.ops_done());
-                Y.emplace_back(from_state.interface(), rule.entry(_state_mapping)._top_label);
+                Y.emplace_back(from_state.interface(), rule.entry(_factory._state_mapping)._top_label); // TODO: Handle the case ._top_label == Query::wilcard_label()
             }
             assert(interface != nullptr);
-            auto [found, abstract_interface_id] = _interface_abstraction.exists(interface);
+            auto [found, abstract_interface_id] = _factory._interface_abstraction.exists(interface);
             assert(found);
             return pdaaal::make_refinement<refinement_option>(std::move(X), std::move(Y), abstract_interface_id, abstract_rule._pre);
         }
@@ -700,11 +720,7 @@ namespace aalwines {
         }
 
     private:
-        const Translation& _translation;
-        const pdaaal::RefinementMapping<const Interface*>& _interface_abstraction;
-        const StateMapping& _state_mapping;
-        const pdaaal::AbstractionMapping<rule_t,abstract_rule_t>& _rule_mapping;
-        const std::vector<size_t>& _concrete_initial;
+        const factory_t& _factory;
     };
 
 }
