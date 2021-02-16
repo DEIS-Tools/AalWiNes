@@ -29,18 +29,18 @@
 
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
-#include <pdaaal/NewPDAFactory.h>
+#include <pdaaal/PDAFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
 
 namespace aalwines {
 
     template<typename W_FN = std::function<void(void)>, typename W = void>
-    class NetworkPDAFactory : public pdaaal::NewPDAFactory<Query::label_t, W> {
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
         using weight_type = typename W_FN::result_type;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::NewPDAFactory<label_t, weight_type>;
+        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type>;
         using PDA = pdaaal::TypedPDA<label_t>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
@@ -167,7 +167,7 @@ namespace aalwines {
                 _states.unpack(trace[sno + 1]._pdastate, &next);
                 if (!next.ops_done()) {
                     // we get the rule we use, print
-                    const auto& entry = next._inf->table().entries()[next._eid];
+                    const auto& entry = next._inf->table()->entries()[next._eid];
                     const auto& forward = entry._rules[next._rid];
                     if (!add_interfaces(disabled, active, entry, forward)) return false;
                     rules.push_back(&forward);
@@ -177,7 +177,7 @@ namespace aalwines {
                     // run through the rules and find a match!
                     const auto& next_stack = trace[sno + 1]._stack;
                     bool found = false;
-                    for (const auto& entry : s._inf->table().entries()) {
+                    for (const auto& entry : s._inf->table()->entries()) {
                         if (entry._top_label != step._stack.front() && !entry.ignores_label()) continue; // not matching on pre
                         for (const auto& forward : entry._rules) {
                             if (forward._ops.size() > 1 || // would have been handled in other case

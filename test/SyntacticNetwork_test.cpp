@@ -117,8 +117,6 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     std::istringstream qstream(query);
     builder.do_parse(qstream);
 
-    pdaaal::SolverAdapter solver;
-
     auto& q = builder._result[0];
     std::vector<Query::mode_t> modes{q.approximation()};
     std::pair<size_t, size_t> reduction;

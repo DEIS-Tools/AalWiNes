@@ -394,7 +394,7 @@ namespace aalwines {
     }
 
     bool NetworkSAXHandler::add_interface_name(const std::string& value) {
-        auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
+        auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces, false);
         if (!was_inserted) {
             // Was this added because of an out-interface in an already parsed routing-table?
             auto f = forward_constructed_interfaces.find(value);
@@ -436,7 +436,7 @@ namespace aalwines {
             case keys::interface_name:
                 return add_interface_name(value);
             case keys::entry_out: {
-                auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
+                auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces, false);
                 if (was_inserted) {
                     forward_constructed_interfaces.insert(value);
                 }
@@ -499,7 +499,7 @@ namespace aalwines {
                 return true;
             case context::context_type::interface_array:
                 context_stack.push(interface_context);
-                current_table = RoutingTable{};
+                current_table = current_router->emplace_table();
                 return true;
             case context::context_type::entry_array:
                 context_stack.push(entry_context);
@@ -618,7 +618,7 @@ namespace aalwines {
                 break;
             case context::context_type::routing_table:
                 last_key = keys::table_label;
-                current_table.emplace_entry(key);
+                current_table->emplace_entry(key);
                 break;
             case context::context_type::entry:
                 if (key == "out") {
@@ -711,16 +711,14 @@ namespace aalwines {
                 current_router->set_coordinate(Coordinate(latitude, longitude));
                 break;
             case context::context_type::interface: {
-                // TODO: This construction can be optimized. Currently we copy shared routing tables onto each interface.
-                for (size_t i = 0; i < current_interfaces.size() - 1; ++i) {
-                    current_interfaces[i]->table() = current_table; // Copy assignment.
+                for (Interface* current_interface : current_interfaces) {
+                    current_interface->set_table(current_table);
                 }
-                current_interfaces.back()->table() = std::move(current_table); // Move the last time. No need for extra copies.
                 current_interfaces.clear();
                 break;
             }
             case context::context_type::entry:
-                current_table.back()._rules.emplace_back(std::move(ops), via, priority, weight);
+                current_table->back()._rules.emplace_back(std::move(ops), via, priority, weight);
                 break;
             default:
                 break;

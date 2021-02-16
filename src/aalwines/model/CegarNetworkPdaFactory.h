@@ -91,13 +91,13 @@ namespace aalwines {
 
     private:
         abstract_state_t abstract_state(const state_t& state) {
-            const Interface* interface = state.ops_done() ? state._inf : state._inf->table().entries()[state._eid]._rules[state._rid]._via->match();
+            const Interface* interface = state.ops_done() ? state._inf : state._inf->table()->entries()[state._eid]._rules[state._rid]._via->match();
             abstract_state_t result{
                     _interface_abstraction_fn(interface),
                     state._nfa_state, // No change here.
                     std::vector<std::tuple<RoutingTable::op_t, uint32_t>>()};
             if (!state.ops_done()) {
-                const auto& ops = state._inf->table().entries()[state._eid]._rules[state._rid]._ops;
+                const auto& ops = state._inf->table()->entries()[state._eid]._rules[state._rid]._ops;
                 assert(state._opid + 1 < ops.size());
                 for (size_t i = state._opid + 1; i < ops.size(); ++i) {
                     assert(ops[i]._op == RoutingTable::op_t::POP || _abstract_label_lookup(ops[i]._op_label).first);
@@ -133,7 +133,7 @@ namespace aalwines {
             return {e._top_label, op, op_label};
         }
         [[nodiscard]] const RoutingTable::entry_t& entry(const StateMapping& state_map) const {
-            return state_map.get_concrete_value(_from_id)._inf->table().entries()[_eid];
+            return state_map.get_concrete_value(_from_id)._inf->table()->entries()[_eid];
         }
         [[nodiscard]] const RoutingTable::forward_t& forward(const StateMapping& state_map) const {
             return forward(entry(state_map));
@@ -337,7 +337,7 @@ namespace aalwines {
 
                 _translation.rules(from.first,
                 [from_id = from.second, inf = from.first._inf, &add_state, this](state_t&& to_state, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) {
-                    size_t eid = ((&entry) - inf->table().entries().data());
+                    size_t eid = ((&entry) - inf->table()->entries().data());
                     size_t rid = ((&forward) - entry._rules.data());
                     size_t to_id = add_state(std::move(to_state));
                     _rule_mapping.insert(rule_t(from_id, eid, rid, to_id));
@@ -602,7 +602,7 @@ namespace aalwines {
                 const auto& [header, from_state, state, eid, rid] = *it;
                 if (!state.ops_done()) continue;
                 Translation::add_link_to_trace(trace, state, final_header);
-                const auto& entry = from_state._inf->table().entries()[eid];
+                const auto& entry = from_state._inf->table()->entries()[eid];
                 const auto& forward = entry._rules[rid];
                 _factory._translation.add_rule_to_trace(trace, from_state._inf, entry, forward);
                 const auto& ops = forward._ops;
@@ -685,7 +685,7 @@ namespace aalwines {
                         break;
                 }
             } else {
-                const auto& ops = to_state._inf->table().entries()[to_state._eid]._rules[to_state._rid]._ops;
+                const auto& ops = to_state._inf->table()->entries()[to_state._eid]._rules[to_state._rid]._ops;
                 assert(to_state._opid == 0);
                 assert(ops.size() > 1);
                 assert((ops[0]._op == RoutingTable::op_t::POP && op == pdaaal::POP)

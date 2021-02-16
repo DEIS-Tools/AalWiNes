@@ -62,12 +62,15 @@ namespace aalwines {
             return _parent;
         }
 
-        RoutingTable& table() {
+        RoutingTable* table() {
             return _table;
         }
 
-        [[nodiscard]] const RoutingTable& table() const {
+        [[nodiscard]] const RoutingTable* table() const {
             return _table;
+        }
+        void set_table(RoutingTable* table) {
+            _table = table;
         }
 
         [[nodiscard]] bool is_virtual() const {
@@ -92,7 +95,7 @@ namespace aalwines {
         Router* _target = nullptr;
         Router* _parent = nullptr;
         Interface* _matching = nullptr;
-        RoutingTable _table;
+        RoutingTable* _table = nullptr;
     };
 
     class Router {
@@ -129,10 +132,13 @@ namespace aalwines {
         [[nodiscard]] const std::vector<std::string>& names() const { return _names; }
 
         [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
-        std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
+        std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces, bool make_table = true);
         Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
         [[nodiscard]] std::string interface_name(size_t i) const;
+
+        RoutingTable* emplace_table() { return _tables.emplace_back(std::make_unique<RoutingTable>()).get(); }
+        [[nodiscard]] const std::vector<std::unique_ptr<RoutingTable>>& tables() const { return _tables; }
 
         void print_dot(std::ostream& out) const;
         void print_simple(std::ostream& s) const;
@@ -150,6 +156,7 @@ namespace aalwines {
         std::optional<Coordinate> _coordinate = std::nullopt;
         bool _is_null = false;
         std::vector<std::unique_ptr<Interface>> _interfaces;
+        std::vector<std::unique_ptr<RoutingTable>> _tables;
         string_map<Interface*> _interface_map;
     };
 }

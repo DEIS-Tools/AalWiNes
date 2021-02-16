@@ -91,12 +91,12 @@ namespace aalwines {
         return id < _routers.size() ? _routers[id].get() : nullptr;
     }
 
-    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, Router* router) {
-        return router->insert_interface(interface_name, _all_interfaces);
+    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, Router* router, bool make_table) {
+        return router->insert_interface(interface_name, _all_interfaces, make_table);
     }
-    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, const std::string& router_name) {
+    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, const std::string& router_name, bool make_table) {
         auto router = find_router(router_name);
-        return router == nullptr ? std::make_pair(false, nullptr) : insert_interface_to(interface_name, router);
+        return router == nullptr ? std::make_pair(false, nullptr) : insert_interface_to(interface_name, router, make_table);
     }
 
     void Network::add_null_router() {
@@ -182,10 +182,10 @@ namespace aalwines {
         move_network(std::move(nested_network));
 
         // Add push and pop rules.
-        for (auto&& interface : link->source()->interfaces()) {
-            interface->table().add_to_outgoing(link, {RoutingTable::op_t::PUSH, pre_label});
+        for (auto&& table : link->source()->tables()) {
+            table->add_to_outgoing(link, {RoutingTable::op_t::PUSH, pre_label});
         }
-        virtual_guard->table().add_rule(post_label, RoutingTable::action_t(RoutingTable::op_t::POP), nested_end_link);
+        virtual_guard->table()->add_rule(post_label, RoutingTable::action_t(RoutingTable::op_t::POP), nested_end_link);
     }
 
     void Network::concat_network(Interface* link, Network&& nested_network, Interface* nested_ingoing, RoutingTable::label_t post_label) {

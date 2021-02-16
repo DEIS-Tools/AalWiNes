@@ -45,15 +45,22 @@ namespace aalwines {
         _interfaces.reserve(router._interfaces.size());
         // _interface_map = router._interface_map; // Copy of ptrie not working.
         _interface_map = string_map<Interface*>(); // Start from empty map instead
-
-        for (auto& interface : router._interfaces) {
+        _tables.clear();
+        _tables.reserve(router._tables.size());
+        std::unordered_map<const RoutingTable*,RoutingTable*> table_mapping;
+        for (const auto& table : router._tables) {
+            auto new_table = _tables.emplace_back(std::make_unique<RoutingTable>(*table)).get();
+            table_mapping.emplace(table.get(), new_table);
+        }
+        for (const auto& interface : router._interfaces) {
             assert(_interfaces.size() == interface->id());
             auto new_interface = _interfaces.emplace_back(std::make_unique<Interface>(*interface)).get();
             _interface_map[interface->get_name()] = new_interface;
             new_interface->_parent = this;
+            new_interface->set_table(table_mapping[interface->table()]);
         }
-        for (auto& interface : _interfaces) {
-            interface->table().update_interfaces([this](const Interface* old) -> Interface* {
+        for (auto& table : _tables) {
+            table->update_interfaces([this](const Interface* old) -> Interface* {
                 return old == nullptr ? nullptr : this->_interfaces[old->id()].get();
             });
         }
@@ -75,7 +82,7 @@ namespace aalwines {
         return _names.back();
     }
 
-    std::pair<bool,Interface*> Router::insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
+    std::pair<bool,Interface*> Router::insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces, bool make_table) {
         auto res = _interface_map.insert(interface_name);
         if (!res.first) {
             return std::make_pair(false, _interface_map.get_data(res.second));
@@ -86,6 +93,9 @@ namespace aalwines {
         auto interface = _interfaces.back().get();
         all_interfaces.emplace_back(interface);
         _interface_map.get_data(res.second) = interface;
+        if (make_table) {
+            interface->set_table(this->emplace_table());
+        }
         return std::make_pair(true, interface);
     }
 
@@ -134,8 +144,7 @@ namespace aalwines {
         for(auto& i : _interfaces) {
             auto name = interface_name(i->id());
             s << "\tinterface: \"" << name << "\"\n";
-            const RoutingTable& table = i->table();
-            for(auto& e : table.entries()) {
+            for(auto& e : i->table()->entries()) {
                 s << "\t\t[" << e._top_label << "] {\n";
                 for(auto& fwd : e._rules) {
                     s << "\t\t\t" << fwd._priority << " |-[";
@@ -168,9 +177,7 @@ namespace aalwines {
         for(auto& i : _interfaces) {
             if_name = interface_name(i->id());
             auto& label_set = interfaces.try_emplace(if_name).first->second;
-
-            const RoutingTable& table = i->table();
-            for(auto& e : table.entries()) {
+            for(auto& e : i->table()->entries()) {
                 label_set.emplace(e._top_label);
                 for(auto& fwd : e._rules) {
                     auto via = fwd._via;

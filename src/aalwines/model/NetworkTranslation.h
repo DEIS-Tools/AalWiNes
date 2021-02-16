@@ -63,7 +63,7 @@ namespace aalwines {
         }
         static State perform_op(const State& state) {
             assert(!state.ops_done());
-            return perform_op(state, state._inf->table().entries()[state._eid]._rules[state._rid]);
+            return perform_op(state, state._inf->table()->entries()[state._eid]._rules[state._rid]);
         }
         static State perform_op(const State& state, const RoutingTable::forward_t& forward) {
             assert(!state.ops_done());
@@ -144,7 +144,7 @@ namespace aalwines {
                           const std::function<void(State&&, const RoutingTable::entry_t&, const RoutingTable::forward_t&)>& add_rule_type_a,
                           const std::function<void(State&&, const label_t&, std::pair<pdaaal::op_t,label_t>&&)>& add_rule_type_b) {
             if (from_state.ops_done()) {
-                const auto& entries = from_state._inf->table().entries();
+                const auto& entries = from_state._inf->table()->entries();
                 for (size_t eid = 0; eid < entries.size(); ++eid) {
                     const auto& entry = entries[eid];
                     for (size_t rid = 0; rid < entry._rules.size(); ++rid) {
@@ -168,7 +168,7 @@ namespace aalwines {
                     }
                 }
             } else {
-                const auto& forward = from_state._inf->table().entries()[from_state._eid]._rules[from_state._rid];
+                const auto& forward = from_state._inf->table()->entries()[from_state._eid]._rules[from_state._rid];
                 assert(from_state._opid + 1 < forward._ops.size()); // Otherwise we would already have moved to the next interface.
 
                 auto pre_label = (forward._ops[from_state._opid]._op == RoutingTable::op_t::POP)
