@@ -80,7 +80,7 @@ namespace aalwines {
             return router;
         }
         Router* get_router(size_t id);
-        Router* find_router(const std::string& router_name);
+        [[nodiscard]] Router* find_router(const std::string& router_name) const;
         [[nodiscard]] const std::vector<std::unique_ptr<Router>>& routers() const { return _routers; }
         [[nodiscard]] size_t size() const { return _routers.size(); }
 
@@ -90,6 +90,11 @@ namespace aalwines {
         std::unordered_set<Query::label_t> interfaces(filter_t& filter);
 
         void add_null_router();
+
+        // Check sanity of network data structure
+        bool check_sanity(std::ostream& error_stream = std::cerr) const;
+        // Remove redundant rules.
+        void pre_process(std::ostream& log = std::cerr);
 
         void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
                             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);

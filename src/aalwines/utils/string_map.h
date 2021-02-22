@@ -50,6 +50,9 @@ public:
     [[nodiscard]] std::pair<bool, size_t> exists(const std::string& key) const {
         return pt::exists(key.data(), key.length());
     }
+    bool erase(const std::string& key) {
+        return pt::erase(key.data(), key.length());
+    }
 
     [[nodiscard]] std::string at(size_t index) const {
         auto vector = pt::unpack(index);

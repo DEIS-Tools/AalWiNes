@@ -104,6 +104,7 @@ namespace aalwines {
                         entry._rules.emplace_back(std::move(ops), via, priority, weight);
                     }
                 }
+                table->sort(); table->sort_rules();
                 for (const auto& interface_name : interface_names) {
                     router->find_interface(interface_name)->set_table(table);
                 }

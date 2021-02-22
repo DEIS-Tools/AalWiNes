@@ -175,7 +175,7 @@ namespace aalwines
         return !(*this == other);
     }
 
-    void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex, const Network* network) const
+    void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex) const
     {
         switch (_op) {
         case op_t::SWAP:
@@ -238,8 +238,7 @@ namespace aalwines
         return result;
     }
 
-    void RoutingTable::entry_t::print_json(std::ostream& s) const
-    {
+    void RoutingTable::entry_t::print_json(std::ostream& s) const {
         if (ignores_label()) {
             s << "\"null\"";
         } else {
@@ -256,15 +255,13 @@ namespace aalwines
         s << "\n\t]";
     }
 
-    void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
-    {
+    void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote) {
         if (quote) s << "\"";
         s << label;
         if (quote) s << "\"";
     }
 
-    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex, const Network* network) const
-    {
+    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex) const {
         s << "{";
         s << "\"weight\":" << _priority;
         if (_via) {
@@ -282,7 +279,7 @@ namespace aalwines
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)
                     s << ", ";
-                _ops[i].print_json(s, true, use_hex, network);
+                _ops[i].print_json(s, true, use_hex);
             }
             s << "]";
         }
@@ -303,8 +300,7 @@ namespace aalwines
         return rule;
     }
 
-    void RoutingTable::print_json(std::ostream& s) const
-    {
+    void RoutingTable::print_json(std::ostream& s) const {
         s << "\t{\n";
         for (size_t i = 0; i < _entries.size(); ++i) {
             if (i != 0)
@@ -315,29 +311,29 @@ namespace aalwines
         s << "\n\t}";
     }
 
-    void RoutingTable::sort()
-    {
+    void RoutingTable::sort() {
         std::sort(std::begin(_entries), std::end(_entries));
     }
+    void RoutingTable::sort_rules() {
+        for (auto& entry : _entries) {
+            std::sort(entry._rules.begin(), entry._rules.end(), [](const auto& a, const auto& b){ return a._priority < b._priority; });
+        }
+    }
 
-    bool RoutingTable::empty() const
-    {
+    bool RoutingTable::empty() const {
         return _entries.empty();
     }
 
-    const std::vector<RoutingTable::entry_t>& RoutingTable::entries() const
-    {
+    const std::vector<RoutingTable::entry_t>& RoutingTable::entries() const {
         return _entries;
     }
 
-    std::ostream& operator<<(std::ostream& s, const RoutingTable::forward_t& fwd)
-    {
+    std::ostream& operator<<(std::ostream& s, const RoutingTable::forward_t& fwd) {
         fwd.print_json(s);
         return s;
     }
 
-    std::ostream& operator<<(std::ostream& s, const RoutingTable::entry_t& entry)
-    {
+    std::ostream& operator<<(std::ostream& s, const RoutingTable::entry_t& entry) {
         s << entry._top_label << " ";
         entry.print_json(s);
         return s;
@@ -348,6 +344,53 @@ namespace aalwines
             for (auto& rule : entry._rules) {
                 rule._via = update_fn(rule._via);
             }
+        }
+    }
+
+    void RoutingTable::remove_unused_rules(std::ostream& log) {
+        // If a rule uses a link that it (due to its priority) also assumes to be disabled, then we can remove that rule.
+        for (auto& entry : _entries) {
+            if (entry._rules.empty()) continue;
+
+            auto log_removal = [&entry,&log](const forward_t& forward){
+                log << "Removing rule: \"";
+                (entry.ignores_label() ? (log << "null") : (log << entry._top_label)) << "\" : ";
+                forward.print_json(log, false);
+                log << std::endl;
+            };
+
+            std::unordered_set<const Interface*> higher_priority_interfaces;
+            std::unordered_set<const Interface*> temp;
+            size_t last_priority = 0;
+            // This is like std::remove_if, but for stateful predicate.
+            auto first = entry._rules.begin();
+            auto last = entry._rules.end();
+            for (; first != last; ++first) {
+                assert(first->_priority >= last_priority);
+                if (first->_priority > last_priority) {
+                    higher_priority_interfaces = temp;
+                    last_priority = first->_priority;
+                }
+                temp.emplace(first->_via);
+                if (higher_priority_interfaces.count(first->_via) > 0) { // Remove *first
+                    log_removal(*first);
+                    for(auto i = first; ++i != last; ) {
+                        assert(i->_priority >= last_priority);
+                        if (i->_priority > last_priority) {
+                            higher_priority_interfaces = temp;
+                            last_priority = i->_priority;
+                        }
+                        temp.emplace(i->_via);
+                        if (higher_priority_interfaces.count(i->_via) == 0) {
+                            *first++ = std::move(*i);
+                        } else {
+                            log_removal(*i);
+                        }
+                    }
+                    break;
+                }
+            }
+            entry._rules.erase(first, last);
         }
     }
 

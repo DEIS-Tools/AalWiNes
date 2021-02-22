@@ -210,4 +210,65 @@ namespace aalwines {
     void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
         _coordinate.emplace(std::stod(latitude), std::stod(longitude));
     }
+
+    bool Router::check_sanity(std::ostream& error_stream) const {
+        if (_names.empty()) {
+            error_stream << "Router with index " << index() << " does not have a name." << std::endl;
+            return false;
+        }
+        if (_interfaces.size() != _interface_map.size()) {
+            error_stream << "In router " << name() << " _interfaces.size() != _interface_map.size()." << std::endl;
+            return false;
+        }
+        size_t interface_i = 0;
+        for (const auto& interface : _interfaces) {
+            if (interface->id() != interface_i) {
+                error_stream << "Interface in router " << name() << " with id() " << interface->id() << " is in position " << interface_i << " of _interfaces. This is incorrect." << std::endl;
+                return false;
+            }
+            if (interface->source() != this) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has source() != this." << std::endl;
+                return false;
+            }
+            if (interface->match() == nullptr) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has match() == nullptr." << std::endl;
+                return false;
+            }
+            if (interface->target() == nullptr) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has target() == nullptr." << std::endl;
+                return false;
+            }
+            if (interface->match()->source() != interface->target()) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has match()->source() != target()." << std::endl;
+                return false;
+            }
+            if (interface->table() == nullptr) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has match()->source() != target()." << std::endl;
+                return false;
+            }
+            if (std::find_if(_tables.begin(), _tables.end(), [&interface](const auto& t){ return t.get() == interface->table(); }) == _tables.end()) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has table() which is not in _tables." << std::endl;
+                return false;
+            }
+            interface_i++;
+        }
+        for (const auto& table : _tables) {
+            for (const auto& entry : table->entries()) {
+                for (const auto& forward : entry._rules) {
+                    if (std::find_if(_interfaces.begin(), _interfaces.end(), [&forward](const auto& i){ return i.get() == forward._via;}) == _interfaces.end()) {
+                        error_stream << "Forwarding rule on router " << name() << " uses _via interface that is not in _interfaces." << std::endl;
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    void Router::pre_process(std::ostream& log) {
+        for (const auto& table : _tables) {
+            table->remove_unused_rules(log);
+        }
+    }
+
 }

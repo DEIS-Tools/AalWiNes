@@ -64,7 +64,7 @@ namespace aalwines {
                 assert(op == op_t::PUSH || op == op_t::SWAP);
                 _op_label = static_cast<size_t>(std::stoul(op_label));
             };
-            void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
+            void print_json(std::ostream& s, bool quote = true, bool use_hex = true) const;
             [[nodiscard]] json to_json() const;
             bool operator==(const action_t& other) const;
             bool operator!=(const action_t& other) const;
@@ -78,7 +78,7 @@ namespace aalwines {
             forward_t() = default;
             forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
                 : _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
-            void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
+            void print_json(std::ostream&, bool use_hex = true) const;
             [[nodiscard]] json to_json() const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
@@ -117,6 +117,7 @@ namespace aalwines {
         [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
+        void sort_rules();
         template <typename... Args>
         entry_t& emplace_entry(Args... args) { return _entries.emplace_back(std::forward<Args>(args)...); }
         void pop_entry() { _entries.pop_back(); }
@@ -131,6 +132,8 @@ namespace aalwines {
         void merge(const RoutingTable& other);
 
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
+
+        void remove_unused_rules(std::ostream& log);
         
     private:
         std::vector<entry_t>::iterator insert_entry(label_t top_label);

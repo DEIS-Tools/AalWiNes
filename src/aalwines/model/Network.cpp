@@ -82,7 +82,7 @@ namespace aalwines {
         return *this;
     }
 
-    Router* Network::find_router(const std::string& router_name) {
+    Router* Network::find_router(const std::string& router_name) const {
         auto from_res = _mapping.exists(router_name);
         return from_res.first ? _mapping.get_data(from_res.second) : nullptr;
     }
@@ -100,15 +100,24 @@ namespace aalwines {
     }
 
     void Network::add_null_router() {
+        bool used = false;
         auto null_router = add_router("NULL", true);
+        auto table = null_router->emplace_table();
         for(const auto& r : routers()) {
             for(const auto& inf : r->interfaces()) {
                 if(inf->match() == nullptr) {
+                    used = true;
                     std::stringstream interface_name;
                     interface_name << "i" << inf->global_id();
-                    insert_interface_to(interface_name.str(), null_router).second->make_pairing(inf.get());
+                    auto new_inf = insert_interface_to(interface_name.str(), null_router, false).second;
+                    new_inf->make_pairing(inf.get());
+                    new_inf->set_table(table);
                 }
             }
+        }
+        if (!used) {
+            _routers.pop_back();
+            _mapping.erase("NULL");
         }
     }
 
@@ -275,6 +284,71 @@ namespace aalwines {
         }
         network.add_null_router();
         return network;
+    }
+
+    bool Network::check_sanity(std::ostream& error_stream) const {
+        size_t router_i = 0;
+        for (const auto& router : _routers) {
+            if (router->index() != router_i) {
+                error_stream << "Router with index() " << router->index() << " are in position " << router_i << " of _routers. This is incorrect." << std::endl;
+                return false;
+            }
+            if (!router->check_sanity(error_stream)) {
+                error_stream << "When checking router with index " << router_i << " in the network." << std::endl;
+                return false;
+            }
+            for (const auto& router_name : router->names()) {
+                if (find_router(router_name) != router.get()) {
+                    error_stream << "Router name " << router_name << " is not mapped to router with index " << router->index() << "." << std::endl;
+                    return false;
+                }
+            }
+            for (const auto& interface : router->interfaces()) {
+                if (std::find_if(_all_interfaces.begin(), _all_interfaces.end(), [&interface](const auto& i){ return i == interface.get(); }) == _all_interfaces.end()) {
+                    error_stream << "Interface " << interface->get_name() << " in router " << router->name() << " is not in _all_interfaces." << std::endl;
+                    return false;
+                }
+            }
+            router_i++;
+        }
+        size_t interface_i = 0;
+        for (const Interface* interface : _all_interfaces) {
+            if (interface == nullptr) {
+                error_stream << "Network contains nullptr in _all_interfaces." << std::endl;
+                return false;
+            }
+            if (interface->source() == nullptr) {
+                error_stream << "Interface in _all_interfaces has source() == nullptr." << std::endl;
+                return false;
+            }
+            auto r = std::find_if(_routers.begin(), _routers.end(), [interface](const auto& r){ return r.get() == interface->source(); });
+            if (r == _routers.end()) {
+                error_stream << "Interface in _all_interfaces has source() that is not in _routers." << std::endl;
+                return false;
+            }
+            auto t = std::find_if(_routers.begin(), _routers.end(), [interface](const auto& r){ return r.get() == interface->target(); });
+            if (t == _routers.end()) {
+                error_stream << "Interface in _all_interfaces has target() that is not in _routers." << std::endl;
+                return false;
+            }
+            auto i = std::find_if(r->get()->interfaces().begin(), r->get()->interfaces().end(), [interface](const auto& i){ return i.get() == interface; });
+            if (i == r->get()->interfaces().end()) {
+                error_stream << "Interface in _all_interfaces was not found in its source()->interfaces()." << std::endl;
+                return false;
+            }
+            if (interface->global_id() != interface_i) {
+                error_stream << "Interface with global_id() " << interface_i << " is in position " << interface_i << " of _all_interfaces. This is incorrect." << std::endl;
+                return false;
+            }
+            interface_i++;
+        }
+        return true;
+    }
+
+    void Network::pre_process(std::ostream& log) {
+        for (const auto& router : _routers) {
+            router->pre_process(log);
+        }
     }
 
 }
