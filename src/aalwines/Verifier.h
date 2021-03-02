@@ -34,7 +34,6 @@
 #include <aalwines/query/QueryBuilder.h>
 #include <aalwines/model/NetworkPDAFactory.h>
 #include <aalwines/model/NetworkWeight.h>
-#include <pdaaal/SolverAdapter.h>
 #include <pdaaal/Reducer.h>
 
 #include <boost/program_options.hpp>

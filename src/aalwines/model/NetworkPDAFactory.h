@@ -29,18 +29,18 @@
 
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
-#include <pdaaal/NewPDAFactory.h>
+#include <pdaaal/PDAFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
 
 namespace aalwines {
 
     template<typename W_FN = std::function<void(void)>, typename W = void>
-    class NetworkPDAFactory : public pdaaal::NewPDAFactory<Query::label_t, W> {
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
         using weight_type = typename W_FN::result_type;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::NewPDAFactory<label_t, weight_type>;
+        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type>;
         using PDA = pdaaal::TypedPDA<label_t>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
@@ -242,7 +242,7 @@ namespace aalwines {
                 state_t s;
                 _states.unpack(step._pdastate, &s);
                 if (s.ops_done()) {
-                    Translation::add_link_to_trace(result_trace, s, step._stack);
+                    Translation::add_link_to_trace(result_trace, s._inf, step._stack);
                     if (cnt < entries.size()) {
                         _translation.add_rule_to_trace(result_trace, s._inf, *entries[cnt], *rules[cnt]);
                         ++cnt;

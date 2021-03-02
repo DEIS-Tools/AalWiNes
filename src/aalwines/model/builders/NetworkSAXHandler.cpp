@@ -712,6 +712,7 @@ namespace aalwines {
                 break;
             case context::context_type::interface: {
                 // TODO: This construction can be optimized. Currently we copy shared routing tables onto each interface.
+                current_table.sort();
                 for (size_t i = 0; i < current_interfaces.size() - 1; ++i) {
                     current_interfaces[i]->table() = current_table; // Copy assignment.
                 }

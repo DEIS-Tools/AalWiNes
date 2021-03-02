@@ -198,12 +198,12 @@ namespace aalwines {
             }
         }
 
-        static void add_link_to_trace(json& trace, const State& state, const std::vector<label_t>& final_header) {
+        static void add_link_to_trace(json& trace, const Interface* inf, const std::vector<label_t>& final_header) {
             trace.emplace_back();
-            trace.back()["from_router"] = state._inf->target()->name();
-            trace.back()["from_interface"] = state._inf->match()->get_name();
-            trace.back()["to_router"] = state._inf->source()->name();
-            trace.back()["to_interface"] = state._inf->get_name();
+            trace.back()["from_router"] = inf->target()->name();
+            trace.back()["from_interface"] = inf->match()->get_name();
+            trace.back()["to_router"] = inf->source()->name();
+            trace.back()["to_interface"] = inf->get_name();
             trace.back()["stack"] = json::array();
             std::for_each(final_header.rbegin(), final_header.rend(), [&stack=trace.back()["stack"]](const auto& label){
                 if (label == Query::bottom_of_stack()) return;
