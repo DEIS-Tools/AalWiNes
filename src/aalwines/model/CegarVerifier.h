@@ -46,7 +46,15 @@ namespace aalwines {
                 return cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
             } else {
                 CegarNetworkPdaFactory<> factory(json_output, network, query, std::move(all_labels),
-                                                 [](const auto& label) -> uint32_t { return 0; },
+                                                 [](const auto& label) -> uint32_t {
+                    switch (label) { // Special labels map to distinct values, but all normal labels in the network maps to the same abstract label.
+                        case Query::unused_label():
+                            return 0;
+                        case Query::bottom_of_stack():
+                            return 1;
+                        default:
+                            return 2;
+                    }},
                                                  [](const Interface* inf){ return 0;});
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
                 return cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
