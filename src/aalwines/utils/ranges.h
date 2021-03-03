@@ -32,7 +32,7 @@
 
 namespace aalwines::utils {
 
-// Given that we are stuck with C++17 for the moment, we implement some usefull ranges here.
+// Given that we are stuck with C++17 for the moment, we implement some useful ranges here.
 // This is not intended to match the C++20 ranges, it is just based on what was needed.
 
 // SingletonRange<Elem>                Contains a single element
@@ -247,7 +247,7 @@ namespace aalwines::utils {
         iterator _begin;
     };
 
-    // These template don't really work/help, but meh..
+    // These template parameter deduction guides don't really work/help, but meh..
     template<typename InnerRange, typename TransformFn>
     VectorRange(InnerRange&& range, TransformFn&& transform) -> VectorRange<InnerRange, typename TransformFn::result_type::value_type>;
     template<typename InnerRange, typename ValueType>

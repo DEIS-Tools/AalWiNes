@@ -410,15 +410,34 @@ namespace aalwines {
             assert(abstract_rule._from < _factory._num_states_no_ops);
             auto [a_inf, nfa_state, ops] = _factory._abstract_states.at(abstract_rule._from);
             assert(ops.empty());
+            std::unordered_set<const Interface*> interfaces_with_wildcard_headers;
+            std::optional<std::vector<label_t>> labels_matching_wildcard;
             for (const auto& [header, old_inf, c_nfa_state, e, r] : configurations) {
                 auto inf = (r == nullptr) ? old_inf : r->_via->match();
                 if (nfa_state != c_nfa_state || !_factory._interface_abstraction.maps_to(inf, a_inf)) continue;
-                for (const auto& label : this->pre_labels(header)) {
-                    if (this->label_maps_to(label, abstract_rule._pre)) {
-                        X.emplace_back(inf, label);
+                if (!header.empty() && !header.top_is_concrete()) { // Check if header has wildcard on top.
+                    if (interfaces_with_wildcard_headers.emplace(inf).second) { // Only add to X if interface is fresh here. (Not enough to ensure X has no duplicates, but it helps...)
+                        if (!labels_matching_wildcard) { // Only compute this once, since it is the same for all headers with wildcard on top.
+                            labels_matching_wildcard = this->pre_labels(header);
+                            labels_matching_wildcard->erase(std::remove_if(labels_matching_wildcard->begin(), labels_matching_wildcard->end(),
+                                [this,&abstract_rule](const auto& label){ return !this->label_maps_to(label, abstract_rule._pre); }),
+                                labels_matching_wildcard->end());
+                        }
+                        for (const auto& label : labels_matching_wildcard.value()) {
+                            X.emplace_back(inf, label);
+                        }
+                    }
+                } else {
+                    for (const auto& label : this->pre_labels(header)) {
+                        if (this->label_maps_to(label, abstract_rule._pre)) {
+                            X.emplace_back(inf, label);
+                        }
                     }
                 }
             }
+            // Sort and remove duplicates from X.
+            std::sort(X.begin(), X.end());
+            X.erase(std::unique(X.begin(), X.end()), X.end());
             return find_refinement_common(std::move(X), abstract_rule, a_inf, nfa_state);
         }
         header_t get_header(const configuration_t& conf) override {
@@ -456,7 +475,7 @@ namespace aalwines {
             if (configurations.empty()) {
                 auto [a_inf, nfa_state, ops] = _factory._abstract_states.at(initial_abstract_state);
                 for (const auto& inf : _factory._interface_abstraction.get_concrete_values_range(a_inf)) {
-                    if (NFA::has_as_successor(_factory._query.path().initial(), inf->global_id(), nfa_state)) {
+                    if (NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state)) {
                         first_inf = inf;
                         break;
                     }
@@ -535,9 +554,23 @@ namespace aalwines {
                 for (const auto& forward : entry->_rules) {
                     if (!matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size)) continue;
                     auto [post, additional_pops] = compute_pop_post(entry->_top_label, forward._ops);
-                    auto new_header = this->update_header(header, entry->_top_label, post, additional_pops); // TODO: Also handle wildcard pre_label here...
+                    std::optional<header_t> new_header;
+                    auto pre_label = entry->_top_label;
+                    if (entry->ignores_label()) { // Wildcard pre_label
+                        if (forward._ops.size() == 0) {
+                            new_header = header; // No-op on wildcard is always possible. Use old header.
+                        } else {
+                            auto res = this->update_header_wildcard_pre(header, post, additional_pops);
+                            if (res) {
+                                new_header = res.value().first;
+                                pre_label = res.value().second;
+                            }
+                        }
+                    } else {
+                        new_header = this->update_header(header, entry->_top_label, post, additional_pops); // TODO: Also handle wildcard pre_label here...
+                    }
                     if (!new_header.has_value()) continue;
-                    result.emplace_back(new_header.value(), inf, std::get<1>(to_state), entry, &forward);
+                    result.emplace_back(new_header.value(), inf, std::get<1>(to_state), entry, &forward); // TODO: Add pre_label to configuration and use it for trace reconstruction.
                 }
             }
             return result;
@@ -568,7 +601,6 @@ namespace aalwines {
         }
 
         std::pair<std::vector<label_t>, size_t> compute_pop_post(const label_t& pre_label, const std::vector<RoutingTable::action_t>& ops) const {
-            // TODO: Also handle wildcard pre_label...
             std::vector<label_t> post;
             size_t additional_pops = 0;
             post.emplace_back(pre_label);
