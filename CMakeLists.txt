@@ -21,6 +21,7 @@ endif (AALWINES_BuildBundle)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall -Wpedantic -I -fPIC")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG -Wall -Wpedantic -fPIC")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lstdc++ -lm")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -33,7 +34,7 @@ if (AALWINES_GetDependencies)
     
     ExternalProject_add(ptrie-ext
         GIT_REPOSITORY git@github.com:MortenSchou/ptrie.git
-        GIT_TAG af7f132f2c3e81f7402be51828f3e1076ff895a1
+        GIT_TAG 40281b3bd4a676269e962cfb9772dfa7db933387
         #URL https://github.com/petergjoel/ptrie/archive/v1.1.1.zip
         #URL_HASH SHA512=5435d6f8132d273b50eccd721790d559f7dc67ffdada75fec315f4c53705199f31f1ddc80dda0cb86f883db27076fa6d324d28516b442fecce3ffa51213aef4e
         #URL https://github.com/petergjoel/ptrie/archive/v1.1.0.zip
@@ -55,7 +56,7 @@ if (AALWINES_GetDependencies)
     )
     ExternalProject_add(pdaaal-ext
         GIT_REPOSITORY git@github.com:MortenSchou/PDAAAL.git
-        GIT_TAG da11ae4ce2de47ec579811100fa1164a83eabdd9
+        GIT_TAG f4af2b7b9f87271311033b6d3e346e37c274e7ba
         #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.5.zip
         #URL_HASH SHA512=7c9e1418c491f693b1dbcfac8b20aa10cc0ecc8db1456000d1b8ea3c1376d9dbe545abbfe550d7d5020631c4dcb44fe2b6205654337c68a16227f0810e0f32a6
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include

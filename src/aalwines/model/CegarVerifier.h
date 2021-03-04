@@ -43,7 +43,9 @@ namespace aalwines {
                                                  [](const Query::label_t& label) -> Query::label_t { return label; },
                                                  [](const Interface* inf){ return inf->global_id();});
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
-                return cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
+                auto res = cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
+                if (res) return std::move(res).value().get();
+                return std::nullopt;
             } else {
                 CegarNetworkPdaFactory<> factory(json_output, network, query, std::move(all_labels),
                                                  [](const auto& label) -> uint32_t {
@@ -57,7 +59,9 @@ namespace aalwines {
                     }},
                                                  [](const Interface* inf){ return 0;});
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
-                return cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
+                auto res = cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
+                if (res) return std::move(res).value().get();
+                return std::nullopt;
             }
         }
 

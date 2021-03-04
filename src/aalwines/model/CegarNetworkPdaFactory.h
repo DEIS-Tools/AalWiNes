@@ -328,19 +328,27 @@ namespace aalwines {
             utils::VectorRange<utils::FilterRange<typename pdaaal::RefinementMapping<const Interface*>::concrete_value_range>, cegar_configuration_t>,
             utils::SingletonRange<cegar_configuration_t>>;
 
+    struct json_wrapper {
+        // json's implicit type conversions messes up with std::variant in Clang10.
+        // So we put the json in a wrapping.
+        explicit json_wrapper(json&& j) : _json(std::move(j)) {};
+        json&& get() && { return std::move(_json); }
+        json _json;
+    };
+
     // For now simple unweighted version.
     template<pdaaal::refinement_option_t refinement_option, typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
     class CegarNetworkPdaReconstruction : public pdaaal::CegarPdaReconstruction<
             Query::label_t, // label_t
             const Interface*, // state_t
             ConfigurationRange,
-            json , // concrete_trace_t
+            json_wrapper , // concrete_trace_t
             W, C, A> {
         friend class CegarNetworkPdaFactory<W_FN,W,C,A>;
         using factory_t = CegarNetworkPdaFactory<W_FN,W,C,A>;
     public:
         using label_t = typename factory_t::label_t;
-        using concrete_trace_t = json;
+        using concrete_trace_t = json_wrapper;
     private:
         using Translation = typename factory_t::Translation;
         using state_t = const Interface*; // This is the 'state' that is refined.
@@ -374,8 +382,8 @@ namespace aalwines {
             return utils::VectorRange<utils::FilterRange<typename pdaaal::RefinementMapping<const Interface*>::concrete_value_range>, configuration_t>(
                 utils::FilterRange(
                     _factory._interface_abstraction.get_concrete_values_range(a_inf), // Inner range of interfaces
-                    [this,&nfa_state](const auto& inf){ return NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
-                [this, header=this->initial_header(), &abstract_rule, &nfa_state, &to_state, ops_size](const auto& inf){
+                    [this,nfa_state=nfa_state](const auto& inf){ return NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
+                [this, header=this->initial_header(), &abstract_rule, nfa_state=nfa_state, &to_state, ops_size](const auto& inf){
                     return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size); // Transform interface to vector of configurations.
             });
         }
@@ -394,8 +402,7 @@ namespace aalwines {
             return find_refinement_common(std::move(X), abstract_rule, a_inf, nfa_state);
         }
         configuration_range_t search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf) override {
-            const auto& [header, old_inf, nfa_state, e, r, l] = conf;
-            auto inf = (r == nullptr) ? old_inf : r->_via->match();
+            auto inf = get_interface(conf);
             assert(_factory._interface_abstraction.maps_to(inf, std::get<0>(_factory._abstract_states.at(abstract_rule._from))));
             if (abstract_rule._from < _factory._num_states_no_ops) { // I.e. ops.empty()
                 auto to_state = _factory._abstract_states.at(abstract_rule._to);
@@ -404,11 +411,11 @@ namespace aalwines {
 
                 return utils::VectorRange<utils::SingletonRange<const Interface*>, configuration_t>(
                     utils::SingletonRange<const Interface*>(inf),
-                    [this, &header, &abstract_rule, &nfa_state, &to_state, ops_size](const auto& inf){
-                        return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size); // Transform interface to vector of configurations.
+                    [this, &conf, &abstract_rule, nfa_state=std::get<2>(conf), &to_state, ops_size](const auto& inf){
+                        return make_configurations(std::get<0>(conf), abstract_rule, inf, nfa_state, to_state, ops_size); // Transform interface to vector of configurations.
                     });
             } else {
-                return utils::SingletonRange<configuration_t>(header, inf, nfa_state, nullptr, nullptr, std::vector<label_t>());
+                return utils::SingletonRange<configuration_t>(std::get<0>(conf), inf, std::get<2>(conf), nullptr, nullptr, std::vector<label_t>());
             }
         }
         refinement_t find_refinement(const abstract_rule_t& abstract_rule, const std::vector<configuration_t>& configurations) override {
@@ -418,9 +425,10 @@ namespace aalwines {
             assert(ops.empty());
             std::unordered_set<const Interface*> interfaces_with_wildcard_headers;
             std::optional<std::vector<label_t>> labels_matching_wildcard;
-            for (const auto& [header, old_inf, c_nfa_state, e, r, l] : configurations) {
-                auto inf = (r == nullptr) ? old_inf : r->_via->match();
-                if (nfa_state != c_nfa_state || !_factory._interface_abstraction.maps_to(inf, a_inf)) continue;
+            for (const auto& conf : configurations) { // [header, old_inf, c_nfa_state, e, r, l]
+                auto inf = get_interface(conf);
+                const auto& header = std::get<0>(conf);
+                if (nfa_state != std::get<2>(conf) || !_factory._interface_abstraction.maps_to(inf, a_inf)) continue;
                 if (!header.empty() && !header.top_is_concrete()) { // Check if header has wildcard on top.
                     if (interfaces_with_wildcard_headers.emplace(inf).second) { // Only add to X if interface is fresh here. (Not enough to ensure X has no duplicates, but it helps...)
                         if (!labels_matching_wildcard) { // Only compute this once, since it is the same for all headers with wildcard on top.
@@ -451,7 +459,7 @@ namespace aalwines {
         }
 
         concrete_trace_t get_concrete_trace(std::vector<configuration_t>&& configurations, std::vector<label_t>&& final_header, size_t initial_abstract_state) override {
-            concrete_trace_t trace = json::array();
+            json trace = json::array();
             size_t remaining_pops = 0;
             for (auto it = configurations.crbegin(); it < configurations.crend(); ++it) {
                 const auto& [header, from_inf, nfa_state, entry, forward, labels] = *it;
@@ -504,10 +512,12 @@ namespace aalwines {
             }
             Translation::add_link_to_trace(trace, first_inf, final_header);
             std::reverse(trace.begin(), trace.end());
-            return trace;
+            return json_wrapper(std::move(trace));
         }
     private:
-
+        static const Interface* get_interface(const configuration_t& conf) {
+            return (std::get<4>(conf) == nullptr) ? std::get<1>(conf) : std::get<4>(conf)->_via->match();
+        }
         std::vector<const RoutingTable::entry_t*> get_entries_matching(const header_t& header, const Interface* inf) const {
             auto labels = this->pre_labels(header);
             assert(std::is_sorted(labels.begin(), labels.end()));
