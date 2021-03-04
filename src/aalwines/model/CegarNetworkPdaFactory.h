@@ -316,7 +316,13 @@ namespace aalwines {
         std::vector<size_t> _accepting;
     };
 
-    using cegar_configuration_t = std::tuple<pdaaal::Header<Query::label_t>, const Interface*, const pdaaal::NFA<Query::label_t>::state_t*, const RoutingTable::entry_t*, const RoutingTable::forward_t*>;
+    using cegar_configuration_t = std::tuple<pdaaal::Header<Query::label_t>,              // Current header (possibly set of headers represented using wildcards)
+                                             const Interface*,                            // Current link
+                                             const pdaaal::NFA<Query::label_t>::state_t*, // State in the path NFA
+                                             const RoutingTable::entry_t*,                // Entry and ..
+                                             const RoutingTable::forward_t*,              // .. forwarding rule is used when reconstructing trace
+                                             std::vector<Query::label_t>>;                // In some cases, if wildcard labels where specialized, we need to know which in order to reconstruct trace.
+
     using ConfigurationRange = utils::VariantRange< // TODO: We could make this simpler / more direct, but it works for now...
             utils::VectorRange<utils::SingletonRange<const Interface*>, cegar_configuration_t>,
             utils::VectorRange<utils::FilterRange<typename pdaaal::RefinementMapping<const Interface*>::concrete_value_range>, cegar_configuration_t>,
@@ -388,7 +394,7 @@ namespace aalwines {
             return find_refinement_common(std::move(X), abstract_rule, a_inf, nfa_state);
         }
         configuration_range_t search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf) override {
-            const auto& [header, old_inf, nfa_state, e, r] = conf;
+            const auto& [header, old_inf, nfa_state, e, r, l] = conf;
             auto inf = (r == nullptr) ? old_inf : r->_via->match();
             assert(_factory._interface_abstraction.maps_to(inf, std::get<0>(_factory._abstract_states.at(abstract_rule._from))));
             if (abstract_rule._from < _factory._num_states_no_ops) { // I.e. ops.empty()
@@ -402,7 +408,7 @@ namespace aalwines {
                         return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size); // Transform interface to vector of configurations.
                     });
             } else {
-                return utils::SingletonRange<configuration_t>(header, inf, nfa_state, nullptr, nullptr);
+                return utils::SingletonRange<configuration_t>(header, inf, nfa_state, nullptr, nullptr, std::vector<label_t>());
             }
         }
         refinement_t find_refinement(const abstract_rule_t& abstract_rule, const std::vector<configuration_t>& configurations) override {
@@ -412,7 +418,7 @@ namespace aalwines {
             assert(ops.empty());
             std::unordered_set<const Interface*> interfaces_with_wildcard_headers;
             std::optional<std::vector<label_t>> labels_matching_wildcard;
-            for (const auto& [header, old_inf, c_nfa_state, e, r] : configurations) {
+            for (const auto& [header, old_inf, c_nfa_state, e, r, l] : configurations) {
                 auto inf = (r == nullptr) ? old_inf : r->_via->match();
                 if (nfa_state != c_nfa_state || !_factory._interface_abstraction.maps_to(inf, a_inf)) continue;
                 if (!header.empty() && !header.top_is_concrete()) { // Check if header has wildcard on top.
@@ -446,31 +452,43 @@ namespace aalwines {
 
         concrete_trace_t get_concrete_trace(std::vector<configuration_t>&& configurations, std::vector<label_t>&& final_header, size_t initial_abstract_state) override {
             concrete_trace_t trace = json::array();
+            size_t remaining_pops = 0;
             for (auto it = configurations.crbegin(); it < configurations.crend(); ++it) {
-                const auto& [header, from_inf, nfa_state, entry, forward] = *it;
+                const auto& [header, from_inf, nfa_state, entry, forward, labels] = *it;
                 if (forward == nullptr) continue;
                 assert(entry != nullptr);
+                if (remaining_pops > 0) {
+                    // We need this header to finalize the last step.
+                    // We know that the top 'remaining_pops' labels of 'header' is concrete, since otherwise it would have been recorded in 'labels' in last step.
+                    assert(header.concrete_part.size() >= remaining_pops);
+                    final_header.insert(final_header.end(), header.concrete_part.end() - remaining_pops, header.concrete_part.end());
+                    remaining_pops = 0;
+                }
                 auto to_inf = forward->_via->match();
                 Translation::add_link_to_trace(trace, to_inf, final_header);
                 _factory._translation.add_rule_to_trace(trace, from_inf, *entry, *forward);
                 const auto& ops = forward->_ops;
-                // FIXME: This only works for operation sequences on the form:  POP | SWAP? PUSH*    (as checked by these asserts)
-                assert(ops.size() <= 1 || !std::any_of(ops.begin(), ops.end(), [](const auto& op){ return op._op == RoutingTable::op_t::POP; }));
-                assert(std::count_if(ops.begin(), ops.end(), [](const auto& op){ return op._op == RoutingTable::op_t::SWAP; }) <= ((ops.empty() || ops[0]._op == RoutingTable::op_t::SWAP) ? 1 : 0));
-                for (auto op_it = ops.crbegin(); op_it < ops.crend(); ++op_it) {
-                    switch (op_it->_op) {
-                        case RoutingTable::op_t::POP:
-                            final_header.push_back(entry->_top_label);
-                            break;
-                        case RoutingTable::op_t::SWAP:
-                            final_header.back() = entry->_top_label;
-                            break;
-                        case RoutingTable::op_t::PUSH:
-                            final_header.pop_back();
-                            break;
-                    }
+                auto [post, pops] = compute_pop_post(entry->_top_label, ops);
+#ifndef NDEBUG
+                assert(final_header.size() >= post.size());
+                for (size_t i = 0; i < post.size(); ++i) { // Assert that top of final_header matches post.
+                    assert(post[i] == final_header[i + final_header.size() - post.size()]);
+                }
+#endif
+                final_header.erase(final_header.end() - post.size(), final_header.end()); // Remove what was pushed (i.e. post)
+                for (auto label_it = labels.crbegin(); label_it < labels.crend(); ++label_it) { // If wildcards was specialized and popped, push the corresponding valid labels.
+                    final_header.push_back(*label_it);
+                    assert(pops > 0);
+                    pops--; // Keep count of how many pops we have left to reverse.
+                }
+                if (pops == 0 && !entry->ignores_label()) { // Standard case where top label is normal, and we didn't pop more.
+                    final_header.push_back(entry->_top_label);
+                }
+                if (pops > 0) { // We popped more than we have pushed on now.
+                    remaining_pops = pops; // Remember this, and handle it using the previous header (next iteration due to reverse iterator).
                 }
             }
+            assert(remaining_pops == 0);
             const Interface* first_inf = nullptr;
             if (configurations.empty()) {
                 auto [a_inf, nfa_state, ops] = _factory._abstract_states.at(initial_abstract_state);
@@ -506,7 +524,7 @@ namespace aalwines {
             std::set_intersection(inf->table().entries().begin(), inf->table().entries().end(),
                                   labels.begin(), labels.end(), pointer_back_inserter(matching_entries), CompEntryLabel());
             if (!inf->table().entries().empty() && inf->table().entries().back().ignores_label() && (matching_entries.empty() || !matching_entries.back()->ignores_label())) {
-                matching_entries.emplace_back(&inf->table().entries().back()); // TODO: Does this handle wildcards correctly??
+                matching_entries.emplace_back(&inf->table().entries().back());
             }
             return matching_entries;
         }
@@ -554,23 +572,14 @@ namespace aalwines {
                 for (const auto& forward : entry->_rules) {
                     if (!matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size)) continue;
                     auto [post, additional_pops] = compute_pop_post(entry->_top_label, forward._ops);
-                    std::optional<header_t> new_header;
-                    auto pre_label = entry->_top_label;
+                    std::optional<std::pair<header_t,std::vector<label_t>>> new_header;
                     if (entry->ignores_label()) { // Wildcard pre_label
-                        if (forward._ops.size() == 0) {
-                            new_header = header; // No-op on wildcard is always possible. Use old header.
-                        } else {
-                            auto res = this->update_header_wildcard_pre(header, post, additional_pops);
-                            if (res) {
-                                new_header = res.value().first;
-                                pre_label = res.value().second;
-                            }
-                        }
+                        new_header = this->update_header_wildcard_pre(header, post, additional_pops);
                     } else {
-                        new_header = this->update_header(header, entry->_top_label, post, additional_pops); // TODO: Also handle wildcard pre_label here...
+                        new_header = this->update_header(header, entry->_top_label, post, additional_pops);
                     }
                     if (!new_header.has_value()) continue;
-                    result.emplace_back(new_header.value(), inf, std::get<1>(to_state), entry, &forward); // TODO: Add pre_label to configuration and use it for trace reconstruction.
+                    result.emplace_back(new_header.value().first, inf, std::get<1>(to_state), entry, &forward, new_header.value().second);
                 }
             }
             return result;
@@ -603,7 +612,9 @@ namespace aalwines {
         std::pair<std::vector<label_t>, size_t> compute_pop_post(const label_t& pre_label, const std::vector<RoutingTable::action_t>& ops) const {
             std::vector<label_t> post;
             size_t additional_pops = 0;
-            post.emplace_back(pre_label);
+            if (pre_label != Query::wildcard_label()) {
+                post.emplace_back(pre_label);
+            }
             for (const auto& action : ops) {
                 switch (action._op) {
                     case RoutingTable::op_t::POP:
