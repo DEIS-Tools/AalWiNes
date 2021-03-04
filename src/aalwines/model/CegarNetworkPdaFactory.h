@@ -70,7 +70,8 @@ namespace aalwines {
                                label_abstraction_fn_t&& label_abstraction_fn,
                                std::function<size_t(const Interface*)>&& interface_abstraction_fn)
         : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)), json_output(json_output),
-              _all_labels(std::move(all_labels)), _translation(query, network, [](){}),
+              //_all_labels(std::move(all_labels)),
+              _translation(query, network, [](){}),
               _query(query), _network(network), //_failures(query.number_of_failures()),
               _interface_abstraction(pdaaal::AbstractionMapping<const Interface*,size_t>(std::move(interface_abstraction_fn), network.all_interfaces().begin(), network.all_interfaces().end())),
               _abstract_tables(_interface_abstraction.size())
@@ -91,20 +92,42 @@ namespace aalwines {
             }
         }
         void refine(std::pair<pdaaal::Refinement<const Interface*>, pdaaal::Refinement<label_t>>&& refinement) {
+            auto new_interfaces_begin = _interface_abstraction.size();
             _interface_abstraction.refine(refinement.first);
-            // TODO: (Maybe) Refine spurious rules that match this refinement.
-            // TODO: Optimization: Find a way to refine and reuse states and rules...
+            auto new_interfaces_end = _interface_abstraction.size();
+            assert(new_interfaces_begin + refinement.first.partitions().size() + (refinement.first.partitions().empty() ? 0 : 1) == new_interfaces_end);
+            // TODO: Should this be combined with use_label_refinement??
+            use_interface_refinement(refinement.first.abstract_id, new_interfaces_begin, new_interfaces_end);
+
+            auto new_labels_end = this->number_of_labels();
+            auto new_labels_count = refinement.second.partitions().size();
+            if (new_labels_count > 0) {
+                new_labels_count--;
+            }
+            use_label_refinement(refinement.second.abstract_id, new_labels_end - new_labels_count, new_labels_end);
+
+            // TODO: Optimization: Find a way to refine and reuse states, edges and tables...
             reinitialize();
 
         }
-        void refine(pdaaal::HeaderRefinement<label_t>&& refinement) {
-            // TODO: (Maybe) Refine spurious rules that match this refinement.
-            // TODO: Optimization: Find a way to refine and reuse states and rules...
+        void refine(pdaaal::HeaderRefinement<label_t>&& header_refinement) {
+            auto new_labels_end = this->number_of_labels();
+            for (auto it = header_refinement.refinements().crbegin(); it < header_refinement.refinements().crend(); ++it) { // Header refinements were applied in order, so we go back in reverse.
+                const auto& refinement = *it;
+                assert(!refinement.partitions().empty());
+                auto new_labels_count = refinement.partitions().size() - 1; // New labels were made for all partitions except one, which kept the old label.
+                auto new_labels_begin = new_labels_end - new_labels_count;
+                auto old_label = refinement.abstract_id;
+                assert(old_label < new_labels_begin);
+                use_label_refinement(old_label, new_labels_begin, new_labels_end);
+                assert(new_labels_end > new_labels_count);
+                new_labels_end -= new_labels_count;
+            }
+            // TODO: Optimization: Find a way to refine and reuse states, edges and tables...
             reinitialize();
         }
 
     protected:
-        size_t _num_states_no_ops;
         void build_pda() override {
             size_t count_rules = 0;
             _num_states_no_ops = _abstract_states.size();
@@ -167,10 +190,19 @@ namespace aalwines {
             _accepting.clear();
             _abstract_tables.clear();
             _abstract_tables = std::vector<table_t>(_interface_abstraction.size());
-            _out_infs.clear();
+            _out_infs.clear(); // TODO: _out_infs is concrete and should never change after first construction. (Currently also used to indicate if table was processed for that inf...)
             _edges.clear();
             _abstract_states = pdaaal::ptrie_set<abstract_state_t>();
             make_edges();
+        }
+
+        void use_interface_refinement(size_t old_interface, size_t new_interfaces_begin, size_t new_interfaces_end) {
+            // TODO: Use old_interface -> [new_interfaces_begin, new_interfaces_end)
+            // TODO: (Maybe) Refine spurious rules that match this refinement.
+        }
+        void use_label_refinement(size_t old_label, size_t new_label_begin, size_t new_label_end) {
+            // TODO: Use old_label -> [new_labels_begin, new_labels_end)
+            // TODO: (Maybe) Refine spurious rules that match this refinement.
         }
 
         void add_spurious_rule(abstract_rule_t&& rule) {
@@ -295,7 +327,7 @@ namespace aalwines {
         }
 
     private:
-        std::unordered_set<label_t> _all_labels;
+        //std::unordered_set<label_t> _all_labels;
         Translation _translation; // TODO: Figure out how to use common parts from Translation.
         const Query& _query;
         const Network& _network;
@@ -303,8 +335,9 @@ namespace aalwines {
 
         std::vector<table_t> _abstract_tables;
         pdaaal::ptrie_set<abstract_state_t> _abstract_states;
+        size_t _num_states_no_ops = std::numeric_limits<size_t>::max();
 
-        // Idea go only go through concrete tables once and only go through (concrete) path regex once.
+        // The idea is to only go through concrete tables once and only go through (concrete) path regex once.
         // Combine (product) abstracted versions of tables and path.
         std::unordered_map<const Interface*, /* TODO: const RoutingTable* */  // out_infs[e].contains(e')  iff  (e',..) \in \tau(e,..).
                 std::unordered_set<const Interface*>> _out_infs;
@@ -354,8 +387,6 @@ namespace aalwines {
         using state_t = const Interface*; // This is the 'state' that is refined.
         using abstract_state_t = typename factory_t::abstract_state_t;
         using header_t = pdaaal::Header<Query::label_t>;
-        //using configuration_t = cegar_configuration_t;
-        //using configuration_range_t = const std::vector<configuration_t>&;
         using configuration_range_t = ConfigurationRange;
         using configuration_t = typename configuration_range_t::value_type; // = cegar_configuration_t;
         using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W, C, A>;
@@ -605,11 +636,17 @@ namespace aalwines {
             std::sort(labels.begin(), labels.end());
             for (const auto& inf : _factory._interface_abstraction.get_concrete_values(a_inf)) {
                 if (_factory._out_infs.find(inf) == _factory._out_infs.end()) continue;
-                for (const RoutingTable::entry_t* entry : get_entries_matching(labels, inf)) { // TODO: Handle the wilcard_label correctly in pdaaal::make_refinement!
-                    assert(this->label_maps_to(entry->_top_label, abstract_rule._pre));
-                    if (std::any_of(entry->_rules.begin(), entry->_rules.end(), // Check if any forwarding rule on this entry matches abstract rule.
-                                    [&](const auto& forward){ return matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size); })) {
-                        Y.emplace_back(inf, entry->_top_label);
+                for (const RoutingTable::entry_t* entry : get_entries_matching(labels, inf)) {
+                    if (entry->ignores_label()) {
+                        // TODO: Handle the wilcard_label correctly in pdaaal::make_refinement!
+                        assert(false);
+                        throw base_error("Not yet implemented...");
+                    } else {
+                        assert(this->label_maps_to(entry->_top_label, abstract_rule._pre));
+                        if (std::any_of(entry->_rules.begin(), entry->_rules.end(), // Check if any forwarding rule on this entry matches abstract rule.
+                                        [&](const auto& forward){ return matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size); })) {
+                            Y.emplace_back(inf, entry->_top_label);
+                        }
                     }
                 }
             }

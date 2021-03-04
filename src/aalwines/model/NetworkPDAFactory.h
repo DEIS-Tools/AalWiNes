@@ -84,7 +84,7 @@ namespace aalwines {
             [from_id,&result,this](state_t&& to_state, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) {
                 rule_t rule;
                 rule._from = from_id;
-                std::tie(rule._op, rule._op_label) = Translation::first_action(forward);
+                std::tie(rule._op, rule._op_label) = forward.first_action();
                 rule._to = add_state(to_state);
                 rule._pre = entry._top_label;
                 if constexpr (is_weighted) {
