@@ -34,6 +34,7 @@
 #include <aalwines/model/NetworkTranslation.h>
 #include <aalwines/utils/pointer_back_inserter.h>
 #include <aalwines/utils/ranges.h>
+#include <aalwines/model/EdgeStatus.h>
 
 #include <utility>
 
@@ -354,7 +355,8 @@ namespace aalwines {
                                              const pdaaal::NFA<Query::label_t>::state_t*, // State in the path NFA
                                              const RoutingTable::entry_t*,                // Entry and ..
                                              const RoutingTable::forward_t*,              // .. forwarding rule is used when reconstructing trace
-                                             std::vector<Query::label_t>>;                // In some cases, if wildcard labels where specialized, we need to know which in order to reconstruct trace.
+                                             std::vector<Query::label_t>,                // In some cases, if wildcard labels where specialized, we need to know which in order to reconstruct trace.
+                                             EdgeStatus>;
 
     using ConfigurationRange = utils::VariantRange< // TODO: We could make this simpler / more direct, but it works for now...
             utils::VectorRange<utils::SingletonRange<const Interface*>, cegar_configuration_t>,
@@ -415,7 +417,7 @@ namespace aalwines {
                     _factory._interface_abstraction.get_concrete_values_range(a_inf), // Inner range of interfaces
                     [this,nfa_state=nfa_state](const auto& inf){ return NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
                 [this, header=this->initial_header(), &abstract_rule, nfa_state=nfa_state, &to_state, ops_size](const auto& inf){
-                    return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size); // Transform interface to vector of configurations.
+                    return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size, EdgeStatus()); // Transform interface to vector of configurations.
             });
         }
         refinement_t find_initial_refinement(const abstract_rule_t& abstract_rule) override {
@@ -443,10 +445,10 @@ namespace aalwines {
                 return utils::VectorRange<utils::SingletonRange<const Interface*>, configuration_t>(
                     utils::SingletonRange<const Interface*>(inf),
                     [this, &conf, &abstract_rule, nfa_state=std::get<2>(conf), &to_state, ops_size](const auto& inf){
-                        return make_configurations(std::get<0>(conf), abstract_rule, inf, nfa_state, to_state, ops_size); // Transform interface to vector of configurations.
+                        return make_configurations(std::get<0>(conf), abstract_rule, inf, nfa_state, to_state, ops_size, std::get<6>(conf)); // Transform interface to vector of configurations.
                     });
             } else {
-                return utils::SingletonRange<configuration_t>(std::get<0>(conf), inf, std::get<2>(conf), nullptr, nullptr, std::vector<label_t>());
+                return utils::SingletonRange<configuration_t>(std::get<0>(conf), inf, std::get<2>(conf), nullptr, nullptr, std::vector<label_t>(), std::get<6>(conf));
             }
         }
         refinement_t find_refinement(const abstract_rule_t& abstract_rule, const std::vector<configuration_t>& configurations) override {
@@ -493,7 +495,7 @@ namespace aalwines {
             json trace = json::array();
             size_t remaining_pops = 0;
             for (auto it = configurations.crbegin(); it < configurations.crend(); ++it) {
-                const auto& [header, from_inf, nfa_state, entry, forward, labels] = *it;
+                const auto& [header, from_inf, nfa_state, entry, forward, labels, edge_status] = *it;
                 if (forward == nullptr) continue;
                 assert(entry != nullptr);
                 if (remaining_pops > 0) {
@@ -607,11 +609,14 @@ namespace aalwines {
 
         std::vector<configuration_t> make_configurations(const header_t& header, const abstract_rule_t& abstract_rule,
                                                          const Interface* inf, const nfa_state_t* nfa_state,
-                                                         const abstract_state_t& to_state, size_t ops_size) {
+                                                         const abstract_state_t& to_state, size_t ops_size, const EdgeStatus& edge_status) {
+            assert(edge_status.soundness_check());
             std::vector<configuration_t> result;
             for (const RoutingTable::entry_t* entry : get_entries_matching(header, inf)) {
                 for (const auto& forward : entry->_rules) {
                     if (!matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size)) continue;
+                    auto next_edge_status = edge_status.next_edge_state(*entry, forward, _factory._query.number_of_failures());
+                    if (!next_edge_status.has_value()) continue;
                     auto [post, additional_pops] = compute_pop_post(entry->_top_label, forward._ops);
                     std::optional<std::pair<header_t,std::vector<label_t>>> new_header;
                     if (entry->ignores_label()) { // Wildcard pre_label
@@ -620,7 +625,7 @@ namespace aalwines {
                         new_header = this->update_header(header, entry->_top_label, post, additional_pops);
                     }
                     if (!new_header.has_value()) continue;
-                    result.emplace_back(new_header.value().first, inf, std::get<1>(to_state), entry, &forward, new_header.value().second);
+                    result.emplace_back(new_header.value().first, inf, std::get<1>(to_state), entry, &forward, new_header.value().second, std::move(next_edge_status).value());
                 }
             }
             return result;

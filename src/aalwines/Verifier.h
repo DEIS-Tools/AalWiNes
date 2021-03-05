@@ -112,7 +112,6 @@ namespace aalwines {
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
             if (_engine == 5) {
-                assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["no_abstraction"] = json::object();
                 full_time.start();
                 auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), output["no_abstraction"]);
@@ -124,7 +123,6 @@ namespace aalwines {
                     result = utils::outcome_t::NO;
                 }
             } else if (_engine == 4) {
-                assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["abstraction"] = json::object();
                 full_time.start();
                 auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
@@ -136,7 +134,6 @@ namespace aalwines {
                     result = utils::outcome_t::NO;
                 }
             } else if (_engine == 3) {
-                assert(q.number_of_failures() == 0); // k>0 not yet supported for CEGAR.
                 output["abstraction"] = json::object();
                 full_time.start();
                 auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
