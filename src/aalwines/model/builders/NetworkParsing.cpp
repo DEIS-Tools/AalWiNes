@@ -52,6 +52,8 @@ namespace aalwines {
         auto network = json_file.empty() ? TopologyBuilder::parse(topo_zoo, warnings) : FastJsonBuilder::parse(json_file, warnings);
         parsing_stopwatch.stop();
 
+        assert(network.check_sanity());
+        network.pre_process(std::clog);
         return network;
     }
 

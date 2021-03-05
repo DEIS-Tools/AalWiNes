@@ -711,7 +711,7 @@ namespace aalwines {
                 current_router->set_coordinate(Coordinate(latitude, longitude));
                 break;
             case context::context_type::interface: {
-                current_table->sort();
+                current_table->sort(); current_table->sort_rules();
                 for (Interface* current_interface : current_interfaces) {
                     current_interface->set_table(current_table);
                 }

@@ -150,6 +150,11 @@ namespace aalwines {
         [[nodiscard]] std::optional<Coordinate> coordinate() const { return _coordinate; }
         void set_coordinate(Coordinate coordinate) { _coordinate.emplace(coordinate); }
 
+        // Check sanity of network data structure
+        bool check_sanity(std::ostream& error_stream = std::cerr) const;
+        // Remove redundant rules.
+        void pre_process(std::ostream& log = std::cerr);
+
     private:
         size_t _index = std::numeric_limits<size_t>::max();
         std::vector<std::string> _names;
