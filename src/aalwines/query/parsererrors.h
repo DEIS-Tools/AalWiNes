@@ -56,7 +56,7 @@ namespace aalwines {
             return "base error ";
         }
 
-        virtual void print(std::ostream &os) const {
+        void print(std::ostream &os) const override {
             os << prefix() << " " << _location << " : " << what() << std::endl;
         }
 

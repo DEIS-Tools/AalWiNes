@@ -30,7 +30,7 @@
 #include <ostream>
 #include <json.hpp>
 
-namespace utils {
+namespace aalwines::utils {
     enum class outcome_t { YES, NO, MAYBE };
 
     std::ostream& operator<<(std::ostream& os, const outcome_t& outcome) {

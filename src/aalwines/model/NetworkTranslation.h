@@ -84,32 +84,6 @@ namespace aalwines {
     public:
         NetworkTranslation(const Query& query, const Network& network) : _query(query), _network(network) { };
 
-        static std::pair<pdaaal::op_t,label_t> first_action(const RoutingTable::forward_t& forward) {
-            if (forward._ops.empty()) {
-                return std::make_pair(pdaaal::NOOP, label_t());
-            } else {
-                return convert_action(forward._ops[0]);
-            }
-        }
-        static std::pair<pdaaal::op_t,label_t> convert_action(const RoutingTable::action_t& action) {
-            pdaaal::op_t op;
-            label_t op_label;
-            switch (action._op) {
-                case RoutingTable::op_t::POP:
-                    op = pdaaal::POP;
-                    break;
-                case RoutingTable::op_t::PUSH:
-                    op = pdaaal::PUSH;
-                    op_label = action._op_label;
-                    break;
-                case RoutingTable::op_t::SWAP:
-                    op = pdaaal::SWAP;
-                    op_label = action._op_label;
-                    break;
-            }
-            return std::make_pair(op, op_label);
-        }
-
         void make_initial_states(const std::function<void(State&&)>& add_initial) {
             auto add = [&add_initial](const std::vector<nfa_state_t*>& next, const Interface* inf) {
                 if (inf != nullptr && inf->is_virtual()) return; // don't start on a virtual interface.
@@ -176,7 +150,7 @@ namespace aalwines {
                         : forward._ops[from_state._opid]._op_label;
                 add_rule_type_b(State::perform_op(from_state, forward), // To-state
                                 pre_label,
-                                convert_action(forward._ops[from_state._opid + 1])); // Op, op-label
+                                forward._ops[from_state._opid + 1].convert_to_pda_op()); // Op, op-label
             }
         }
 
@@ -198,12 +172,12 @@ namespace aalwines {
             }
         }
 
-        static void add_link_to_trace(json& trace, const State& state, const std::vector<label_t>& final_header) {
+        static void add_link_to_trace(json& trace, const Interface* inf, const std::vector<label_t>& final_header) {
             trace.emplace_back();
-            trace.back()["from_router"] = state._inf->target()->name();
-            trace.back()["from_interface"] = state._inf->match()->get_name();
-            trace.back()["to_router"] = state._inf->source()->name();
-            trace.back()["to_interface"] = state._inf->get_name();
+            trace.back()["from_router"] = inf->target()->name();
+            trace.back()["from_interface"] = inf->match()->get_name();
+            trace.back()["to_router"] = inf->source()->name();
+            trace.back()["to_interface"] = inf->get_name();
             trace.back()["stack"] = json::array();
             std::for_each(final_header.rbegin(), final_header.rend(), [&stack=trace.back()["stack"]](const auto& label){
                 if (label == Query::bottom_of_stack()) return;

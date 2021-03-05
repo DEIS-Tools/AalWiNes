@@ -84,7 +84,7 @@ namespace aalwines {
             [from_id,&result,this](state_t&& to_state, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) {
                 rule_t rule;
                 rule._from = from_id;
-                std::tie(rule._op, rule._op_label) = Translation::first_action(forward);
+                std::tie(rule._op, rule._op_label) = forward.first_action();
                 rule._to = add_state(to_state);
                 rule._pre = entry._top_label;
                 if constexpr (is_weighted) {
@@ -242,7 +242,7 @@ namespace aalwines {
                 state_t s;
                 _states.unpack(step._pdastate, &s);
                 if (s.ops_done()) {
-                    Translation::add_link_to_trace(result_trace, s, step._stack);
+                    Translation::add_link_to_trace(result_trace, s._inf, step._stack);
                     if (cnt < entries.size()) {
                         _translation.add_rule_to_trace(result_trace, s._inf, *entries[cnt], *rules[cnt]);
                         ++cnt;

@@ -532,22 +532,22 @@ namespace aalwines {
     }
 
     template <NetworkSAXHandler::context::context_type type, NetworkSAXHandler::context::key_flag flag,
-              NetworkSAXHandler::keys key, NetworkSAXHandler::keys... alternatives>
+              NetworkSAXHandler::keys current_key, NetworkSAXHandler::keys... alternatives>
               // 'key' is the key to use. 'alternatives' are any other keys using the same flag in the same context (i.e. a one_of(key, alternatives...) requirement).
     bool NetworkSAXHandler::handle_key() {
         static_assert(flag == NetworkSAXHandler::context::FLAG_1 || flag == NetworkSAXHandler::context::FLAG_2
                    || flag == NetworkSAXHandler::context::FLAG_3 || flag == NetworkSAXHandler::context::FLAG_4,
                    "Template parameter flag must be a single key, not a union or empty.");
-        static_assert(((NetworkSAXHandler::context::get_key(type, flag) == key) || ... || (NetworkSAXHandler::context::get_key(type, flag) == alternatives)),
+        static_assert(((NetworkSAXHandler::context::get_key(type, flag) == current_key) || ... || (NetworkSAXHandler::context::get_key(type, flag) == alternatives)),
                    "The result of get_key(type, flag) must match 'key' or one of the alternatives");
         if (!context_stack.top().needs_value(flag)) {
-            errors << "Duplicate definition of key: \"" << key;
+            errors << "Duplicate definition of key: \"" << current_key;
             ((errors << "\"/\"" << alternatives), ...);
             errors << "\" in " << type << " object. " << std::endl;
             return false;
         }
         context_stack.top().got_value(flag);
-        last_key = key;
+        last_key = current_key;
         return true;
     }
 
@@ -711,6 +711,7 @@ namespace aalwines {
                 current_router->set_coordinate(Coordinate(latitude, longitude));
                 break;
             case context::context_type::interface: {
+                current_table->sort();
                 for (Interface* current_interface : current_interfaces) {
                     current_interface->set_table(current_table);
                 }
