@@ -96,7 +96,7 @@ namespace aalwines {
             auto new_interfaces_begin = _interface_abstraction.size();
             _interface_abstraction.refine(refinement.first);
             auto new_interfaces_end = _interface_abstraction.size();
-            assert(new_interfaces_begin + refinement.first.partitions().size() + (refinement.first.partitions().empty() ? 0 : 1) == new_interfaces_end);
+            assert(new_interfaces_begin + refinement.first.partitions().size() - (refinement.first.partitions().empty() ? 0 : 1) == new_interfaces_end);
             // TODO: Should this be combined with use_label_refinement??
             use_interface_refinement(refinement.first.abstract_id, new_interfaces_begin, new_interfaces_end);
 
@@ -610,7 +610,7 @@ namespace aalwines {
         std::vector<configuration_t> make_configurations(const header_t& header, const abstract_rule_t& abstract_rule,
                                                          const Interface* inf, const nfa_state_t* nfa_state,
                                                          const abstract_state_t& to_state, size_t ops_size, const EdgeStatus& edge_status) {
-            assert(edge_status.soundness_check());
+            assert(edge_status.soundness_check(_factory._query.number_of_failures()));
             std::vector<configuration_t> result;
             for (const RoutingTable::entry_t* entry : get_entries_matching(header, inf)) {
                 for (const auto& forward : entry->_rules) {
