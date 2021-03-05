@@ -42,8 +42,14 @@ namespace po = boost::program_options;
 namespace aalwines {
 
     inline void to_json(json & j, const Query::mode_t& mode) {
-        static const char *modeTypes[] {"OVER", "UNDER", "DUAL", "EXACT"};
-        j = modeTypes[mode];
+        switch (mode) {
+            case Query::mode_t::OVER:
+                j = "OVER";
+                break;
+            case Query::mode_t::EXACT:
+                j = "EXACT";
+                break;
+        }
     }
 
     class Verifier {
@@ -102,7 +108,7 @@ namespace aalwines {
             output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
-            std::vector<Query::mode_t> modes = q.approximation() == Query::DUAL ? std::vector<Query::mode_t>{Query::OVER, Query::UNDER} : std::vector<Query::mode_t>{q.approximation()};
+            std::vector<Query::mode_t> modes = std::vector<Query::mode_t>{q.approximation()};
             output["mode"] = q.approximation();
             q.set_approximation(modes[0]);
 
@@ -210,7 +216,7 @@ namespace aalwines {
                     if (q.number_of_failures() == 0) {
                         result = engine_outcome ? utils::outcome_t::YES : utils::outcome_t::NO;
                     }
-                    if (result == utils::outcome_t::MAYBE && m == Query::OVER && !engine_outcome) {
+                    if (result == utils::outcome_t::MAYBE && m == Query::mode_t::OVER && !engine_outcome) {
                         result = utils::outcome_t::NO;
                     }
                     if (result != utils::outcome_t::MAYBE) {

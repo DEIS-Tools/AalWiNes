@@ -90,7 +90,6 @@ namespace aalwines {
             [[nodiscard]] std::pair<pdaaal::op_t,label_t> first_action() const;
             std::pair<pdaaal::op_t,size_t> first_action(const std::function<std::pair<bool,size_t>(const label_t&)>& label_abstraction) const;
         };
-
         struct entry_t {
             size_t _top_label = Query::wildcard_label();
             std::vector<forward_t> _rules;
@@ -113,6 +112,12 @@ namespace aalwines {
             [[nodiscard]] bool ignores_label() const {
                 return _top_label == Query::wildcard_label();
             }
+        };
+        struct CompEntryLabel {
+            bool operator()(const entry_t& a, const label_t& b) const { return a._top_label < b; }
+            bool operator()(const label_t& a, const entry_t& b) const { return a < b._top_label; }
+            bool operator()(const entry_t& a, const entry_t& b) const { return a._top_label < b._top_label; }
+            bool operator()(const label_t& a, const label_t& b) const { return a < b; }
         };
 
     public:

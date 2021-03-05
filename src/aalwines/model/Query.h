@@ -39,8 +39,8 @@ namespace aalwines {
     class Query {
     public:
 
-        enum mode_t {
-            OVER, UNDER, DUAL, EXACT
+        enum class mode_t {
+            OVER, EXACT
         };
 
         using label_t = size_t;

@@ -263,34 +263,13 @@ namespace aalwines {
                     }
                 }
             };
-            auto add_initial = [&add,this](const std::vector<nfa_state_t*>& next, const Interface* inf) {
-                if (inf->is_virtual()) return; // don't start on a virtual interface.
+            _translation.make_initial_states([&add,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
                 auto a_inf = _interface_abstraction.exists(inf).second;
                 for (const auto& n : next) {
                     add(n, inf, a_inf, true);
                 }
-            };
-            for (const auto& i : _query.path().initial()) {
-                for (const auto& e : i->_edges) {
-                    auto next = e.follow_epsilon();
-                    if (e.wildcard(_network.all_interfaces().size())) {
-                        for (const auto& inf : _network.all_interfaces()) {
-                            add_initial(next, inf->match());
-                        }
-                    } else if (!e._negated) {
-                        for (const auto& s : e._symbols) {
-                            auto inf = _network.all_interfaces()[s];
-                            add_initial(next, inf->match());
-                        }
-                    } else {
-                        for (const auto& inf : _network.all_interfaces()) {
-                            if (e.contains(inf->global_id())) {
-                                add_initial(next, inf->match());
-                            }
-                        }
-                    }
-                }
-            }
+            });
+
             while (!waiting.empty()) {
                 auto [inf, nfa_state, a_inf] = waiting.back();
                 waiting.pop_back();
@@ -556,16 +535,10 @@ namespace aalwines {
             assert(std::is_sorted(labels.begin(), labels.end()));
             return get_entries_matching(labels, inf);
         }
-        struct CompEntryLabel {
-            bool operator()(const RoutingTable::entry_t& a, const label_t& b) const { return a._top_label < b; }
-            bool operator()(const label_t& a, const RoutingTable::entry_t& b) const { return a < b._top_label; }
-            bool operator()(const RoutingTable::entry_t& a, const RoutingTable::entry_t& b) const { return a._top_label < b._top_label; }
-            bool operator()(const label_t& a, const label_t& b) const { return a < b; }
-        };
         std::vector<const RoutingTable::entry_t*> get_entries_matching(const std::vector<label_t>& labels, const Interface* inf) const {
             std::vector<const RoutingTable::entry_t*> matching_entries;
             std::set_intersection(inf->table()->entries().begin(), inf->table()->entries().end(),
-                                  labels.begin(), labels.end(), pointer_back_inserter(matching_entries), CompEntryLabel());
+                                  labels.begin(), labels.end(), pointer_back_inserter(matching_entries), RoutingTable::CompEntryLabel());
             if (!inf->table()->entries().empty() && inf->table()->entries().back().ignores_label() && (matching_entries.empty() || !matching_entries.back()->ignores_label())) {
                 matching_entries.emplace_back(&inf->table()->entries().back());
             }

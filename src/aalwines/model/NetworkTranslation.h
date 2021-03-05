@@ -84,29 +84,35 @@ namespace aalwines {
     public:
         NetworkTranslation(const Query& query, const Network& network) : _query(query), _network(network) { };
 
-        void make_initial_states(const std::function<void(State&&)>& add_initial) {
-            auto add = [&add_initial](const std::vector<nfa_state_t*>& next, const Interface* inf) {
-                if (inf != nullptr && inf->is_virtual()) return; // don't start on a virtual interface.
-                for (const auto& n : next) {
-                    add_initial(State(inf, n));
+        void make_initial_states(const std::function<void(const Interface*, const nfa_state_t*)>& add) {
+            auto add_many = [&add](const Interface* inf, const std::vector<nfa_state_t*>& next) {
+                for (const auto& nfa_state : next) {
+                    add(inf, nfa_state);
                 }
             };
+            make_initial_states(add_many);
+        }
+        void make_initial_states(const std::function<void(const Interface*, const std::vector<nfa_state_t*>&)>& add) {
             for (const auto& i : _query.path().initial()) {
                 for (const auto& e : i->_edges) {
                     auto next = e.follow_epsilon();
                     if (e.wildcard(_network.all_interfaces().size())) {
                         for (const auto& inf : _network.all_interfaces()) {
-                            add(next, inf->match());
+                            if (!inf->is_virtual()) {
+                                add(inf->match(), next);
+                            }
                         }
                     } else if (!e._negated) {
                         for (const auto& s : e._symbols) {
                             auto inf = _network.all_interfaces()[s];
-                            add(next, inf->match());
+                            if (!inf->is_virtual()) {
+                                add(inf->match(), next);
+                            }
                         }
                     } else {
                         for (const auto& inf : _network.all_interfaces()) {
-                            if (e.contains(inf->global_id())) {
-                                add(next, inf->match());
+                            if (e.contains(inf->global_id()) && !inf->is_virtual()) {
+                                add(inf->match(), next);
                             }
                         }
                     }
@@ -159,14 +165,9 @@ namespace aalwines {
             auto num_fail = _query.number_of_failures();
             auto err = std::numeric_limits<size_t>::max();
             switch (_query.approximation()) {
-                case Query::OVER:
+                case Query::mode_t::OVER:
                     return (forward._priority > num_fail) ? err : 0; // TODO: This is incorrect. Should be size of set of links for forwards with smaller priority on current entry...
-                case Query::UNDER: {
-                    auto nm = state._appmode + forward._priority; // TODO: Also incorrect. Same.
-                    return (nm > num_fail) ? err : nm;
-                }
-                case Query::EXACT:
-                case Query::DUAL:
+                case Query::mode_t::EXACT:
                 default:
                     return err;
             }

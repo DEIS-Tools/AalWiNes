@@ -35,26 +35,26 @@
 namespace aalwines {
 
     template<typename W_FN = std::function<void(void)>, typename W = void>
-    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W> {
+    class NetworkPDAFactory : public pdaaal::TypedPDAFactory<Query::label_t, W> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
         using weight_type = typename W_FN::result_type;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type>;
+        using PDAFactory = pdaaal::TypedPDAFactory<label_t, weight_type>;
         using PDA = pdaaal::TypedPDA<label_t>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
     private:
         using Translation = NetworkTranslationW<W_FN>;
-        using state_t = State;
+        using op_t = std::tuple<pdaaal::op_t,label_t>;
+        using ops_t = std::vector<op_t>;
+        using state_t = std::tuple<const Interface*, const nfa_state_t*, ops_t>;
     public:
         NetworkPDAFactory(const Query& query, Network &network, Builder::labelset_t&& all_labels)
         : NetworkPDAFactory(query, network, std::move(all_labels), [](){}) {};
 
         NetworkPDAFactory(const Query& query, const Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
-        : PDAFactory(std::move(all_labels), Query::wildcard_label()), _translation(query, network, weight_f), _query(query), _weight_f(weight_f) {
-            construct_initial();
-        };
+        : PDAFactory(std::move(all_labels)), _translation(query, network, weight_f), _query(query), _weight_f(weight_f) { };
 
         json get_json_trace(std::vector<PDA::tracestate_t> &trace) {
             std::vector<const RoutingTable::entry_t *> entries;
@@ -67,42 +67,54 @@ namespace aalwines {
         }
 
     protected:
-        const std::vector<size_t>& initial() override { return _initial; }
-
-        bool accepting(size_t i) override { return _states.get_data(i); }
-
-        std::vector<rule_t> rules(size_t from_id) override {
-            if (_query.approximation() == Query::EXACT ||
-                _query.approximation() == Query::DUAL) {
-                throw base_error("Exact and Dual analysis method not yet supported");
-            }
-            state_t from_state;
-            _states.unpack(from_id, &from_state);
-            std::vector<rule_t> result;
-
-            _translation.rules(from_state,
-            [from_id,&result,this](state_t&& to_state, const RoutingTable::entry_t& entry, const RoutingTable::forward_t& forward) {
-                rule_t rule;
-                rule._from = from_id;
-                std::tie(rule._op, rule._op_label) = forward.first_action();
-                rule._to = add_state(to_state);
-                rule._pre = entry._top_label;
-                if constexpr (is_weighted) {
-                    rule._weight = _weight_f(forward, entry);
-                }
-                result.push_back(rule);
-            },
-            [from_id,&result,this](state_t&& to_state, const label_t& pre_label, std::pair<pdaaal::op_t,label_t>&& op) {
-                rule_t rule;
-                rule._from = from_id;
-                std::tie(rule._op, rule._op_label) = op;
-                rule._to = add_state(to_state);
-                rule._pre = pre_label;
-                result.push_back(rule);
+        void build_pda() override {
+            _translation.make_initial_states([this](const Interface* inf, const nfa_state_t* nfa_state){
+                add_state<true>(state_t(inf, nfa_state, ops_t()));
             });
-
-            return result;
+            for (size_t from_state = 0; from_state < _states.size(); ++from_state) {
+                auto [inf, nfa_state, ops] = _states.at(from_state);
+                if (ops.empty()) {
+                    for (const auto& entry : inf->table()->entries()) {
+                        for (const auto& forward : entry._rules) {
+                            if (forward._priority > _query.number_of_failures()) continue; // TODO: Approximation here.
+                            auto first_op = forward.first_action();
+                            ops_t other_ops;
+                            for (auto action_it = forward._ops.begin() + 1; action_it != forward._ops.end(); ++action_it) {
+                                other_ops.emplace_back(action_it->convert_to_pda_op());
+                            }
+                            auto apply_per_nfastate = [&,this](const nfa_state_t* nfa_state) {
+                                auto to_state = add_state({forward._via->match(), nfa_state, other_ops});
+                                rule_t rule{from_state, entry._top_label, to_state, std::get<0>(first_op), std::get<1>(first_op)};
+                                if (entry.ignores_label()) {
+                                    this->add_wildcard_rule(rule);
+                                } else {
+                                    this->add_rule(rule);
+                                }
+                            };
+                            if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
+                                apply_per_nfastate(nfa_state);
+                            } else { // Follow NFA edges matching forward._via
+                                for (const auto& e : nfa_state->_edges) {
+                                    if (!e.contains(forward._via->global_id())) continue;
+                                    for (const auto& n : e.follow_epsilon()) {
+                                        apply_per_nfastate(n);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    auto first_op = ops[0];
+                    auto to_state = _states.insert({inf, nfa_state, ops_t(ops.begin()+1, ops.end())}).second;
+                    this->add_wildcard_rule(rule_t{from_state, Query::wildcard_label(), to_state, std::get<0>(first_op), std::get<1>(first_op)});
+                }
+            }
+            assert(std::is_sorted(_initial.begin(), _initial.end()));
+            assert(std::is_sorted(_accepting.begin(), _accepting.end()));
         }
+
+        const std::vector<size_t>& initial() override { return _initial; }
+        const std::vector<size_t>& accepting() override { return _accepting; }
 
     private:
         // Construction (factory)
@@ -110,19 +122,17 @@ namespace aalwines {
         size_t add_state(const state_t& state) {
             auto res = _states.insert(state);
             if (res.first) {
-                _states.get_data(res.second) = state.accepting();
+                if (accepting(state)) {
+                    _accepting.push_back(res.second);
+                }
                 if constexpr (initial) {
                     _initial.push_back(res.second);
                 }
             }
             return res.second;
         }
-
-        void construct_initial() {
-            _translation.make_initial_states([this](state_t&& state) {
-                add_state<true>(state);
-            });
-            std::sort(_initial.begin(), _initial.end());
+        static bool accepting(const state_t& state) {
+            return std::get<2>(state).empty() && !std::get<0>(state)->is_virtual() && std::get<1>(state)->_accepting;
         }
 
         // Trace reconstruction
@@ -153,84 +163,76 @@ namespace aalwines {
             }
         }
 
+        auto get_entries_matching(const label_t& label, const RoutingTable* table) const {
+            assert(std::is_sorted(table->entries().begin(), table->entries().end()));
+            std::vector<const RoutingTable::entry_t*> matching_entries;
+            auto lb = std::lower_bound(table->entries().begin(), table->entries().end(), label, RoutingTable::CompEntryLabel());
+            if (lb != table->entries().end() && lb->_top_label == label) {
+                matching_entries.emplace_back(&(*lb));
+            }
+            if (!table->entries().empty() && table->entries().back().ignores_label() && (matching_entries.empty() || !matching_entries.back()->ignores_label())) {
+                matching_entries.emplace_back(&table->entries().back());
+            }
+            return matching_entries;
+        }
         bool concreterize_trace(const std::vector<PDA::tracestate_t>& trace, std::vector<const RoutingTable::entry_t*>& entries, std::vector<const RoutingTable::forward_t*>& rules) {
             std::unordered_set<const Interface *> disabled, active;
 
             for (size_t sno = 0; sno < trace.size(); ++sno) {
                 const auto& step = trace[sno];
-                state_t s;
-                _states.unpack(step._pdastate, &s);
-                if (!s.ops_done()) continue;
+                auto [inf, nfa_state, ops] = _states.at(step._pdastate);
+                if (!ops.empty()) continue;
                 if (sno == trace.size() - 1 || step._stack.empty()) continue;
-                // peek at next element, we want to write the ops here
-                state_t next;
-                _states.unpack(trace[sno + 1]._pdastate, &next);
-                if (!next.ops_done()) {
-                    // we get the rule we use, print
-                    const auto& entry = next._inf->table()->entries()[next._eid];
-                    const auto& forward = entry._rules[next._rid];
-                    if (!add_interfaces(disabled, active, entry, forward)) return false;
-                    rules.push_back(&forward);
-                    entries.push_back(&entry);
-                } else {
-                    // we have to guess which rule we used!
-                    // run through the rules and find a match!
-                    const auto& next_stack = trace[sno + 1]._stack;
-                    bool found = false;
-                    for (const auto& entry : s._inf->table()->entries()) {
-                        if (entry._top_label != step._stack.front() && !entry.ignores_label()) continue; // not matching on pre
-                        for (const auto& forward : entry._rules) {
-                            if (forward._ops.size() > 1 || // would have been handled in other case
-                                forward._via == nullptr || forward._via->match() != next._inf) continue;
+                auto [next_inf, next_nfa_state, next_ops] = _states.at(trace[sno + 1]._pdastate);
+                const auto& next_stack = trace[sno + 1]._stack;
+                bool found = false;
+                for (const RoutingTable::entry_t* entry : get_entries_matching(step._stack.front(), inf->table())) {
+                    assert(entry->_top_label == step._stack.front() || entry->ignores_label()); // matching on pre
+                    for (const auto& forward : entry->_rules) {
+                        if (forward._via->match() != next_inf) continue;
 
-                            bool approximation_ok = false;
-                            switch (_query.approximation()) {
-                                case Query::UNDER:
-                                    assert(next._appmode >= s._appmode);
-                                    approximation_ok = forward._priority == (next._appmode - s._appmode);
-                                    break;
-                                case Query::OVER:
-                                    approximation_ok = forward._priority <= _query.number_of_failures(); // TODO: This OVER-approximation (using _priority) is incorrect.
-                                    break;
-                                case Query::DUAL:
-                                    throw base_error("Tracing for DUAL not yet implemented");
-                                case Query::EXACT:
-                                    throw base_error("Tracing for EXACT not yet implemented");
-                            }
-                            if (!approximation_ok) continue; // TODO, fix for approximations here!
-
-                            auto expected_next_stack_size = step._stack.size();
-                            bool top_label_ok = true;
-                            if (forward._ops.empty()) {
-                                top_label_ok = step._stack.front() == next_stack.front();
-                            } else {
-                                switch (forward._ops[0]._op) {
-                                    case RoutingTable::op_t::POP:
-                                        expected_next_stack_size--;
-                                        break;
-                                    case RoutingTable::op_t::PUSH:
-                                        expected_next_stack_size++;
-                                    case RoutingTable::op_t::SWAP:
-                                        top_label_ok = forward._ops[0]._op_label == next_stack.front();
-                                        break;
-                                }
-                            }
-                            if (expected_next_stack_size == next_stack.size() && top_label_ok) {
-                                if (!add_interfaces(disabled, active, entry, forward)) continue;
-                                rules.push_back(&forward);
-                                entries.push_back(&entry);
-                                found = true;
+                        bool approximation_ok = false;
+                        switch (_query.approximation()) {
+                            case Query::mode_t::OVER:
+                                approximation_ok = forward._priority <= _query.number_of_failures();
                                 break;
+                            case Query::mode_t::EXACT:
+                                throw base_error("Tracing for EXACT not yet implemented");
+                        }
+                        if (!approximation_ok) continue;
+
+                        auto expected_next_stack_size = step._stack.size();
+                        bool top_label_ok = true;
+                        if (forward._ops.empty()) {
+                            top_label_ok = step._stack.front() == next_stack.front();
+                        } else {
+                            switch (forward._ops[0]._op) {
+                                case RoutingTable::op_t::POP:
+                                    expected_next_stack_size--;
+                                    break;
+                                case RoutingTable::op_t::PUSH:
+                                    expected_next_stack_size++;
+                                case RoutingTable::op_t::SWAP:
+                                    top_label_ok = forward._ops[0]._op_label == next_stack.front();
+                                    break;
                             }
                         }
-                        if (found) break;
+                        if (expected_next_stack_size == next_stack.size() && top_label_ok) {
+                            if (!add_interfaces(disabled, active, *entry, forward)) continue;
+                            rules.push_back(&forward);
+                            entries.push_back(entry);
+                            found = true;
+                            break;
+                        }
                     }
-                    // check if we violate the soundness of the network
-                    if (!found) {
-                        assert(false);
-                        return false;
-                    }
+                    if (found) break;
                 }
+                // check if we violate the soundness of the network
+                if (!found) {
+                    assert(false);
+                    return false;
+                }
+
             }
             return true;
         }
@@ -239,12 +241,11 @@ namespace aalwines {
             auto result_trace = json::array();
             size_t cnt = 0;
             for (const auto &step : trace) {
-                state_t s;
-                _states.unpack(step._pdastate, &s);
-                if (s.ops_done()) {
-                    Translation::add_link_to_trace(result_trace, s._inf, step._stack);
+                auto [inf, nfa_state, ops] = _states.at(step._pdastate);
+                if (ops.empty()) {
+                    Translation::add_link_to_trace(result_trace, inf, step._stack);
                     if (cnt < entries.size()) {
-                        _translation.add_rule_to_trace(result_trace, s._inf, *entries[cnt], *rules[cnt]);
+                        _translation.add_rule_to_trace(result_trace, inf, *entries[cnt], *rules[cnt]);
                         ++cnt;
                     }
                 }
@@ -254,8 +255,9 @@ namespace aalwines {
 
         Translation _translation;
         const Query& _query;
+        pdaaal::ptrie_set<state_t> _states;
         std::vector<size_t> _initial;
-        ptrie::map<state_t,bool> _states;
+        std::vector<size_t> _accepting;
         const W_FN& _weight_f;
     };
 
