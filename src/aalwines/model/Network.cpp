@@ -248,7 +248,7 @@ namespace aalwines {
         network.add_null_router();
         return network;
     }
-    Network Network::make_network(const std::vector<std::pair<std::string,Coordinate>>& names, const std::vector<std::vector<std::string>>& links) {
+    Network Network::make_network(const std::vector<std::pair<std::string,std::optional<Coordinate>>>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
         std::map<std::string, std::string> _interface_map;
         for (size_t i = 0; i < names.size(); ++i) {
