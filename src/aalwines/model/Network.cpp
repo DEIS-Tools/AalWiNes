@@ -216,6 +216,24 @@ namespace aalwines {
         }
         s << "}" << std::endl;
     }
+    void Network::print_dot_topo(std::ostream& s) const {
+        s << "graph network {\n";
+        for (const auto& r : _routers) {
+            if (r->is_null()) continue;
+            bool is_connected = false;
+            for (const auto& i : r->interfaces()) {
+                if (!i->target() || i->target()->is_null() || !i->match()) continue;
+                is_connected = true;
+                // Only make one edge per connected interface pair
+                if (i->match()->global_id() < i->global_id()) continue;
+                s << "\"" << r->name() << "\" -- \"" << i->target()->name() << "\";\n";
+            }
+            if (!is_connected) {
+                s << "\"" << r->name() << "\" [shape=triangle];\n";
+            }
+        }
+        s << "}" << std::endl;
+    }
     void Network::print_simple(std::ostream& s) const {
         for(const auto& r : _routers) {
             s << "router: \"" << r->name() << "\":\n";
@@ -257,7 +275,7 @@ namespace aalwines {
         network.add_null_router();
         return network;
     }
-    Network Network::make_network(const std::vector<std::pair<std::string,Coordinate>>& names, const std::vector<std::vector<std::string>>& links) {
+    Network Network::make_network(const std::vector<std::pair<std::string,std::optional<Coordinate>>>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
         std::map<std::string, std::string> _interface_map;
         for (size_t i = 0; i < names.size(); ++i) {
