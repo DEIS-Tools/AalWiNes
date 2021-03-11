@@ -149,7 +149,12 @@ namespace aalwines {
                 _return_links[to_id].emplace_back(_all_routers[from_id].first);
             }
         }
-        return Network::make_network(_all_routers, _return_links);
+        auto network = Network::make_network(_all_routers, _return_links);
+        // Use filename (without file-extension) is network name.
+        auto pos = gml.find_last_of('/');
+        auto file_name = gml.substr((pos == std::string::npos) ? 0 : pos + 1);
+        network.name = file_name.substr(0, file_name.find('.'));
+        return network;
     }
 
     inline json to_json_no_routing(const Router& router) {
