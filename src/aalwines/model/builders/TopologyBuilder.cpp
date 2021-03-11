@@ -158,11 +158,11 @@ namespace aalwines {
             }
         }
         j["interfaces"] = json::array();
+        j["interfaces"].emplace_back();
+        j["interfaces"].back()["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
+        j["interfaces"].back()["names"] = json::array();
         for (const auto& interface : router.interfaces()) {
-            auto j_i = json::object();
-            j_i["name"] = interface->get_name();
-            j_i["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
-            j["interfaces"].push_back(j_i);
+            j["interfaces"].back()["names"].push_back(interface->get_name());
         }
         if (router.coordinate()) {
             j["location"] = router.coordinate().value();
