@@ -131,40 +131,35 @@ namespace aalwines {
     protected:
         void build_pda() override {
             size_t count_rules = 0;
-            _num_states_no_ops = _abstract_states.size();
-            size_t i;
-            for (i = 0; i < _num_states_no_ops; ++i) {
-                auto [a_inf, nfa_state, empty_ops] = _abstract_states.at(i);
-                assert(empty_ops.empty());
-
-                const auto& table = _abstract_tables[a_inf]; // TODO: Add begin(),end() to pdaaal::ptrie_set...
-                for (size_t table_i = 0; table_i < table.size(); ++table_i) {
-                    auto [label, a_to_inf, first_op, other_ops] = table.at(table_i);
-                    auto it = _edges.find(std::make_tuple(a_inf, nfa_state, a_to_inf));
-                    if (it == _edges.end()) continue;
-                    for (const auto& to_nfa_state : it->second) {
-                        auto to_state = _abstract_states.insert({a_to_inf, to_nfa_state, other_ops}).second;
-                        abstract_rule_t rule(i, label, to_state, std::get<0>(first_op), std::get<1>(first_op));
-                        if(is_spurious_rule(rule)) continue;
-                        if (label == abstract_wildcard_label()) {
-                            this->add_wildcard_rule(rule);
-                        } else {
-                            this->add_rule(rule);
+            for (size_t from_state = 0; from_state < _abstract_states.size(); ++from_state) {
+                auto [a_inf, nfa_state, ops] = _abstract_states.at(from_state);
+                if (ops.empty()) {
+                    assert(from_state < _num_states_no_ops);
+                    const auto& table = _abstract_tables[a_inf]; // TODO: Add begin(),end() to pdaaal::ptrie_set...
+                    for (size_t table_i = 0; table_i < table.size(); ++table_i) {
+                        auto [label, a_to_inf, first_op, other_ops] = table.at(table_i);
+                        auto it = _edges.find(std::make_tuple(a_inf, nfa_state, a_to_inf));
+                        if (it == _edges.end()) continue;
+                        for (const auto& to_nfa_state : it->second) {
+                            auto to_state = _abstract_states.insert({a_to_inf, to_nfa_state, other_ops}).second;
+                            abstract_rule_t rule(from_state, label, to_state, std::get<0>(first_op), std::get<1>(first_op));
+                            if(is_spurious_rule(rule)) continue;
+                            if (label == abstract_wildcard_label()) {
+                                this->add_wildcard_rule(rule);
+                            } else {
+                                this->add_rule(rule);
+                            }
+                            count_rules++;
                         }
-                        count_rules++;
                     }
+                } else {
+                    assert(from_state >= _num_states_no_ops);
+                    auto first_op = ops[0];
+                    auto to_state = _abstract_states.insert({a_inf, nfa_state, a_ops_t(ops.begin()+1, ops.end())}).second;
+                    abstract_rule_t rule(from_state, abstract_wildcard_label(), to_state, std::get<0>(first_op), std::get<1>(first_op));
+                    this->add_wildcard_rule(rule);
+                    count_rules++;
                 }
-            }
-            // Process remaining ops
-            for (; i < _abstract_states.size(); ++i) {
-                auto [a_inf, nfa_state, ops] = _abstract_states.at(i);
-                assert(!ops.empty()); // Otherwise it would have mapped to an abstract_state with index < num_states_no_ops.
-
-                auto first_op = ops[0];
-                auto to_state = _abstract_states.insert({a_inf, nfa_state, a_ops_t(ops.begin()+1, ops.end())}).second;
-                abstract_rule_t rule(i, abstract_wildcard_label(), to_state, std::get<0>(first_op), std::get<1>(first_op));
-                this->add_wildcard_rule(rule);
-                count_rules++;
             }
 
             json_output["rules"] = count_rules; // _rule_mapping.size();
@@ -297,6 +292,7 @@ namespace aalwines {
                     }
                 }
             }
+            _num_states_no_ops = _abstract_states.size();
         }
 
         uint32_t abstract_pre_label(const label_t& pre_label) const {
@@ -394,7 +390,7 @@ namespace aalwines {
             return utils::VectorRange<utils::FilterRange<typename pdaaal::RefinementMapping<const Interface*>::concrete_value_range>, configuration_t>(
                 utils::FilterRange(
                     _factory._interface_abstraction.get_concrete_values_range(a_inf), // Inner range of interfaces
-                    [this,nfa_state=nfa_state](const auto& inf){ return NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
+                    [this,nfa_state=nfa_state](const auto& inf){ return !inf->match()->is_virtual() && NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
                 [this, header=this->initial_header(), &abstract_rule, nfa_state=nfa_state, &to_state, ops_size](const auto& inf){
                     return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size, EdgeStatus()); // Transform interface to vector of configurations.
             });
@@ -606,6 +602,7 @@ namespace aalwines {
 
         refinement_t find_refinement_common(std::vector<std::pair<state_t,label_t>>&& X, const abstract_rule_t& abstract_rule, size_t a_inf, const nfa_state_t* nfa_state) {
             std::vector<std::pair<state_t,label_t>> Y;
+            std::vector<state_t> Y_wildcard;
             auto to_state = _factory._abstract_states.at(abstract_rule._to);
             size_t ops_size = std::get<2>(to_state).size() + (abstract_rule._op == pdaaal::op_t::NOOP ? 0 : 1);
             assert(abstract_rule._op != pdaaal::op_t::NOOP || ops_size == 0);
@@ -615,23 +612,30 @@ namespace aalwines {
             for (const auto& inf : _factory._interface_abstraction.get_concrete_values(a_inf)) {
                 if (_factory._out_infs.find(inf) == _factory._out_infs.end()) continue;
                 for (const RoutingTable::entry_t* entry : get_entries_matching(labels, inf)) {
-                    if (entry->ignores_label()) {
-                        // TODO: Handle the wilcard_label correctly in pdaaal::make_refinement!
-                        assert(false);
-                        throw base_error("Not yet implemented...");
-                    } else {
-                        assert(this->label_maps_to(entry->_top_label, abstract_rule._pre));
-                        if (std::any_of(entry->_rules.begin(), entry->_rules.end(), // Check if any forwarding rule on this entry matches abstract rule.
-                                        [&](const auto& forward){ return matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size); })) {
+                    if (std::any_of(entry->_rules.begin(), entry->_rules.end(), // Check if any forwarding rule on this entry matches abstract rule.
+                                    [&](const auto& forward){ return matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size); })) {
+                        if (entry->ignores_label()) {
+                            assert(Y_wildcard.empty() || Y_wildcard.back() != inf); // At most one entry->ignores_label() per interface.
+                            Y_wildcard.emplace_back(inf);
+                            break; // inf \in Y_wildcard covers all (inf,label) pairs that could be added to Y later, so break now.
+                        } else {
+                            assert(this->label_maps_to(entry->_top_label, abstract_rule._pre));
                             Y.emplace_back(inf, entry->_top_label);
                         }
                     }
                 }
             }
-            if (Y.empty()) {
+            if (Y.empty() && Y_wildcard.empty()) {
                 return abstract_rule; // This is a spurious rule (i.e. it has no matching concrete rules), so remove it (and remember it's removal for later).
             } // else
-            return pdaaal::make_refinement<refinement_option>(std::move(X), std::move(Y), a_inf, abstract_rule._pre);
+            if (!Y_wildcard.empty()) {
+                std::sort(Y_wildcard.begin(), Y_wildcard.end());
+                Y.erase(std::remove_if(Y.begin(), Y.end(), [&Y_wildcard](const auto& p){
+                    auto lb = std::lower_bound(Y_wildcard.begin(), Y_wildcard.end(), p.first);
+                    return lb != Y_wildcard.end() && *lb == p.first; // Remove from Y elements with interface in Y_wildcard, since they are covered by the wildcard.
+                }), Y.end());
+            }
+            return pdaaal::make_refinement<refinement_option>(std::move(X), std::move(Y), a_inf, abstract_rule._pre, std::move(Y_wildcard));
         }
 
         std::pair<std::vector<label_t>, size_t> compute_pop_post(const label_t& pre_label, const std::vector<RoutingTable::action_t>& ops) const {
