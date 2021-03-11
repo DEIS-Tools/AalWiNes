@@ -101,6 +101,9 @@ namespace aalwines {
                     } else if (key == "Longitude") {
                         longitude = std::stod(str.substr(pos+1));
                     } else if (key == "]") {
+                        if (router_name.empty()) {
+                            router_name = std::to_string(id);
+                        }
                         if (std::find_if(_all_routers.begin(), _all_routers.end(), // We may have duplicate names, so we find a suffix to make it unique.
                                          [&](const auto& item){ return item.first == router_name; }) != _all_routers.end()) {
                             size_t suffix = 2;
@@ -108,6 +111,7 @@ namespace aalwines {
                             while (std::find_if(_all_routers.begin(), _all_routers.end(),
                                                 [&](const auto& item){ return item.first == new_router_name; }) != _all_routers.end()) {
                                 suffix++;
+                                new_router_name = router_name + std::to_string(suffix);
                             }
                             router_name = new_router_name;
                         }

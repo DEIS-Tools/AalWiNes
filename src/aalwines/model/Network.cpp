@@ -277,7 +277,7 @@ namespace aalwines {
     }
     Network Network::make_network(const std::vector<std::pair<std::string,std::optional<Coordinate>>>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
-        std::map<std::string, std::string> _interface_map;
+        std::map<std::pair<std::string,std::string>, std::string> _interface_map;
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i].first;
             auto coordinate = names[i].second;
@@ -286,7 +286,7 @@ namespace aalwines {
             size_t interface_count = 0;
             for (const auto& other : links[i]) {
                 network.insert_interface_to("in" + std::to_string(interface_count), router);
-                _interface_map.insert({name + other, ("in" + std::to_string(interface_count))});
+                _interface_map.insert({std::make_pair(name,other), ("in" + std::to_string(interface_count))});
                 ++interface_count;
             }
         }
@@ -297,7 +297,7 @@ namespace aalwines {
                 assert(router1 != nullptr);
                 auto router2 = network.find_router(other);
                 if(router2 == nullptr) continue;
-                router1->find_interface(_interface_map[name + other])->make_pairing(router2->find_interface(_interface_map[other + name]));
+                router1->find_interface(_interface_map[std::make_pair(name,other)])->make_pairing(router2->find_interface(_interface_map[std::make_pair(other,name)]));
             }
         }
         network.add_null_router();
