@@ -57,7 +57,7 @@ namespace aalwines {
                         default:
                             return 2;
                     }},
-                                                 [](const Interface* inf){ return 0;});
+                                                 [](const Interface* inf){ return inf->is_virtual() ? 1 : 0; }); // Distinguishing virtual interfaces from non-virtual simplifies the abstraction construction.
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
                 auto res = cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
                 if (res) return std::move(res).value().get();

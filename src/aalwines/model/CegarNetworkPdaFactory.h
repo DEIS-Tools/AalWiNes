@@ -73,7 +73,7 @@ namespace aalwines {
         : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)), json_output(json_output),
               //_all_labels(std::move(all_labels)),
               _translation(query, network, [](){}),
-              _query(query), _network(network), //_failures(query.number_of_failures()),
+              _query(query), //_failures(query.number_of_failures()),
               _interface_abstraction(pdaaal::AbstractionMapping<const Interface*,size_t>(std::move(interface_abstraction_fn), network.all_interfaces().begin(), network.all_interfaces().end())),
               _abstract_tables(_interface_abstraction.size())
         {
@@ -89,7 +89,7 @@ namespace aalwines {
             } else {
                 assert(refinement.index() == 1); // Spurious abstract rule that needs to be removed.
                 add_spurious_rule(std::get<1>(std::move(refinement)));
-                // Here we don't need to reinitialize(), since build_pda takes care of not adding the spurious rule.
+                // Here we don't need to remake stuff, since build_pda takes care of not adding the spurious rule.
             }
         }
         void refine(std::pair<pdaaal::Refinement<const Interface*>, pdaaal::Refinement<label_t>>&& refinement) {
@@ -97,8 +97,8 @@ namespace aalwines {
             _interface_abstraction.refine(refinement.first);
             auto new_interfaces_end = _interface_abstraction.size();
             assert(new_interfaces_begin + refinement.first.partitions().size() - (refinement.first.partitions().empty() ? 0 : 1) == new_interfaces_end);
-            // TODO: Should this be combined with use_label_refinement??
-            use_interface_refinement(refinement.first.abstract_id, new_interfaces_begin, new_interfaces_end);
+
+            refine_states(refinement.first.abstract_id, new_interfaces_begin, new_interfaces_end);
 
             auto new_labels_end = this->number_of_labels();
             auto new_labels_count = refinement.second.partitions().size();
@@ -107,11 +107,11 @@ namespace aalwines {
             }
             use_label_refinement(refinement.second.abstract_id, new_labels_end - new_labels_count, new_labels_end);
 
-            // TODO: Optimization: Find a way to refine and reuse states, edges and tables...
-            reinitialize();
-
+            // TODO: Optimization: Find a way to refine and reuse tables...
+            remake_tables();
         }
         void refine(pdaaal::HeaderRefinement<label_t>&& header_refinement) {
+            /* --Not yet used...
             auto new_labels_end = this->number_of_labels();
             for (auto it = header_refinement.refinements().crbegin(); it < header_refinement.refinements().crend(); ++it) { // Header refinements were applied in order, so we go back in reverse.
                 const auto& refinement = *it;
@@ -123,13 +123,18 @@ namespace aalwines {
                 use_label_refinement(old_label, new_labels_begin, new_labels_end);
                 assert(new_labels_end > new_labels_count);
                 new_labels_end -= new_labels_count;
-            }
-            // TODO: Optimization: Find a way to refine and reuse states, edges and tables...
-            reinitialize();
+            }*/
+            // TODO: Optimization: Find a way to refine and reuse tables...
+            remake_tables();
         }
 
     protected:
         void build_pda() override {
+            // Since we don't reset states when refining (to keep indexes consistent) we don't a priori know which states are still valid.
+            // For states with ops.empty() we use _edges to check validity, for !ops.empty() we store the reachable states here.
+            // Keeping all states can increase the PDA size a bit, since the PDA datastructure assumes consecutive state ids, i.e. it will also create entries for the unused states.
+            std::unordered_set<size_t> other_states;
+
             size_t count_rules = 0;
             for (size_t from_state = 0; from_state < _abstract_states.size(); ++from_state) {
                 auto [a_inf, nfa_state, ops] = _abstract_states.at(from_state);
@@ -142,8 +147,11 @@ namespace aalwines {
                         if (it == _edges.end()) continue;
                         for (const auto& to_nfa_state : it->second) {
                             auto to_state = _abstract_states.insert({a_to_inf, to_nfa_state, other_ops}).second;
+                            if (!other_ops.empty()) { // Remember that to_state is reachable and handle later.
+                                other_states.emplace(to_state);
+                            }
                             abstract_rule_t rule(from_state, label, to_state, std::get<0>(first_op), std::get<1>(first_op));
-                            if(is_spurious_rule(rule)) continue;
+                            if (is_spurious_rule(rule)) continue;
                             if (label == abstract_wildcard_label()) {
                                 this->add_wildcard_rule(rule);
                             } else {
@@ -152,21 +160,23 @@ namespace aalwines {
                             count_rules++;
                         }
                     }
-                } else {
-                    assert(from_state >= _num_states_no_ops);
-                    auto first_op = ops[0];
-                    auto to_state = _abstract_states.insert({a_inf, nfa_state, a_ops_t(ops.begin()+1, ops.end())}).second;
-                    abstract_rule_t rule(from_state, abstract_wildcard_label(), to_state, std::get<0>(first_op), std::get<1>(first_op));
-                    this->add_wildcard_rule(rule);
-                    count_rules++;
                 }
             }
+            for (size_t from_state : other_states) {
+                auto [a_inf, nfa_state, ops] = _abstract_states.at(from_state);
+                assert(!ops.empty());
+                auto first_op = ops[0];
+                auto to_state = _abstract_states.insert({a_inf, nfa_state, a_ops_t(ops.begin()+1, ops.end())}).second;
+                abstract_rule_t rule(from_state, abstract_wildcard_label(), to_state, std::get<0>(first_op), std::get<1>(first_op));
+                this->add_wildcard_rule(rule);
+                count_rules++;
+            }
 
-            json_output["rules"] = count_rules; // _rule_mapping.size();
+            json_output["rules"] = count_rules;
             json_output["labels"] = this->number_of_labels();
             json_output["interfaces"] = _interface_abstraction.size();
             json_output["cegar_iterations"] = json_output["cegar_iterations"].get<int>() + 1;
-            //std::cout << "; rules: " << _rule_mapping.size() << "; labels: " << this->number_of_labels() << "; (interfaces: " << _interface_abstraction.size() << ")" << std::endl; // FIXME: Remove...
+            //std::cout << "; rules: " << count_rules << "; labels: " << this->number_of_labels() << "; (interfaces: " << _interface_abstraction.size() << ")" << std::endl; // FIXME: Remove...
         }
         const std::vector<size_t>& initial() override {
             return _initial;
@@ -176,25 +186,94 @@ namespace aalwines {
         }
 
     private:
-        void initialize() {
-            make_edges();
-        }
-        void reinitialize() {
-            // After first time, we (refine and) reuse interface_abstracion, but recreate all (refined) states and rules.
-            // TODO: Optimization: Find a way to refine and reuse stuff...
-            _initial.clear();
-            _accepting.clear();
-            _abstract_tables.clear();
-            _abstract_tables = std::vector<table_t>(_interface_abstraction.size());
-            _out_infs.clear(); // TODO: _out_infs is concrete and should never change after first construction. (Currently also used to indicate if table was processed for that inf...)
-            _edges.clear();
-            _abstract_states = pdaaal::ptrie_set<abstract_state_t>();
-            make_edges();
+        template<bool initial=false>
+        void add_state(const nfa_state_t* nfa_state, const Interface* inf, size_t a_inf) {
+            auto [abstract_fresh, abstract_id] = _abstract_states.insert({a_inf, nfa_state, a_ops_t{}});
+            if (abstract_fresh) {
+                if (initial) {
+                    _initial.push_back(abstract_id);
+                }
+                if (nfa_state->_accepting && !inf->is_virtual()) { // We assume that the interface abstraction always distinguishes virtual and non-virtual interfaces.
+                    _accepting.push_back(abstract_id);
+                }
+            }
         }
 
-        void use_interface_refinement(size_t old_interface, size_t new_interfaces_begin, size_t new_interfaces_end) {
-            // TODO: Use old_interface -> [new_interfaces_begin, new_interfaces_end)
-            // TODO: (Maybe) Refine spurious rules that match this refinement.
+        void initialize() {
+            std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
+                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+            std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
+
+            _translation.make_initial_states([&seen,&waiting,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
+                auto a_inf = _interface_abstraction.exists(inf).second;
+                for (const auto& n : next) {
+                    if (seen.emplace(inf, n).second) {
+                        waiting.emplace_back(inf, n, a_inf);
+                        add_state<true>(n, inf, a_inf);
+                    }
+                }
+            });
+            make_edges<true>(std::move(seen), std::move(waiting));
+        }
+
+        void refine_states(size_t old_interface, size_t new_interfaces_begin, size_t new_interfaces_end) {
+            if (new_interfaces_begin == new_interfaces_end) return; // No interface refinement.
+
+            // This refinement of states is similar to the result of resetting all and rerunning initialize(),
+            // except that the ids of abstract states are kept stable.
+            // This is useful for keeping _spurious_rules consistent.
+
+            std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
+                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+            std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
+
+            // The refinement might make some old _initial states stop being initial.
+            // Here we find nfa_states s such that (old_interface, s) was initial.
+            std::vector<const nfa_state_t*> old_initial;
+            std::vector<const nfa_state_t*> new_initial;
+            std::vector<const nfa_state_t*> temp;
+
+            _translation.make_initial_states([&,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
+                assert(std::is_sorted(next.begin(), next.end()));
+                auto a_inf = _interface_abstraction.exists(inf).second;
+                bool is_new = new_interfaces_begin <= a_inf && a_inf < new_interfaces_end;
+                for (const auto& n : next) {
+                    if (seen.emplace(inf, n).second) {
+                        waiting.emplace_back(inf, n, a_inf);
+                        if (is_new) {
+                            add_state<true>(n, inf, a_inf); // We only add new states.
+                        }
+                    }
+                }
+                if (a_inf == old_interface) {
+                    temp.clear();
+                    std::set_union(old_initial.begin(), old_initial.end(), next.begin(), next.end(), std::back_inserter(temp));
+                    std::swap(old_initial, temp);
+                } else if (is_new) {
+                    temp.clear();
+                    std::set_union(new_initial.begin(), new_initial.end(), next.begin(), next.end(), std::back_inserter(temp));
+                    std::swap(new_initial, temp);
+                }
+            });
+
+            // Use old_initial and new_initial to figure out if some states from _initial should no longer be initial. Remove them.
+            std::vector<const nfa_state_t*> diff;
+            std::set_difference(new_initial.begin(), new_initial.end(), old_initial.begin(), old_initial.end(), std::back_inserter(diff));
+            for (const auto& nfa_state : diff) {
+                assert(_abstract_states.exists({old_interface, nfa_state, a_ops_t{}}).first);
+                auto state = _abstract_states.exists({old_interface, nfa_state, a_ops_t{}}).second;
+                auto it = std::find(_initial.begin(), _initial.end(), state);
+                assert(it != _initial.end());
+                _initial.erase(it);
+            }
+
+            // Nothing fancy here, just clear and remake the edges.
+            _edges.clear();
+            make_edges(std::move(seen), std::move(waiting), [new_interfaces_begin, new_interfaces_end](size_t a_inf){
+                return new_interfaces_begin <= a_inf && a_inf < new_interfaces_end;
+            });
+
+            // TODO: (Maybe) Refine spurious rules that match  old_interface -> [new_interfaces_begin, new_interfaces_end).
         }
         void use_label_refinement(size_t old_label, size_t new_label_begin, size_t new_label_end) {
             // TODO: Use old_label -> [new_labels_begin, new_labels_end)
@@ -208,15 +287,21 @@ namespace aalwines {
             return _spurious_rules.exists(rule).first;
         }
 
+        template<bool first_time = false>
         void process_table(const Interface* inf, size_t a_inf) {
             auto label_abstraction = [this](const label_t& label) { return this->abstract_label(label); };
             assert(a_inf < _abstract_tables.size());
-            auto& out_set = _out_infs.try_emplace(inf).first->second;
+            std::unordered_set<const Interface*>* out_set;
+            if constexpr (first_time) {
+                out_set = &_out_infs.try_emplace(inf).first->second;
+            }
             for (const auto& entry : inf->table()->entries()) {
                 auto label = abstract_pre_label(entry._top_label);
                 for (const auto& forward : entry._rules) {
                     if (forward._priority > _query.number_of_failures()) continue; // TODO: Approximation here.
-                    out_set.emplace(forward._via);
+                    if constexpr (first_time) {
+                        out_set->emplace(forward._via);
+                    }
                     assert(_interface_abstraction.exists(forward._via->match()).first);
                     auto to = _interface_abstraction.exists(forward._via->match()).second;
                     auto first_op = forward.first_action(label_abstraction);
@@ -228,54 +313,35 @@ namespace aalwines {
                 }
             }
         }
-        void make_edges() {
-            std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
-            std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
 
-            auto add = [&seen, &waiting, this](const nfa_state_t* n, const Interface* inf, size_t a_inf, bool initial = false) {
+        template<bool first_time = false>
+        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, boost::hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
+                        std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>>&& waiting,
+                        const std::function<bool(size_t)>& is_new = [](const auto&){return true;}) {
+            auto add = [&seen, &waiting, &is_new, this](const nfa_state_t* n, const Interface* inf, size_t a_inf) {
                 if (seen.emplace(inf, n).second) {
                     waiting.emplace_back(inf, n, a_inf);
-                    auto [abstract_fresh, abstract_id] = _abstract_states.insert({a_inf, n, a_ops_t{}});
-
-                    if (abstract_fresh) {
-                        if (initial) {
-                            _initial.push_back(abstract_id);
-                        }
-                        if (n->_accepting) {
-                            if (!inf->is_virtual()) {
-                                _accepting.push_back(abstract_id);
-                            } else {
-                                // Check if a non-virtual interface maps to the same abstract interface.
-                                for (const Interface* i : _interface_abstraction.get_concrete_values_range(a_inf)) {
-                                    if (!i->is_virtual()) {
-                                        _accepting.push_back(abstract_id);
-                                        break;
-                                    }
-                                }
-                            }
+                    if constexpr (first_time) {
+                        add_state(n, inf, a_inf);
+                    } else {
+                        if (is_new(a_inf)) {
+                            add_state(n, inf, a_inf);
                         }
                     }
                 }
             };
-            _translation.make_initial_states([&add,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
-                auto a_inf = _interface_abstraction.exists(inf).second;
-                for (const auto& n : next) {
-                    add(n, inf, a_inf, true);
-                }
-            });
-
+            _relevant_tables.clear();
             while (!waiting.empty()) {
                 auto [inf, nfa_state, a_inf] = waiting.back();
                 waiting.pop_back();
 
-                auto it = _out_infs.find(inf);
-                if (it == _out_infs.end()) {
-                    process_table(inf, a_inf);
-                    it = _out_infs.find(inf);
+                if (_relevant_tables.emplace(inf).second) {
+                    if constexpr (first_time) { // First time we need to process tables to construct _out_infs, but later we defer process_table to the remake_tables() function.
+                        process_table<first_time>(inf, a_inf);
+                    }
                 }
-                assert(it != _out_infs.end());
-                for (const Interface* out_inf : it->second) {
+                assert(_out_infs.find(inf) != _out_infs.end());
+                for (const Interface* out_inf : _out_infs.find(inf)->second) {
                     auto to_inf = out_inf->match();
                     auto a_to_inf = _interface_abstraction.exists(to_inf).second;
                     if (out_inf->is_virtual()) {
@@ -292,7 +358,14 @@ namespace aalwines {
                     }
                 }
             }
-            _num_states_no_ops = _abstract_states.size();
+        }
+
+        void remake_tables() { // Used after the first time.
+            _abstract_tables.clear();
+            _abstract_tables = std::vector<table_t>(_interface_abstraction.size());
+            for (const auto& inf : _relevant_tables) {
+                process_table(inf, _interface_abstraction.exists(inf).second);
+            }
         }
 
         uint32_t abstract_pre_label(const label_t& pre_label) const {
@@ -306,18 +379,20 @@ namespace aalwines {
         //std::unordered_set<label_t> _all_labels;
         Translation _translation; // TODO: Figure out how to use common parts from Translation.
         const Query& _query;
-        const Network& _network;
         pdaaal::RefinementMapping<const Interface*> _interface_abstraction; // This is what gets refined by CEGAR.
 
         std::vector<table_t> _abstract_tables;
         pdaaal::ptrie_set<abstract_state_t> _abstract_states;
-        size_t _num_states_no_ops = std::numeric_limits<size_t>::max();
+
+        // Keeps track of which tables (interfaces) have been processed, and remembers for next time (when useful)...
+        std::unordered_set<const Interface* /* TODO: const RoutingTable* ... */> _relevant_tables;
 
         // The idea is to only go through concrete tables once and only go through (concrete) path regex once.
         // Combine (product) abstracted versions of tables and path.
         std::unordered_map<const Interface*, /* TODO: const RoutingTable* */  // out_infs[e].contains(e')  iff  (e',..) \in \tau(e,..).
-                std::unordered_set<const Interface*>> _out_infs;
-        pdaaal::fut::set<std::tuple<std::tuple<size_t, const nfa_state_t*,size_t>, const nfa_state_t*>,
+                std::unordered_set<const Interface*>> _out_infs; // Constructed first time, never changed after that.
+
+        pdaaal::fut::set<std::tuple<std::tuple<size_t, const nfa_state_t*, size_t>, const nfa_state_t*>,
                 pdaaal::fut::type::hash, pdaaal::fut::type::vector> _edges; // Given (a(e),s,a(e')) Lists all s' such that (e,s) -> (e',s'), i.e. s --e'-> s' and e' \in out_infs[e]
 
         pdaaal::ptrie_set<abstract_rule_t> _spurious_rules;
@@ -412,7 +487,7 @@ namespace aalwines {
         configuration_range_t search_concrete_rules(const abstract_rule_t& abstract_rule, const configuration_t& conf) override {
             auto inf = get_interface(conf);
             assert(_factory._interface_abstraction.maps_to(inf, std::get<0>(_factory._abstract_states.at(abstract_rule._from))));
-            if (abstract_rule._from < _factory._num_states_no_ops) { // I.e. ops.empty()
+            if (std::get<2>(_factory._abstract_states.at(abstract_rule._from)).empty()) {
                 auto to_state = _factory._abstract_states.at(abstract_rule._to);
                 size_t ops_size = std::get<2>(to_state).size() + (abstract_rule._op == pdaaal::op_t::NOOP ? 0 : 1);
                 assert(abstract_rule._op != pdaaal::op_t::NOOP || ops_size == 0);
@@ -428,7 +503,7 @@ namespace aalwines {
         }
         refinement_t find_refinement(const abstract_rule_t& abstract_rule, const std::vector<configuration_t>& configurations) override {
             std::vector<std::pair<state_t,label_t>> X;
-            assert(abstract_rule._from < _factory._num_states_no_ops);
+            assert(std::get<2>(_factory._abstract_states.at(abstract_rule._from)).empty());
             auto [a_inf, nfa_state, ops] = _factory._abstract_states.at(abstract_rule._from);
             assert(ops.empty());
             std::unordered_set<const Interface*> interfaces_with_wildcard_headers;
