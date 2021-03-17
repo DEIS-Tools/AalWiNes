@@ -66,15 +66,15 @@ namespace aalwines {
     public:
         json& json_output;
 
-        template<typename label_abstraction_fn_t>
+        template<typename label_abstraction_fn_t, typename interface_abstraction_fn_t>
         CegarNetworkPdaFactory(json& json_output, const Network& network, const Query& query, std::unordered_set<label_t>&& all_labels,
                                label_abstraction_fn_t&& label_abstraction_fn,
-                               std::function<size_t(const Interface*)>&& interface_abstraction_fn)
+                               interface_abstraction_fn_t&& interface_abstraction_fn)
         : parent_t(all_labels, std::forward<label_abstraction_fn_t>(label_abstraction_fn)), json_output(json_output),
               //_all_labels(std::move(all_labels)),
               _translation(query, network, [](){}),
               _query(query), //_failures(query.number_of_failures()),
-              _interface_abstraction(pdaaal::AbstractionMapping<const Interface*,size_t>(std::move(interface_abstraction_fn), network.all_interfaces().begin(), network.all_interfaces().end())),
+              _interface_abstraction(pdaaal::AbstractionMapping(std::forward<interface_abstraction_fn_t>(interface_abstraction_fn), network.all_interfaces().begin(), network.all_interfaces().end())),
               _abstract_tables(_interface_abstraction.size())
         {
             static_assert(std::is_convertible_v<label_abstraction_fn_t,
