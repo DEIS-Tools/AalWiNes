@@ -71,6 +71,7 @@ namespace aalwines {
         }
         void set_table(RoutingTable* table) {
             _table = table;
+            _table->add_my_interface(this);
         }
 
         [[nodiscard]] bool is_virtual() const {

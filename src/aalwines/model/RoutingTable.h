@@ -144,11 +144,20 @@ namespace aalwines {
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
 
         void remove_unused_rules(std::ostream& log);
+
+        void add_my_interface(const Interface* inf) {
+            assert(std::find(_my_interfaces.begin(), _my_interfaces.end(), inf) == _my_interfaces.end());
+            _my_interfaces.emplace_back(inf);
+        }
+        const std::vector<const Interface*>& interfaces() const {
+            return _my_interfaces;
+        }
         
     private:
         std::vector<entry_t>::iterator insert_entry(label_t top_label);
 
         std::vector<entry_t> _entries;
+        std::vector<const Interface*> _my_interfaces; // The interfaces inf for which inf->table() == this
     };
 }
 #endif /* ROUTINGTABLE_H */
