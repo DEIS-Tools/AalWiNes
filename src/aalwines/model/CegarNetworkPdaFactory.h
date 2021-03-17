@@ -288,14 +288,14 @@ namespace aalwines {
         }
 
         template<bool first_time = false>
-        void process_table(const Interface* inf, size_t a_inf) {
+        void process_table(const RoutingTable* table, std::vector<size_t>&& a_infs) {
             auto label_abstraction = [this](const label_t& label) { return this->abstract_label(label); };
             assert(a_inf < _abstract_tables.size());
             std::unordered_set<const Interface*>* out_set;
             if constexpr (first_time) {
-                out_set = &_out_infs.try_emplace(inf).first->second;
+                out_set = &_out_infs.try_emplace(table).first->second;
             }
-            for (const auto& entry : inf->table()->entries()) {
+            for (const auto& entry : table->entries()) {
                 auto label = abstract_pre_label(entry._top_label);
                 for (const auto& forward : entry._rules) {
                     if (forward._priority > _query.number_of_failures()) continue; // TODO: Approximation here.
@@ -309,7 +309,9 @@ namespace aalwines {
                     for (size_t i = 1; i < forward._ops.size(); ++i) {
                         ops.emplace_back(forward._ops[i].convert_to_pda_op(label_abstraction));
                     }
-                    _abstract_tables[a_inf].insert({label,to,first_op,std::move(ops)});
+                    for (const auto& a_inf : a_infs) {
+                        _abstract_tables[a_inf].insert({label,to,first_op,std::move(ops)});
+                    }
                 }
             }
         }
@@ -335,13 +337,13 @@ namespace aalwines {
                 auto [inf, nfa_state, a_inf] = waiting.back();
                 waiting.pop_back();
 
-                if (_relevant_tables.emplace(inf).second) {
+                if (_relevant_tables.try_emplace(inf->table()).first->second.emplace(a_inf).second) {
                     if constexpr (first_time) { // First time we need to process tables to construct _out_infs, but later we defer process_table to the remake_tables() function.
-                        process_table<first_time>(inf, a_inf);
+                        process_table<first_time>(inf->table(), std::vector<size_t>{a_inf});
                     }
                 }
-                assert(_out_infs.find(inf) != _out_infs.end());
-                for (const Interface* out_inf : _out_infs.find(inf)->second) {
+                assert(_out_infs.find(inf->table()) != _out_infs.end());
+                for (const Interface* out_inf : _out_infs.find(inf->table())->second) {
                     auto to_inf = out_inf->match();
                     auto a_to_inf = _interface_abstraction.exists(to_inf).second;
                     if (out_inf->is_virtual()) {
@@ -363,8 +365,8 @@ namespace aalwines {
         void remake_tables() { // Used after the first time.
             _abstract_tables.clear();
             _abstract_tables = std::vector<table_t>(_interface_abstraction.size());
-            for (const auto& inf : _relevant_tables) {
-                process_table(inf, _interface_abstraction.exists(inf).second);
+            for (const auto& [table, a_infs] : _relevant_tables) {
+                process_table(table, std::vector<size_t>(a_infs.begin(), a_infs.end()));
             }
         }
 
@@ -385,11 +387,11 @@ namespace aalwines {
         pdaaal::ptrie_set<abstract_state_t> _abstract_states;
 
         // Keeps track of which tables (interfaces) have been processed, and remembers for next time (when useful)...
-        std::unordered_set<const Interface* /* TODO: const RoutingTable* ... */> _relevant_tables;
+        std::unordered_map<const RoutingTable*, std::unordered_set<size_t>> _relevant_tables;
 
         // The idea is to only go through concrete tables once and only go through (concrete) path regex once.
         // Combine (product) abstracted versions of tables and path.
-        std::unordered_map<const Interface*, /* TODO: const RoutingTable* */  // out_infs[e].contains(e')  iff  (e',..) \in \tau(e,..).
+        std::unordered_map<const RoutingTable*,  // out_infs[e].contains(e')  iff  (e',..) \in \tau(e,..).
                 std::unordered_set<const Interface*>> _out_infs; // Constructed first time, never changed after that.
 
         pdaaal::fut::set<std::tuple<std::tuple<size_t, const nfa_state_t*, size_t>, const nfa_state_t*>,
@@ -685,7 +687,7 @@ namespace aalwines {
             auto labels = this->get_concrete_labels(abstract_rule._pre);
             std::sort(labels.begin(), labels.end());
             for (const auto& inf : _factory._interface_abstraction.get_concrete_values(a_inf)) {
-                if (_factory._out_infs.find(inf) == _factory._out_infs.end()) continue;
+                if (_factory._out_infs.find(inf->table()) == _factory._out_infs.end()) continue;
                 for (const RoutingTable::entry_t* entry : get_entries_matching(labels, inf)) {
                     if (std::any_of(entry->_rules.begin(), entry->_rules.end(), // Check if any forwarding rule on this entry matches abstract rule.
                                     [&](const auto& forward){ return matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size); })) {
