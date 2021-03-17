@@ -139,7 +139,6 @@ namespace aalwines {
             for (size_t from_state = 0; from_state < _abstract_states.size(); ++from_state) {
                 auto [a_inf, nfa_state, ops] = _abstract_states.at(from_state);
                 if (ops.empty()) {
-                    assert(from_state < _num_states_no_ops);
                     const auto& table = _abstract_tables[a_inf]; // TODO: Add begin(),end() to pdaaal::ptrie_set...
                     for (size_t table_i = 0; table_i < table.size(); ++table_i) {
                         auto [label, a_to_inf, first_op, other_ops] = table.at(table_i);

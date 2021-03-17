@@ -49,33 +49,59 @@ namespace aalwines {
             } else {
                 // Identify edges in the path NFA that explicitly mentions an interface. Use this for initial abstraction.
                 using edge_t = const typename pdaaal::NFA<Query::label_t>::edge_t*;
-                std::unordered_map<const Interface*, std::vector<edge_t>> map;
+                std::unordered_map<const Interface*, std::vector<edge_t>> inf_map;
                 for (const auto& state : query.path().states()) {
                     for (const auto& edge : state->_edges) {
                         for (const auto& symbol : edge._symbols) {
                             auto inf = network.all_interfaces()[symbol]->match();
-                            map.try_emplace(inf).first->second.emplace_back(&edge);
+                            inf_map.try_emplace(inf).first->second.emplace_back(&edge);
                         }
                     }
                 }
                 // TODO: Do the same with labels mentioned in initial and final NFAs.
 
+                // We distinguish labels based on the next hops that it leads to.
+                std::unordered_map<Query::label_t, std::unordered_set<const Interface*>> label_to_next_hops;
+                for (const auto& router : network.routers()) {
+                    for (const auto& table : router->tables()) {
+                        for (const auto& entry : table->entries()) {
+                            for (const auto& forward : entry._rules) {
+                                if (forward._priority > query.number_of_failures()) continue; // TODO: Approximation here.
+                                label_to_next_hops.try_emplace(entry._top_label).first->second.emplace(forward._via);
+                            }
+                        }
+                    }
+                }
+                // This is a bit slow, but it's okay for now..
+                std::vector<std::vector<const Interface*>> next_hops_set;
+                std::unordered_map<Query::label_t, size_t> label_map;
+                for (const auto& [label, nh_set] : label_to_next_hops) {
+                    std::vector<const Interface*> next_hops(nh_set.begin(), nh_set.end());
+                    std::sort(next_hops.begin(), next_hops.end());
+                    auto it = std::find(next_hops_set.begin(), next_hops_set.end(), next_hops);
+                    label_map.emplace(label, it - next_hops_set.begin());
+                    if (it == next_hops_set.end()) {
+                        next_hops_set.emplace_back(std::move(next_hops));
+                    }
+                }
+
                 CegarNetworkPdaFactory<> factory(json_output, network, query, std::move(all_labels),
-                    [](const auto& label) -> uint32_t {
+                    [&label_map](const auto& label) -> size_t {
                         switch (label) { // Special labels map to distinct values, but all normal labels in the network maps to the same abstract label.
                             case Query::unused_label():
                                 return 0;
                             case Query::bottom_of_stack():
                                 return 1;
                             default:
-                                return 2;
+                                auto it = label_map.find(label);
+                                return (it == label_map.end() ? 2 : it->second + 3);
                         }
                     },
-                    [&map](const Interface* inf) -> std::tuple<bool, std::vector<edge_t>> {
-                        auto it = map.find(inf);
+                    [&inf_map](const Interface* inf) -> std::tuple<bool, std::vector<edge_t>> {
+                        auto it = inf_map.find(inf);
                         return std::make_tuple(
                                 inf->is_virtual(), // Distinguishing virtual interfaces from non-virtual simplifies the abstraction construction.
-                             (it == map.end()) ? std::vector<edge_t>() : it->second); // Use the NFA edges that explicitly mentions inf as the 'abstract state', i.e. group together interfaces that are mentioned similarly.
+                             (it == inf_map.end()) ? std::vector<edge_t>() : it->second); // Use the NFA edges that explicitly mentions inf as the 'abstract state', i.e. group together interfaces that are mentioned similarly.
                     }
                 );
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
