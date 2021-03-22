@@ -23,6 +23,7 @@ add_dependencies(aalwines ptrie-ext rapidxml-ext pdaaal-ext)
 target_link_libraries(aalwines PRIVATE ${Boost_LIBRARIES} pdaaal)
 target_include_directories(aalwines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+find_package(Git)
 add_custom_command(OUTPUT git_hash.h
 		COMMAND ${CMAKE_COMMAND} -E echo_append "#define AALWINES_GIT_HASH " > git_hash.h
 		COMMAND ${GIT_EXECUTABLE} rev-parse HEAD >> git_hash.h
