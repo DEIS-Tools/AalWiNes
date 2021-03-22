@@ -89,6 +89,7 @@ namespace aalwines {
                     throw base_error(es.str());
                 }
                 RoutingTable* table = router->emplace_table();
+                std::unordered_set<const Interface*> table_out_interfaces;
                 for (const auto& [label_string, json_routing_entries] : json_routing_table.items()) {
                     auto& entry = table->emplace_entry(label_string);
 
@@ -102,8 +103,10 @@ namespace aalwines {
                         auto priority = json_routing_entry.at("priority").get<size_t>();
                         auto weight = json_routing_entry.contains("weight") ? json_routing_entry.at("weight").get<uint32_t>() : 0;
                         entry._rules.emplace_back(std::move(ops), via, priority, weight);
+                        table_out_interfaces.emplace(via);
                     }
                 }
+                table->set_out_interfaces(table_out_interfaces);
                 table->sort(); table->sort_rules();
                 for (const auto& interface_name : interface_names) {
                     router->find_interface(interface_name)->set_table(table);

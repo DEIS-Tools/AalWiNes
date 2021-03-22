@@ -149,8 +149,14 @@ namespace aalwines {
             assert(std::find(_my_interfaces.begin(), _my_interfaces.end(), inf) == _my_interfaces.end());
             _my_interfaces.emplace_back(inf);
         }
-        const std::vector<const Interface*>& interfaces() const {
+        [[nodiscard]] const std::vector<const Interface*>& interfaces() const {
             return _my_interfaces;
+        }
+        void set_out_interfaces(const std::unordered_set<const Interface*>& out_interfaces) {
+            _out_interfaces = std::vector<const Interface*>(out_interfaces.begin(), out_interfaces.end());
+        }
+        [[nodiscard]] const std::vector<const Interface*>& out_interfaces() const {
+            return _out_interfaces;
         }
         
     private:
@@ -158,6 +164,7 @@ namespace aalwines {
 
         std::vector<entry_t> _entries;
         std::vector<const Interface*> _my_interfaces; // The interfaces inf for which inf->table() == this
+        std::vector<const Interface*> _out_interfaces; // The interfaces inf for which there exists eid,rid such that entries()[eid]._rules[rid]._via == inf
     };
 }
 #endif /* ROUTINGTABLE_H */
