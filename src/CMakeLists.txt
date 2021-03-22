@@ -23,15 +23,26 @@ add_dependencies(aalwines ptrie-ext rapidxml-ext pdaaal-ext)
 target_link_libraries(aalwines PRIVATE ${Boost_LIBRARIES} pdaaal)
 target_include_directories(aalwines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(Git)
-add_custom_command(OUTPUT git_hash.h
-		COMMAND ${CMAKE_COMMAND} -E echo_append "#define AALWINES_GIT_HASH " > git_hash.h
-		COMMAND ${GIT_EXECUTABLE} rev-parse HEAD >> git_hash.h
-		COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY(x) #x" >> git_hash.h
-		COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIGY_MACRO(x) STRINGIFY(x) " >> git_hash.h
-		COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIGY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
-		DEPENDS aalwines main.cpp
-		VERBATIM)
+if(DEFINED ENV{GITHUB_SHA}) # Workaround for Github CI workflow, where the current directory (for some odd reason) is not a git repository.
+	add_custom_command(OUTPUT git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo_append "#define AALWINES_GIT_HASH " > git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "$ENV{GITHUB_SHA}" >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY(x) #x" >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIGY_MACRO(x) STRINGIFY(x) " >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIGY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
+			DEPENDS aalwines main.cpp
+			VERBATIM)
+else()
+	find_package(Git)
+	add_custom_command(OUTPUT git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo_append "#define AALWINES_GIT_HASH " > git_hash.h
+			COMMAND ${GIT_EXECUTABLE} rev-parse HEAD >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY(x) #x" >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIGY_MACRO(x) STRINGIFY(x) " >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIGY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
+			DEPENDS aalwines main.cpp
+			VERBATIM)
+endif()
 add_custom_target(generate_hash DEPENDS "git_hash.h")
 add_executable(aalwines-bin main.cpp)
 target_link_libraries(aalwines-bin PRIVATE aalwines)
