@@ -103,11 +103,15 @@ int main(int argc, const char** argv)
     po::notify(vm);
 
     if (vm.count("help")) {
-        std::cout << opts << "\n";
+        std::cout << opts << std::endl;
         return 1;
     }
     if (vm.count("version")) {
-        std::cout << "AalWiNes v1.0.0 - git hash: " AALWINES_GIT_HASH_STR << "\n";
+        std::cout << "AalWiNes v1.0.0 - git hash: " AALWINES_GIT_HASH_STR << std::endl
+                  << "Copyright (C) 2021  Peter G. Jensen, Morten K. Schou, Dan Kristiansen, Bernhard C. Schrenk, Kenneth Yrke Jørgensen" << std::endl
+                  << "License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>." << std::endl
+                  << "This is free software: you are free to change and redistribute it." << std::endl
+                  << "There is NO WARRANTY, to the extent permitted by law." << std::endl;
         return 1;
     }
     verifier.check_settings();
