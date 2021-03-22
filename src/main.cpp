@@ -71,6 +71,7 @@ int main(int argc, const char** argv)
     Verifier verifier("Verification Options");
     
     bool print_dot = false;
+    bool print_dot_topo = false;
     bool print_net = false;
     bool no_parser_warnings = false;
     bool silent = false;
@@ -79,6 +80,7 @@ int main(int argc, const char** argv)
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
+            ("dot-topo", po::bool_switch(&print_dot_topo), "A dot output of the topology will be printed to cout when set.")
             ("net", po::bool_switch(&print_net), "A json output of the network will be printed to cout when set.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
@@ -122,6 +124,9 @@ int main(int argc, const char** argv)
 
     if (print_dot) {
         network.print_dot(std::cout);
+    }
+    if (print_dot_topo) {
+        network.print_dot_topo(std::cout);
     }
 
     if (!json_destination.empty()) {
