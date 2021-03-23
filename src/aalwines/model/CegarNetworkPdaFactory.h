@@ -74,8 +74,7 @@ namespace aalwines {
               //_all_labels(std::move(all_labels)),
               _translation(query, network, [](){}),
               _query(query), //_failures(query.number_of_failures()),
-              _interface_abstraction(pdaaal::AbstractionMapping(std::forward<interface_abstraction_fn_t>(interface_abstraction_fn), network.all_interfaces().begin(), network.all_interfaces().end())),
-              _abstract_tables(_interface_abstraction.size())
+              _interface_abstraction(pdaaal::AbstractionMapping(std::forward<interface_abstraction_fn_t>(interface_abstraction_fn), network.all_interfaces().begin(), network.all_interfaces().end()))
         {
             static_assert(std::is_convertible_v<label_abstraction_fn_t,
                     std::function<decltype(std::declval<label_abstraction_fn_t>()(std::declval<const label_t&>()))(const label_t&)>>);
@@ -108,7 +107,7 @@ namespace aalwines {
             use_label_refinement(refinement.second.abstract_id, new_labels_end - new_labels_count, new_labels_end);
 
             // TODO: Optimization: Find a way to refine and reuse tables...
-            remake_tables();
+            make_tables();
         }
         void refine(pdaaal::HeaderRefinement<label_t>&& header_refinement) {
             /* --Not yet used...
@@ -125,7 +124,7 @@ namespace aalwines {
                 new_labels_end -= new_labels_count;
             }*/
             // TODO: Optimization: Find a way to refine and reuse tables...
-            remake_tables();
+            make_tables();
         }
 
     protected:
@@ -201,7 +200,7 @@ namespace aalwines {
         void initialize() {
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
                     boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
-            std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
+            std::vector<std::tuple<const Interface*, const nfa_state_t*, size_t>> waiting;
 
             _translation.make_initial_states([&seen,&waiting,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
                 auto a_inf = _interface_abstraction.exists(inf).second;
@@ -213,6 +212,7 @@ namespace aalwines {
                 }
             });
             make_edges<true>(std::move(seen), std::move(waiting));
+            make_tables();
         }
 
         void refine_states(size_t old_interface, size_t new_interfaces_begin, size_t new_interfaces_end) {
@@ -286,20 +286,13 @@ namespace aalwines {
             return _spurious_rules.exists(rule).first;
         }
 
-        template<bool first_time = false>
         void process_table(const RoutingTable* table, std::vector<size_t>&& a_infs) {
             auto label_abstraction = [this](const label_t& label) { return this->abstract_label(label); };
-            std::unordered_set<const Interface*>* out_set;
-            if constexpr (first_time) {
-                out_set = &_out_infs.try_emplace(table).first->second;
-            }
             for (const auto& entry : table->entries()) {
                 auto label = abstract_pre_label(entry._top_label);
                 for (const auto& forward : entry._rules) {
                     if (forward._priority > _query.number_of_failures()) continue; // TODO: Approximation here.
-                    if constexpr (first_time) {
-                        out_set->emplace(forward._via);
-                    }
+
                     assert(_interface_abstraction.exists(forward._via->match()).first);
                     auto to = _interface_abstraction.exists(forward._via->match()).second;
                     auto first_op = forward.first_action(label_abstraction);
@@ -336,13 +329,9 @@ namespace aalwines {
                 auto [inf, nfa_state, a_inf] = waiting.back();
                 waiting.pop_back();
 
-                if (_relevant_tables.try_emplace(inf->table()).first->second.emplace(a_inf).second) {
-                    if constexpr (first_time) { // First time we need to process tables to construct _out_infs, but later we defer process_table to the remake_tables() function.
-                        process_table<first_time>(inf->table(), std::vector<size_t>{a_inf});
-                    }
-                }
-                assert(_out_infs.find(inf->table()) != _out_infs.end());
-                for (const Interface* out_inf : _out_infs.find(inf->table())->second) {
+                _relevant_tables.try_emplace(inf->table()).first->second.emplace(a_inf);
+
+                for (const Interface* out_inf : inf->table()->out_interfaces()) {
                     auto to_inf = out_inf->match();
                     auto a_to_inf = _interface_abstraction.exists(to_inf).second;
                     if (out_inf->is_virtual()) {
@@ -361,7 +350,7 @@ namespace aalwines {
             }
         }
 
-        void remake_tables() { // Used after the first time.
+        void make_tables() {
             _abstract_tables.clear();
             _abstract_tables = std::vector<table_t>(_interface_abstraction.size());
             for (const auto& [table, a_infs] : _relevant_tables) {
@@ -390,9 +379,6 @@ namespace aalwines {
 
         // The idea is to only go through concrete tables once and only go through (concrete) path regex once.
         // Combine (product) abstracted versions of tables and path.
-        std::unordered_map<const RoutingTable*,  // out_infs[e].contains(e')  iff  (e',..) \in \tau(e,..).
-                std::unordered_set<const Interface*>> _out_infs; // Constructed first time, never changed after that.
-
         pdaaal::fut::set<std::tuple<std::tuple<size_t, const nfa_state_t*, size_t>, const nfa_state_t*>,
                 pdaaal::fut::type::hash, pdaaal::fut::type::vector> _edges; // Given (a(e),s,a(e')) Lists all s' such that (e,s) -> (e',s'), i.e. s --e'-> s' and e' \in out_infs[e]
 
@@ -686,7 +672,7 @@ namespace aalwines {
             auto labels = this->get_concrete_labels(abstract_rule._pre);
             std::sort(labels.begin(), labels.end());
             for (const auto& inf : _factory._interface_abstraction.get_concrete_values(a_inf)) {
-                if (_factory._out_infs.find(inf->table()) == _factory._out_infs.end()) continue;
+                if (_factory._relevant_tables.find(inf->table()) == _factory._relevant_tables.end()) continue;
                 for (const RoutingTable::entry_t* entry : get_entries_matching(labels, inf)) {
                     if (std::any_of(entry->_rules.begin(), entry->_rules.end(), // Check if any forwarding rule on this entry matches abstract rule.
                                     [&](const auto& forward){ return matches_forward(forward, abstract_rule, nfa_state, to_state, ops_size); })) {
