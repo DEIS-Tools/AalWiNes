@@ -32,6 +32,7 @@
 
 namespace aalwines {
 
+    /*
     struct State {
         using nfa_state_t = typename pdaaal::NFA<Query::label_t>::state_t;
         size_t _eid = 0; // which entry we are going for
@@ -74,6 +75,7 @@ namespace aalwines {
             }
         }
     } __attribute__((packed)); // packed is needed to make this work fast with ptries
+    */
 
     // This one is general, and will be reused by both NetworkPDAFactory and CegarNetworkPDAFactory
     class NetworkTranslation {
@@ -120,6 +122,7 @@ namespace aalwines {
             }
         }
 
+        /*
         void rules(const State& from_state,
                           const std::function<void(State&&, const RoutingTable::entry_t&, const RoutingTable::forward_t&)>& add_rule_type_a,
                           const std::function<void(State&&, const label_t&, std::pair<pdaaal::op_t,label_t>&&)>& add_rule_type_b) {
@@ -158,8 +161,91 @@ namespace aalwines {
                                 pre_label,
                                 forward._ops[from_state._opid + 1].convert_to_pda_op()); // Op, op-label
             }
+        }*/
+
+        using edge_variant = std::variant<const RoutingTable*, const Interface*, const Interface*>;
+        static edge_variant special_interface(const Interface* interface) {
+            return edge_variant(std::in_place_index<2>, interface);
+        }
+        template<bool initial=false>
+        static edge_variant get_edge_pointer(const Interface* interface) {
+            if constexpr (initial) { // Special case for initial states, where we don't have a table from previous state.
+                if (interface->table()->interfaces().size() == 1) {
+                    assert(interface->table()->interfaces()[0] == interface);
+                    return interface->table();
+                } else {
+                    return edge_variant(std::in_place_index<1>, interface);
+                }
+            } else {
+                std::vector<const Interface*> out_infs, temp;
+                for (const auto& table : interface->target()->tables()) {
+                    auto lb = std::lower_bound(table->out_interfaces().begin(), table->out_interfaces().end(), interface->match());
+                    if (lb != table->out_interfaces().end() && *lb == interface->match()) {
+                        std::set_union(out_infs.begin(), out_infs.end(), table->out_interfaces().begin(), table->out_interfaces().end(), std::back_inserter(temp));
+                        std::swap(temp, out_infs);
+                    }
+                }
+                auto intersection = interface_intersection(out_infs, interface->table());
+                if (intersection.size() == 1) {
+                    assert(intersection[0] == interface);
+                    return interface->table(); // interface is uniquely identified by interface->table() and any table t with interface->match() in t->out_interfaces() (t being part of previous state in PDA.)
+                } else {
+                    assert(intersection.size() > 1);
+                    return edge_variant(std::in_place_index<1>, interface); // Multiple edges (inf,inf->match()) pairs correspond to the same pair of tables, so we need interface to identify edge.
+                }
+            }
+        }
+        static std::vector<const Interface*> interface_intersection(const RoutingTable* from, const RoutingTable* to) {
+            assert(from != nullptr);
+            return interface_intersection(from->out_interfaces(), to);
+        }
+        static std::vector<const Interface*> interface_intersection(const std::vector<const Interface*>& from_out_infs, const RoutingTable* to) {
+            assert(to != nullptr);
+            std::vector<const Interface*> from_out_match_infs;
+            std::transform(from_out_infs.begin(), from_out_infs.end(),
+                           std::back_inserter(from_out_match_infs), [](const auto& inf){ return inf->match(); });
+            std::sort(from_out_match_infs.begin(), from_out_match_infs.end());
+            std::vector<const Interface*> intersection;
+            std::set_intersection(to->interfaces().begin(), to->interfaces().end(),
+                                  from_out_match_infs.begin(), from_out_match_infs.end(),
+                                  std::back_inserter(intersection));
+            return intersection;
+        }
+        static const RoutingTable* get_table(const edge_variant& variant) {
+            switch (variant.index()) {
+                case 0:
+                    return std::get<0>(variant);
+                case 1:
+                    return std::get<1>(variant)->table();
+                case 2:
+                default:
+                    return std::get<2>(variant)->table();
+            }
+        }
+        static const Interface* get_interface(const edge_variant& variant, const RoutingTable* from = nullptr) {
+            switch (variant.index()) {
+                case 0:
+                    return get_interface(from, std::get<0>(variant));
+                case 1:
+                    return std::get<1>(variant);
+                case 2:
+                default:
+                    return std::get<2>(variant);
+            }
+        }
+        static const Interface* get_interface(const RoutingTable* from, const RoutingTable* to) {
+            assert(to != nullptr);
+            if (from == nullptr) {
+                assert(to->interfaces().size() == 1);
+                return to->interfaces()[0];
+            } else {
+                auto intersection = interface_intersection(from, to);
+                assert(intersection.size() == 1);
+                return intersection[0];
+            }
         }
 
+        /*
         size_t set_approximation(const State& state, const RoutingTable::forward_t& forward) {
             if (forward._via->is_virtual()) return state._appmode;
             auto num_fail = _query.number_of_failures();
@@ -171,7 +257,7 @@ namespace aalwines {
                 default:
                     return err;
             }
-        }
+        }*/
 
         static void add_link_to_trace(json& trace, const Interface* inf, const std::vector<label_t>& final_header) {
             trace.emplace_back();

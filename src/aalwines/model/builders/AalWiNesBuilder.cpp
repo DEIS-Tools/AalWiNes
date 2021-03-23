@@ -107,10 +107,10 @@ namespace aalwines {
                     }
                 }
                 table->set_out_interfaces(table_out_interfaces);
-                table->sort(); table->sort_rules();
                 for (const auto& interface_name : interface_names) {
                     router->find_interface(interface_name)->set_table(table);
                 }
+                table->sort(); table->sort_rules();
             }
         }
 

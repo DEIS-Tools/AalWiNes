@@ -365,6 +365,8 @@ namespace aalwines
 
     void RoutingTable::sort() {
         std::sort(std::begin(_entries), std::end(_entries));
+        std::sort(std::begin(_my_interfaces), std::end(_my_interfaces));
+        std::sort(std::begin(_out_interfaces), std::end(_out_interfaces));
     }
     void RoutingTable::sort_rules() {
         for (auto& entry : _entries) {

@@ -139,7 +139,6 @@ namespace aalwines {
             for (size_t from_state = 0; from_state < _abstract_states.size(); ++from_state) {
                 auto [a_inf, nfa_state, ops] = _abstract_states.at(from_state);
                 if (ops.empty()) {
-                    assert(from_state < _num_states_no_ops);
                     const auto& table = _abstract_tables[a_inf]; // TODO: Add begin(),end() to pdaaal::ptrie_set...
                     for (size_t table_i = 0; table_i < table.size(); ++table_i) {
                         auto [label, a_to_inf, first_op, other_ops] = table.at(table_i);
@@ -190,7 +189,7 @@ namespace aalwines {
         void add_state(const nfa_state_t* nfa_state, const Interface* inf, size_t a_inf) {
             auto [abstract_fresh, abstract_id] = _abstract_states.insert({a_inf, nfa_state, a_ops_t{}});
             if (abstract_fresh) {
-                if (initial) {
+                if constexpr (initial) {
                     _initial.push_back(abstract_id);
                 }
                 if (nfa_state->_accepting && !inf->is_virtual()) { // We assume that the interface abstraction always distinguishes virtual and non-virtual interfaces.
@@ -290,7 +289,6 @@ namespace aalwines {
         template<bool first_time = false>
         void process_table(const RoutingTable* table, std::vector<size_t>&& a_infs) {
             auto label_abstraction = [this](const label_t& label) { return this->abstract_label(label); };
-            assert(a_inf < _abstract_tables.size());
             std::unordered_set<const Interface*>* out_set;
             if constexpr (first_time) {
                 out_set = &_out_infs.try_emplace(table).first->second;
@@ -310,6 +308,7 @@ namespace aalwines {
                         ops.emplace_back(forward._ops[i].convert_to_pda_op(label_abstraction));
                     }
                     for (const auto& a_inf : a_infs) {
+                        assert(a_inf < _abstract_tables.size());
                         _abstract_tables[a_inf].insert({label,to,first_op,std::move(ops)});
                     }
                 }

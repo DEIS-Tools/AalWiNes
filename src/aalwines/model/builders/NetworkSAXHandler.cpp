@@ -713,10 +713,10 @@ namespace aalwines {
                 break;
             case context::context_type::interface: {
                 current_table->set_out_interfaces(current_table_out_interfaces);
-                current_table->sort(); current_table->sort_rules();
                 for (Interface* current_interface : current_interfaces) {
                     current_interface->set_table(current_table);
                 }
+                current_table->sort(); current_table->sort_rules();
                 current_interfaces.clear();
                 current_table_out_interfaces.clear();
                 break;
