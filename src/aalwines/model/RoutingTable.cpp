@@ -451,4 +451,8 @@ namespace aalwines
         }
     }
 
+    size_t RoutingTable::count_rules() const {
+        return std::transform_reduce(_entries.begin(), _entries.end(), 0, std::plus<>(), [](const auto& entry){ return entry._rules.size(); });
+    }
+
 }

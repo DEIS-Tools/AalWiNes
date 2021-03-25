@@ -144,6 +144,7 @@ namespace aalwines {
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
 
         void pre_process_rules(std::ostream& log);
+        [[nodiscard]] size_t count_rules() const;
 
         void add_my_interface(const Interface* inf) {
             assert(std::find(_my_interfaces.begin(), _my_interfaces.end(), inf) == _my_interfaces.end());

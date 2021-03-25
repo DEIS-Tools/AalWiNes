@@ -144,6 +144,8 @@ namespace aalwines {
         void print_dot(std::ostream& out) const;
         void print_simple(std::ostream& s) const;
         void print_json(json_stream& json_output) const;
+        [[nodiscard]] size_t count_rules() const;
+        [[nodiscard]] size_t count_entries() const;
 
         void set_latitude_longitude(const std::string& latitude, const std::string& longitude);
         [[nodiscard]] std::string latitude() const {return _coordinate ? std::to_string(_coordinate->latitude()) : ""; };

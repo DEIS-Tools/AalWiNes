@@ -106,6 +106,7 @@ namespace aalwines {
         void print_dot_topo(std::ostream& s) const;
         void print_simple(std::ostream& s) const;
         void print_json(json_stream& json_output) const;
+        void print_info(std::ostream& s) const;
 
         std::string name;
 

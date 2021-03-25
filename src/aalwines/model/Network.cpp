@@ -115,13 +115,12 @@ namespace aalwines {
                 }
             }
         }
+        table->sort();
         if (!used) {
             _routers.pop_back();
             _mapping.erase("NULL");
         }
     }
-
-    const char* empty_string = "";
 
     std::unordered_set<size_t> Network::interfaces(filter_t& filter) {
         std::unordered_set<size_t> res;
@@ -249,6 +248,13 @@ namespace aalwines {
             json_output.end_object();
         }
         json_output.end_object();
+    }
+
+    void Network::print_info(std::ostream& s) const {
+        s << "Network: " << name << std::endl;
+        s << "Routers: " << std::count_if(_routers.begin(), _routers.end(), [](const auto& r){ return !r->is_null(); }) << std::endl;
+        s << "Entries: " << std::transform_reduce(_routers.begin(), _routers.end(), 0, std::plus<>(), [](const auto& r){ return r->count_entries(); }) << std::endl;
+        s << "Rules: " << std::transform_reduce(_routers.begin(), _routers.end(), 0, std::plus<>(), [](const auto& r){ return r->count_rules(); }) << std::endl;
     }
 
 

@@ -206,6 +206,12 @@ namespace aalwines {
         }
         json_output.end_object();
     }
+    size_t Router::count_rules() const {
+        return std::transform_reduce(_tables.begin(), _tables.end(), 0, std::plus<>(), [](const auto& table){ return table->count_rules(); });
+    }
+    size_t Router::count_entries() const {
+        return std::transform_reduce(_tables.begin(), _tables.end(), 0, std::plus<>(), [](const auto& table){ return table->entries().size(); });
+    }
 
     void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
         _coordinate.emplace(std::stod(latitude), std::stod(longitude));
