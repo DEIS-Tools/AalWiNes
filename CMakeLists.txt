@@ -56,7 +56,7 @@ if (AALWINES_GetDependencies)
     )
     ExternalProject_add(pdaaal-ext
         GIT_REPOSITORY git@github.com:MortenSchou/PDAAAL.git
-        GIT_TAG 0e3f96251d245fe68ec964ba2a80732210d1f010
+        GIT_TAG 25cc8087ea6f6124b0fd0fcb5cd8ab09bad320e3
         #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.5.zip
         #URL_HASH SHA512=7c9e1418c491f693b1dbcfac8b20aa10cc0ecc8db1456000d1b8ea3c1376d9dbe545abbfe550d7d5020631c4dcb44fe2b6205654337c68a16227f0810e0f32a6
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include

@@ -131,7 +131,7 @@ namespace aalwines {
             } else if (_engine == 4) {
                 output["abstraction"] = json::object();
                 full_time.start();
-                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
+                auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
@@ -142,7 +142,7 @@ namespace aalwines {
             } else if (_engine == 3) {
                 output["abstraction"] = json::object();
                 full_time.start();
-                auto res = CegarVerifier::verify<false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
+                auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;

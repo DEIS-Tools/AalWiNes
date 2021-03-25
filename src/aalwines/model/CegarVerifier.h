@@ -34,7 +34,7 @@ namespace aalwines {
 
     class CegarVerifier {
     public:
-        template<bool no_abstraction = false, pdaaal::refinement_option_t refinement_option = pdaaal::refinement_option_t::best_refinement>
+        template<bool no_abstraction = false, bool use_pre_star = false, pdaaal::refinement_option_t refinement_option = pdaaal::refinement_option_t::best_refinement>
         static std::optional<json> verify(const Network &network, Query& query, std::unordered_set<Query::label_t>&& all_labels, json& json_output) {
             query.compile_nfas();
             // TODO: Weights
@@ -43,7 +43,7 @@ namespace aalwines {
                                                  [](const Query::label_t& label) -> Query::label_t { return label; },
                                                  [](const Interface* inf){ return inf->global_id();});
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
-                auto res = cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
+                auto res = cegar.template cegar_solve<use_pre_star>(std::move(factory), query.construction(), query.destruction());
                 if (res) return std::move(res).value().get();
                 return std::nullopt;
             } else {
@@ -105,7 +105,7 @@ namespace aalwines {
                     }
                 );
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;
-                auto res = cegar.cegar_solve(std::move(factory), query.construction(), query.destruction());
+                auto res = cegar.template cegar_solve<use_pre_star>(std::move(factory), query.construction(), query.destruction());
                 if (res) return std::move(res).value().get();
                 return std::nullopt;
             }
