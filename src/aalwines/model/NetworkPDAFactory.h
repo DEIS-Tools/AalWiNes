@@ -65,12 +65,13 @@ namespace aalwines {
             for (size_t sno = 0; sno < trace.size(); ++sno) {
                 const auto& step = trace[sno];
                 auto [inf_table, nfa_state, ops] = _states.at(step._pdastate);
+                if (!ops.empty()) continue;
                 if (last_inf == nullptr) { // Initial interface
                     last_inf = Translation::get_interface(inf_table);
                 }
-                Translation::add_link_to_trace(result_trace, last_inf, step._stack);
                 if (inf_table.index() == 1) continue; // This information was used as next_inf_table in last iteration. Now we just no-op to the table.
-                if (!ops.empty() || sno == trace.size() - 1) continue; // Handled elsewhere
+                Translation::add_link_to_trace(result_trace, last_inf, step._stack);
+                if (sno == trace.size() - 1) continue;
                 assert(!step._stack.empty()); // There should always be bottom-of-stack label.
                 auto table = Translation::get_table(inf_table);
                 auto [next_inf_table, next_nfa_state, next_ops] = _states.at(trace[sno + 1]._pdastate);
