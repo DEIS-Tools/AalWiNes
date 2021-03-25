@@ -148,10 +148,17 @@ namespace aalwines {
                                 for (auto action_it = forward._ops.begin() + 1; action_it != forward._ops.end(); ++action_it) {
                                     other_ops.emplace_back(action_it->convert_to_pda_op());
                                 }
-                                auto apply_per_nfastate = [&,this](const nfa_state_t* nfa_state) {
-                                    auto to_state = add_state(forward._via->match(), nfa_state, other_ops);
-                                    rule_t rule{from_state, entry._top_label, to_state, std::get<0>(first_op), std::get<1>(first_op)};
-                                    if (entry.ignores_label()) {
+                                rule_t rule;
+                                rule._from = from_state;
+                                rule._pre = entry._top_label;
+                                rule._op = std::get<0>(first_op);
+                                rule._op_label = std::get<1>(first_op);
+                                if constexpr (is_weighted) {
+                                    rule._weight = _weight_f(forward, entry);
+                                }
+                                auto apply_per_nfastate = [&rule,&forward,&entry,&other_ops,this](const nfa_state_t* nfa_state) {
+                                    rule._to = add_state(forward._via->match(), nfa_state, other_ops);
+                                    if (rule._pre == Query::wildcard_label()) {
                                         this->add_wildcard_rule(rule);
                                     } else {
                                         this->add_rule(rule);
