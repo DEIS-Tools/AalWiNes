@@ -32,51 +32,6 @@
 
 namespace aalwines {
 
-    /*
-    struct State {
-        using nfa_state_t = typename pdaaal::NFA<Query::label_t>::state_t;
-        size_t _eid = 0; // which entry we are going for
-        size_t _rid = 0; // which rule in that entry
-        size_t _opid = std::numeric_limits<size_t>::max(); // which operation is the first in the rule (max = no operations left).
-        size_t _appmode = 0; // mode of approximation
-        const Interface *_inf = nullptr;
-        const nfa_state_t* _nfa_state = nullptr;
-        State() = default;
-        State(size_t eid, size_t rid, size_t opid, size_t appmode, const Interface* inf, const nfa_state_t* nfa_state)
-                : _eid(eid), _rid(rid), _opid(opid), _appmode(appmode), _inf(inf), _nfa_state(nfa_state) { };
-        State(const Interface* inf, const nfa_state_t* nfa_state, size_t appmode = 0)
-                : _appmode(appmode), _inf(inf), _nfa_state(nfa_state) { };
-        bool operator==(const State& other) const {
-            return _eid == other._eid && _rid == other._rid && _opid == other._opid
-                   && _appmode == other._appmode && _inf == other._inf && _nfa_state == other._nfa_state;
-        }
-        bool operator!=(const State& other) const {
-            return !(*this == other);
-        }
-        [[nodiscard]] const Interface* interface() const {
-            return _inf;
-        }
-        [[nodiscard]] bool ops_done() const {
-            return _opid == std::numeric_limits<size_t>::max();
-        }
-        [[nodiscard]] bool accepting() const {
-            return ops_done() && (_inf == nullptr || !_inf->is_virtual()) && _nfa_state->_accepting;
-        }
-        static State perform_op(const State& state) {
-            assert(!state.ops_done());
-            return perform_op(state, state._inf->table()->entries()[state._eid]._rules[state._rid]);
-        }
-        static State perform_op(const State& state, const RoutingTable::forward_t& forward) {
-            assert(!state.ops_done());
-            if (state._opid + 2 == forward._ops.size()) {
-                return State(forward._via->match(), state._nfa_state, state._appmode);
-            } else {
-                return State(state._eid, state._rid, state._opid + 1, state._appmode, state._inf, state._nfa_state);
-            }
-        }
-    } __attribute__((packed)); // packed is needed to make this work fast with ptries
-    */
-
     // This one is general, and will be reused by both NetworkPDAFactory and CegarNetworkPDAFactory
     class NetworkTranslation {
     protected:
@@ -121,47 +76,6 @@ namespace aalwines {
                 }
             }
         }
-
-        /*
-        void rules(const State& from_state,
-                          const std::function<void(State&&, const RoutingTable::entry_t&, const RoutingTable::forward_t&)>& add_rule_type_a,
-                          const std::function<void(State&&, const label_t&, std::pair<pdaaal::op_t,label_t>&&)>& add_rule_type_b) {
-            if (from_state.ops_done()) {
-                const auto& entries = from_state._inf->table()->entries();
-                for (size_t eid = 0; eid < entries.size(); ++eid) {
-                    const auto& entry = entries[eid];
-                    for (size_t rid = 0; rid < entry._rules.size(); ++rid) {
-                        const auto& forward = entry._rules[rid];
-                        auto appmode = set_approximation(from_state, forward);
-                        if (appmode == std::numeric_limits<size_t>::max()) continue;
-                        auto apply_per_nfastate = [&](const nfa_state_t* n) {
-                            add_rule_type_a((forward._ops.size() <= 1) ? State(forward._via->match(), n, appmode) : State(eid, rid, 0, appmode, from_state._inf, n), entry, forward);
-                        };
-                        if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
-                            apply_per_nfastate(from_state._nfa_state);
-                        } else { // Follow NFA edges matching forward._via
-                            for (const auto& e : from_state._nfa_state->_edges) {
-                                if (!e.contains(forward._via->global_id())) continue;
-                                for (const auto& n : e.follow_epsilon()) {
-                                    apply_per_nfastate(n);
-                                }
-                            }
-                        }
-
-                    }
-                }
-            } else {
-                const auto& forward = from_state._inf->table()->entries()[from_state._eid]._rules[from_state._rid];
-                assert(from_state._opid + 1 < forward._ops.size()); // Otherwise we would already have moved to the next interface.
-
-                auto pre_label = (forward._ops[from_state._opid]._op == RoutingTable::op_t::POP)
-                        ? Query::wildcard_label()
-                        : forward._ops[from_state._opid]._op_label;
-                add_rule_type_b(State::perform_op(from_state, forward), // To-state
-                                pre_label,
-                                forward._ops[from_state._opid + 1].convert_to_pda_op()); // Op, op-label
-            }
-        }*/
 
         using edge_variant = std::variant<const RoutingTable*, const Interface*, const Interface*>;
         static edge_variant special_interface(const Interface* interface) {
@@ -244,20 +158,6 @@ namespace aalwines {
                 return intersection[0];
             }
         }
-
-        /*
-        size_t set_approximation(const State& state, const RoutingTable::forward_t& forward) {
-            if (forward._via->is_virtual()) return state._appmode;
-            auto num_fail = _query.number_of_failures();
-            auto err = std::numeric_limits<size_t>::max();
-            switch (_query.approximation()) {
-                case Query::mode_t::OVER:
-                    return (forward._priority > num_fail) ? err : 0; // TODO: This is incorrect. Should be size of set of links for forwards with smaller priority on current entry...
-                case Query::mode_t::EXACT:
-                default:
-                    return err;
-            }
-        }*/
 
         static void add_link_to_trace(json& trace, const Interface* inf, const std::vector<label_t>& final_header) {
             trace.emplace_back();

@@ -401,8 +401,9 @@ namespace aalwines
         }
     }
 
-    void RoutingTable::remove_unused_rules(std::ostream& log) {
+    void RoutingTable::pre_process_rules(std::ostream& log) {
         // If a rule uses a link that it (due to its priority) also assumes to be disabled, then we can remove that rule.
+        // Update the _priority of the rule to be the size of the set of failed links needed for that rule to be active.
         for (auto& entry : _entries) {
             if (entry._rules.empty()) continue;
 
@@ -425,6 +426,7 @@ namespace aalwines
                     higher_priority_interfaces = temp;
                     last_priority = first->_priority;
                 }
+                first->_priority = higher_priority_interfaces.size(); // Set priority to the size of the smallest set of failed links that makes this rule (*first) be active.
                 temp.emplace(first->_via);
                 if (higher_priority_interfaces.count(first->_via) > 0) { // Remove *first
                     log_removal(*first);
@@ -434,6 +436,7 @@ namespace aalwines
                             higher_priority_interfaces = temp;
                             last_priority = i->_priority;
                         }
+                        i->_priority = higher_priority_interfaces.size();
                         temp.emplace(i->_via);
                         if (higher_priority_interfaces.count(i->_via) == 0) {
                             *first++ = std::move(*i);

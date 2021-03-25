@@ -267,7 +267,7 @@ namespace aalwines {
 
     void Router::pre_process(std::ostream& log) {
         for (const auto& table : _tables) {
-            table->remove_unused_rules(log);
+            table->pre_process_rules(log);
         }
     }
 

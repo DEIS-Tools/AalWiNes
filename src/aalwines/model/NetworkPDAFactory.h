@@ -142,7 +142,7 @@ namespace aalwines {
                         const auto& table = variant.index() == 0 ? std::get<0>(variant) : std::get<2>(variant)->table();
                         for (const auto& entry : table->entries()) {
                             for (const auto& forward : entry._rules) {
-                                if (forward._priority > _query.number_of_failures()) continue; // TODO: Approximation here.
+                                if (forward._priority > _query.number_of_failures()) continue;
                                 auto first_op = forward.first_action();
                                 ops_t other_ops;
                                 for (auto action_it = forward._ops.begin() + 1; action_it != forward._ops.end(); ++action_it) {

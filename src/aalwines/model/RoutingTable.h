@@ -76,7 +76,7 @@ namespace aalwines {
         struct forward_t {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
-            size_t _priority = 0;
+            size_t _priority = 0; // Initially this is the order of priority, but after RoutingTable::pre_process_rules(), this is the size of the set of failed links needed for this rule to be active.
             uint32_t _weight = 0;
             forward_t() = default;
             forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
@@ -143,7 +143,7 @@ namespace aalwines {
 
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
 
-        void remove_unused_rules(std::ostream& log);
+        void pre_process_rules(std::ostream& log);
 
         void add_my_interface(const Interface* inf) {
             assert(std::find(_my_interfaces.begin(), _my_interfaces.end(), inf) == _my_interfaces.end());

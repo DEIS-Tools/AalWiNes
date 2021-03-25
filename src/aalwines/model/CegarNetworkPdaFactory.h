@@ -291,7 +291,7 @@ namespace aalwines {
             for (const auto& entry : table->entries()) {
                 auto label = abstract_pre_label(entry._top_label);
                 for (const auto& forward : entry._rules) {
-                    if (forward._priority > _query.number_of_failures()) continue; // TODO: Approximation here.
+                    if (forward._priority > _query.number_of_failures()) continue;
 
                     assert(_interface_abstraction.exists(forward._via->match()).first);
                     auto to = _interface_abstraction.exists(forward._via->match()).second;
