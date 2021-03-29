@@ -209,12 +209,9 @@ namespace aalwines
         }
     }
     std::pair<pdaaal::op_t,Query::label_t> RoutingTable::action_t::convert_to_pda_op() const {
-        pdaaal::op_t op;
-        Query::label_t op_label;
+        pdaaal::op_t op = pdaaal::POP;
+        Query::label_t op_label = Query::unused_label(); // Just needs to be initialized to something.
         switch (_op) {
-            case RoutingTable::op_t::POP:
-                op = pdaaal::POP;
-                break;
             case RoutingTable::op_t::PUSH:
                 op = pdaaal::PUSH;
                 op_label = _op_label;
@@ -222,6 +219,9 @@ namespace aalwines
             case RoutingTable::op_t::SWAP:
                 op = pdaaal::SWAP;
                 op_label = _op_label;
+                break;
+            case RoutingTable::op_t::POP:
+            default:
                 break;
         }
         return std::make_pair(op, op_label);
