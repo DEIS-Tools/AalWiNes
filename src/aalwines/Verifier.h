@@ -71,7 +71,7 @@ namespace aalwines {
                 std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
                 exit(-1);
             }
-            if(_engine > 5) {
+            if(_engine > 6) {
                 std::cerr << "Unknown value for --engine : " << _engine << std::endl;
                 exit(-1);
             }
@@ -104,7 +104,7 @@ namespace aalwines {
             constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*"};
+            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "DualSearch"};
             output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
@@ -202,6 +202,18 @@ namespace aalwines {
                             trace_making_time.start();
                             if (engine_outcome) {
                                 auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                                json_trace = factory.get_json_trace(pda_trace);
+                                if (!json_trace.is_null()) result = utils::outcome_t::YES;
+                            }
+                            trace_making_time.stop();
+                            break;
+                        }
+                        case 6: {
+                            engine_outcome = pdaaal::Solver::dual_search_accepts(problem_instance);
+                            reachability_time.stop();
+                            trace_making_time.start();
+                            if (engine_outcome) {
+                                auto pda_trace = pdaaal::Solver::get_trace_dual_search(problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
