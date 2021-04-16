@@ -302,7 +302,7 @@ namespace aalwines {
                     }
                     for (const auto& a_inf : a_infs) {
                         assert(a_inf < _abstract_tables.size());
-                        _abstract_tables[a_inf].insert({label,to,first_op,std::move(ops)});
+                        _abstract_tables[a_inf].insert({label,to,first_op,ops});
                     }
                 }
             }
