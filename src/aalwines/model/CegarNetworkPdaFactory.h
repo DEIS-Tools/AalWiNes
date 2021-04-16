@@ -454,7 +454,8 @@ namespace aalwines {
                     _factory._interface_abstraction.get_concrete_values_range(a_inf), // Inner range of interfaces
                     [this,nfa_state=nfa_state](const auto& inf){ return !inf->match()->is_virtual() && NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
                 [this, header=this->initial_header(), &abstract_rule, nfa_state=nfa_state, &to_state, ops_size](const auto& inf){
-                    return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size, EdgeStatus()); // Transform interface to vector of configurations.
+                    return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size, // Transform interface to vector of configurations.
+                                               EdgeStatus(std::vector<const Interface*>(), std::vector<const Interface*>{inf}));
             });
         }
         refinement_t find_initial_refinement(const abstract_rule_t& abstract_rule) override {
