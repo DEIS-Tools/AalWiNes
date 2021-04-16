@@ -132,7 +132,8 @@ namespace aalwines {
             // Since we don't reset states when refining (to keep indexes consistent) we don't a priori know which states are still valid.
             // For states with ops.empty() we use _edges to check validity, for !ops.empty() we store the reachable states here.
             // Keeping all states can increase the PDA size a bit, since the PDA datastructure assumes consecutive state ids, i.e. it will also create entries for the unused states.
-            std::unordered_set<size_t> other_states;
+            std::unordered_set<size_t> other_states_seen;
+            std::vector<size_t> other_states_waiting;
 
             size_t count_rules = 0;
             for (size_t from_state = 0; from_state < _abstract_states.size(); ++from_state) {
@@ -146,7 +147,9 @@ namespace aalwines {
                         for (const auto& to_nfa_state : it->second) {
                             auto to_state = _abstract_states.insert({a_to_inf, to_nfa_state, other_ops}).second;
                             if (!other_ops.empty()) { // Remember that to_state is reachable and handle later.
-                                other_states.emplace(to_state);
+                                if (other_states_seen.emplace(to_state).second) {
+                                    other_states_waiting.push_back(to_state);
+                                }
                             }
                             abstract_rule_t rule(from_state, label, to_state, std::get<0>(first_op), std::get<1>(first_op));
                             if (is_spurious_rule(rule)) continue;
@@ -160,11 +163,18 @@ namespace aalwines {
                     }
                 }
             }
-            for (size_t from_state : other_states) {
+            while (!other_states_waiting.empty()) {
+                size_t from_state = other_states_waiting.back();
+                other_states_waiting.pop_back();
                 auto [a_inf, nfa_state, ops] = _abstract_states.at(from_state);
                 assert(!ops.empty());
                 auto first_op = ops[0];
                 auto to_state = _abstract_states.insert({a_inf, nfa_state, a_ops_t(ops.begin()+1, ops.end())}).second;
+                if (ops.size() > 1) {
+                    if (other_states_seen.emplace(to_state).second) {
+                        other_states_waiting.push_back(to_state);
+                    }
+                }
                 abstract_rule_t rule(from_state, abstract_wildcard_label(), to_state, std::get<0>(first_op), std::get<1>(first_op));
                 this->add_wildcard_rule(rule);
                 count_rules++;
