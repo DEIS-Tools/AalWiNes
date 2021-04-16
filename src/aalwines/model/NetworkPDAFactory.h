@@ -71,6 +71,7 @@ namespace aalwines {
                 }
                 if (inf_table.index() == 1) continue; // This information was used as next_inf_table in last iteration. Now we just no-op to the table.
                 Translation::add_link_to_trace(result_trace, last_inf, step._stack);
+                active.insert(last_inf->match());
                 if (sno == trace.size() - 1) continue;
                 assert(!step._stack.empty()); // There should always be bottom-of-stack label.
                 auto table = Translation::get_table(inf_table);
@@ -231,7 +232,10 @@ namespace aalwines {
 
             // find all rules with a "covered" pre but lower weight.
             // these must have been disabled!
-            if (forward._priority == 0) return true;
+            if (forward._priority == 0) {
+                active.insert(forward._via);
+                return true;
+            }
             std::unordered_set<const Interface *> tmp = disabled;
 
             // find failing rule and disable _via interface
