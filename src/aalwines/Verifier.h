@@ -57,7 +57,7 @@ namespace aalwines {
 
         explicit Verifier(const std::string& caption = "Verification Options") : verification(caption) {
             verification.add_options()
-                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*,3=post*CEGAR,4=post*CEGARwithSimpleRefinement,5=post*NoAbstraction")
+                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*,3=post*CEGAR,4=post*CEGARwithSimpleRefinement,5=post*NoAbstraction,6=dual*,9=dual*CEGAR")
                     ("tos-reduction,r", po::value<size_t>(&_reduction), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
                     ("trace,t", po::bool_switch(&_print_trace), "Get a trace when possible")
                     ;
@@ -71,7 +71,7 @@ namespace aalwines {
                 std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
                 exit(-1);
             }
-            if(_engine > 8) {
+            if(_engine > 9) {
                 std::cerr << "Unknown value for --engine : " << _engine << std::endl;
                 exit(-1);
             }
@@ -104,7 +104,7 @@ namespace aalwines {
             constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
 
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "DualSearch", "Post* (no ET)", "Pre* (no ET)"};
+            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "DualSearch", "Post* (no ET)", "Pre* (no ET)", "CEGAR_Dual"};
             output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
@@ -143,6 +143,17 @@ namespace aalwines {
                 output["abstraction"] = json::object();
                 full_time.start();
                 auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
+                full_time.stop();
+                if (res) {
+                    result = utils::outcome_t::YES;
+                    json_trace = res.value();
+                } else {
+                    result = utils::outcome_t::NO;
+                }
+            } else if (_engine == 9) {
+                output["abstraction"] = json::object();
+                full_time.start();
+                auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement,true>(builder._network, q, builder.all_labels(), output["abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
