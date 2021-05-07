@@ -41,6 +41,7 @@ BOOST_AUTO_TEST_CASE(QueryTest1) {
     uint64_t i = 42;
     auto next_label = [&i](){return i++;};
     RouteConstruction::make_data_flow(network.get_router(0)->find_interface("iRouter0"), network.get_router(1)->find_interface("iRouter1"), next_label);
+    network.prepare_tables(); network.pre_process();
 
     Builder builder(network);
     std::string query("<.> [.#Router0] [Router0#Router1] [Router1#.] <.> 0 OVER");
@@ -66,6 +67,7 @@ BOOST_AUTO_TEST_CASE(QueryTest2) {
     uint64_t i = 42;
     auto next_label = [&i](){return i++;};
     RouteConstruction::make_data_flow(network.get_router(0)->find_interface("iRouter0"), network.get_router(1)->find_interface("iRouter1"), next_label);
+    network.prepare_tables(); network.pre_process();
 
     Builder builder(network);
     std::string query("<42 43> [.#Router0] [Router0#Router1] [Router1#.] <44 43> 0 OVER");
@@ -92,6 +94,7 @@ BOOST_AUTO_TEST_CASE(QueryTest3) {
     auto next_label = [&i](){return i++;};
     RouteConstruction::make_data_flow(network.get_router(0)->find_interface("iR0"), network.get_router(2)->find_interface("iR2"), next_label);
     RouteConstruction::make_reroute(network.get_router(0)->find_interface("R1"), next_label);
+    network.prepare_tables(); network.pre_process();
 
     Builder builder(network);
     std::string query("<.> [.#R0] [^.#R1]* [R2#.] <.> 1 OVER");

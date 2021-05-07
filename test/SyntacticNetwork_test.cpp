@@ -196,6 +196,8 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace) {
     synthetic_network.print_simple(s_after);
     BOOST_TEST_MESSAGE(s_after.str());
 
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
+
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* ['Router2\\''#.] <.*> 0 OVER \n"
@@ -249,6 +251,8 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace1) {
     std::stringstream s_after;
     synthetic_network.print_simple(s_after);
     BOOST_TEST_MESSAGE(s_after.str());
+
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
 
     Builder builder(synthetic_network);
     {
@@ -305,6 +309,8 @@ BOOST_AUTO_TEST_CASE(NetworkInjectionAndTrace2) {
     synthetic_network.print_simple(s_after);
     BOOST_TEST_MESSAGE(s_after.str());
 
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
+
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* [Router24#.] <.*> 0 OVER \n"
@@ -356,6 +362,8 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace) {
     synthetic_network.print_simple(s_after);
     BOOST_TEST_MESSAGE(s_after.str());
 
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
+
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* ['Router3\\''#.] <.*> 0 OVER \n"
@@ -403,6 +411,8 @@ BOOST_AUTO_TEST_CASE(NetworkConcatenationAndTrace1) {
             synthetic_network.get_router(24)->find_interface("iRouter24"), std::move(synthetic_network2),
             synthetic_network2.get_router(0)->find_interface("iRouter0"), 48);
 
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
+
     Builder builder(synthetic_network);
     {
         std::string query("<.*> [.#Router0] .* ['Router3\\''#.] <.*> 0 OVER \n"
@@ -427,6 +437,8 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance) {
             next_label, path);
 
     BOOST_CHECK_EQUAL(success, true);
+
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
 
     std::stringstream trace;
     Builder builder(synthetic_network);
@@ -454,6 +466,8 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformance1) {
             next_label, path);
 
     BOOST_CHECK_EQUAL(success, true);
+
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
 
     std::stringstream trace;
     Builder builder(synthetic_network);
@@ -503,6 +517,8 @@ BOOST_AUTO_TEST_CASE(SyntheticNetworkPerformanceInjection) {
             50,
             56);
 
+    synthetic_network.prepare_tables(); synthetic_network.pre_process();
+
     std::stringstream trace;
     Builder builder(synthetic_network);
     {
@@ -532,6 +548,8 @@ BOOST_AUTO_TEST_CASE(FastRerouteWithQueryTest) {
     auto fail_interface = network.get_router(3)->find_interface(network.get_router(4)->name());
     success = RouteConstruction::make_reroute(fail_interface, next_label);
     BOOST_CHECK_EQUAL(success, true);
+
+    network.prepare_tables(); network.pre_process();
 
     Builder builder(network);
     {

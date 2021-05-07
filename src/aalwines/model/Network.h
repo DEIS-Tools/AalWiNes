@@ -95,6 +95,7 @@ namespace aalwines {
         bool check_sanity(std::ostream& error_stream = std::cerr) const;
         // Remove redundant rules.
         void pre_process(std::ostream& log = std::cerr);
+        void prepare_tables(); // Sets up data structures in tables. Use if tables were modified. Use before pre_process.
 
         void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
                             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);

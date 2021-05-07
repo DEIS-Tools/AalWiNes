@@ -369,6 +369,22 @@ namespace aalwines {
         return true;
     }
 
+    void Network::prepare_tables() {
+        for (const auto& router : _routers) {
+            for (const auto& table : router->tables()) {
+                std::unordered_set<const Interface*> out_interfaces;
+                for (const auto& entry : table->entries()) {
+                    for (const auto& rule : entry._rules) {
+                        out_interfaces.emplace(rule._via);
+                    }
+                }
+                table->set_out_interfaces(out_interfaces);
+                table->sort();
+                table->sort_rules();
+            }
+        }
+    }
+
     void Network::pre_process(std::ostream& log) {
         for (const auto& router : _routers) {
             router->pre_process(log);
