@@ -43,11 +43,11 @@ BOOST_AUTO_TEST_CASE(FastRerouteTest) {
     auto network = Network::make_network(names, links);
 
     auto interface = network.get_router(1)->find_interface(names[4]);
-    network.get_router(0)->find_interface(names[1])->match()->table().add_rule(
+    network.get_router(0)->find_interface(names[1])->match()->table()->add_rule(
             1,
             {RoutingTable::op_t::SWAP, 2},
             interface);
-    network.get_router(1)->find_interface(names[4])->match()->table().add_rule(
+    network.get_router(1)->find_interface(names[4])->match()->table()->add_rule(
             2,
             {RoutingTable::op_t::SWAP, 3},
             network.get_router(4)->find_interface(names[5]));

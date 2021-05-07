@@ -131,7 +131,7 @@ query_list
         | END// empty 
         ;
 query
-    : LT { builder.label_mode(); builder.invert(true) ; } cregex
+    : LT { builder.label_mode(); builder.invert(false); } cregex
       GT { builder.path_mode();  builder.invert(false); } cregex
       LT { builder.label_mode(); builder.invert(false); } cregex GT number mode
     {
@@ -140,10 +140,10 @@ query
     ;
 
 mode 
-    : OVER { $$ = Query::OVER; }
-    | UNDER { $$ = Query::UNDER; }
-    | DUAL { $$ = Query::DUAL; }
-    | EXACT { $$ = Query::EXACT; }
+    : OVER { $$ = Query::mode_t::OVER; }
+    | UNDER { $$ = Query::mode_t::OVER; } // TODO: Remove
+    | DUAL { $$ = Query::mode_t::OVER; }  // TODO: Remove
+    | EXACT { $$ = Query::mode_t::EXACT; }
     ;
     
 cregex

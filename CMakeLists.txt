@@ -21,6 +21,7 @@ endif (AALWINES_BuildBundle)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall -Wpedantic -I -fPIC")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG -Wall -Wpedantic -fPIC")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lstdc++ -lm")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -32,8 +33,10 @@ if (AALWINES_GetDependencies)
     set(EXTERNAL_INSTALL_LOCATION ${CMAKE_BINARY_DIR}/external)
     
     ExternalProject_add(ptrie-ext
-        URL https://github.com/petergjoel/ptrie/archive/v1.1.0.zip
-        URL_HASH SHA512=092a8f50ca21d1199b19a10c4e0273c93a717a9f6491998a16bf21d21d37e6537ffd8a06ac41a2b623241da6036546d44b754567441944565e2a16646378cf29
+        URL https://github.com/MortenSchou/ptrie/archive/refs/tags/v1.1.2beta.zip
+        URL_HASH SHA512=7dbfd54839509187d27e2ddea34c253ac1f26712012c29eca0d96b9f7bcf9844bdc3b40955aa98e391344745b734aa2f28cf115572b4b0ab2873582b32dfe228
+        #URL https://github.com/petergjoel/ptrie/archive/v1.1.1.zip
+        #URL_HASH SHA512=5435d6f8132d273b50eccd721790d559f7dc67ffdada75fec315f4c53705199f31f1ddc80dda0cb86f883db27076fa6d324d28516b442fecce3ffa51213aef4e
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
     )
     file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/include)
@@ -50,8 +53,8 @@ if (AALWINES_GetDependencies)
             EXPECTED_HASH SHA256=7804b38146921d03374549c9e2a5e3acda097814c43caf2b96a0278e58df26e0
     )
     ExternalProject_add(pdaaal-ext
-        URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.2.5.zip
-        URL_HASH SHA512=7c9e1418c491f693b1dbcfac8b20aa10cc0ecc8db1456000d1b8ea3c1376d9dbe545abbfe550d7d5020631c4dcb44fe2b6205654337c68a16227f0810e0f32a6
+        URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.3.0.zip
+        URL_HASH SHA512=81eb135be9fd2687a48f526fb303c8a7cdc03a59ec0309717fa5af40c5807ed0eecf07f326692fe9f0cb11214b7d3488fd2e2ef5853d245e328509b02b20cbd7
         CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} -DPDAAAL_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release -DPTRIE_INSTALL_DIR=${EXTERNAL_INSTALL_LOCATION}/include
     )
 
@@ -70,7 +73,7 @@ if(BUILD_TESTING AND AALWINES_BuildTests)
     add_subdirectory(${CMAKE_SOURCE_DIR}/test/)
     enable_testing()
     add_test(NAME NetworkTest         COMMAND NetworkTest)
-    add_test(NAME SyntacticNetwork    COMMAND SyntacticNetwork)
+    add_test(NAME SyntheticNetwork    COMMAND SyntheticNetwork)
     add_test(NAME RouteConstruction   COMMAND RouteConstruction)
     add_test(NAME QueryTest           COMMAND QueryTest)
     add_test(NAME JSONFormatTest      COMMAND JSONFormatTest)

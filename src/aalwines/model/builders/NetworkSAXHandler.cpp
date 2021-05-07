@@ -394,7 +394,7 @@ namespace aalwines {
     }
 
     bool NetworkSAXHandler::add_interface_name(const std::string& value) {
-        auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
+        auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces, false);
         if (!was_inserted) {
             // Was this added because of an out-interface in an already parsed routing-table?
             auto f = forward_constructed_interfaces.find(value);
@@ -436,11 +436,12 @@ namespace aalwines {
             case keys::interface_name:
                 return add_interface_name(value);
             case keys::entry_out: {
-                auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces);
+                auto [was_inserted, interface] = current_router->insert_interface(value, all_interfaces, false);
                 if (was_inserted) {
                     forward_constructed_interfaces.insert(value);
                 }
                 via = interface;
+                current_table_out_interfaces.emplace(via);
                 break;
             }
             case keys::pop:
@@ -499,7 +500,7 @@ namespace aalwines {
                 return true;
             case context::context_type::interface_array:
                 context_stack.push(interface_context);
-                current_table = RoutingTable{};
+                current_table = current_router->emplace_table();
                 return true;
             case context::context_type::entry_array:
                 context_stack.push(entry_context);
@@ -532,22 +533,22 @@ namespace aalwines {
     }
 
     template <NetworkSAXHandler::context::context_type type, NetworkSAXHandler::context::key_flag flag,
-              NetworkSAXHandler::keys key, NetworkSAXHandler::keys... alternatives>
+              NetworkSAXHandler::keys current_key, NetworkSAXHandler::keys... alternatives>
               // 'key' is the key to use. 'alternatives' are any other keys using the same flag in the same context (i.e. a one_of(key, alternatives...) requirement).
     bool NetworkSAXHandler::handle_key() {
         static_assert(flag == NetworkSAXHandler::context::FLAG_1 || flag == NetworkSAXHandler::context::FLAG_2
                    || flag == NetworkSAXHandler::context::FLAG_3 || flag == NetworkSAXHandler::context::FLAG_4,
                    "Template parameter flag must be a single key, not a union or empty.");
-        static_assert(((NetworkSAXHandler::context::get_key(type, flag) == key) || ... || (NetworkSAXHandler::context::get_key(type, flag) == alternatives)),
+        static_assert(((NetworkSAXHandler::context::get_key(type, flag) == current_key) || ... || (NetworkSAXHandler::context::get_key(type, flag) == alternatives)),
                    "The result of get_key(type, flag) must match 'key' or one of the alternatives");
         if (!context_stack.top().needs_value(flag)) {
-            errors << "Duplicate definition of key: \"" << key;
+            errors << "Duplicate definition of key: \"" << current_key;
             ((errors << "\"/\"" << alternatives), ...);
             errors << "\" in " << type << " object. " << std::endl;
             return false;
         }
         context_stack.top().got_value(flag);
-        last_key = key;
+        last_key = current_key;
         return true;
     }
 
@@ -618,7 +619,7 @@ namespace aalwines {
                 break;
             case context::context_type::routing_table:
                 last_key = keys::table_label;
-                current_table.emplace_entry(key);
+                current_table->emplace_entry(key);
                 break;
             case context::context_type::entry:
                 if (key == "out") {
@@ -711,16 +712,17 @@ namespace aalwines {
                 current_router->set_coordinate(Coordinate(latitude, longitude));
                 break;
             case context::context_type::interface: {
-                // TODO: This construction can be optimized. Currently we copy shared routing tables onto each interface.
-                for (size_t i = 0; i < current_interfaces.size() - 1; ++i) {
-                    current_interfaces[i]->table() = current_table; // Copy assignment.
+                current_table->set_out_interfaces(current_table_out_interfaces);
+                for (Interface* current_interface : current_interfaces) {
+                    current_interface->set_table(current_table);
                 }
-                current_interfaces.back()->table() = std::move(current_table); // Move the last time. No need for extra copies.
+                current_table->sort(); current_table->sort_rules();
                 current_interfaces.clear();
+                current_table_out_interfaces.clear();
                 break;
             }
             case context::context_type::entry:
-                current_table.back()._rules.emplace_back(std::move(ops), via, priority, weight);
+                current_table->back()._rules.emplace_back(std::move(ops), via, priority, weight);
                 break;
             default:
                 break;

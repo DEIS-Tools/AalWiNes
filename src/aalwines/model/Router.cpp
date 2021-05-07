@@ -45,15 +45,22 @@ namespace aalwines {
         _interfaces.reserve(router._interfaces.size());
         // _interface_map = router._interface_map; // Copy of ptrie not working.
         _interface_map = string_map<Interface*>(); // Start from empty map instead
-
-        for (auto& interface : router._interfaces) {
+        _tables.clear();
+        _tables.reserve(router._tables.size());
+        std::unordered_map<const RoutingTable*,RoutingTable*> table_mapping;
+        for (const auto& table : router._tables) {
+            auto new_table = _tables.emplace_back(std::make_unique<RoutingTable>(*table)).get();
+            table_mapping.emplace(table.get(), new_table);
+        }
+        for (const auto& interface : router._interfaces) {
             assert(_interfaces.size() == interface->id());
             auto new_interface = _interfaces.emplace_back(std::make_unique<Interface>(*interface)).get();
             _interface_map[interface->get_name()] = new_interface;
             new_interface->_parent = this;
+            new_interface->set_table(table_mapping[interface->table()]);
         }
-        for (auto& interface : _interfaces) {
-            interface->table().update_interfaces([this](const Interface* old) -> Interface* {
+        for (auto& table : _tables) {
+            table->update_interfaces([this](const Interface* old) -> Interface* {
                 return old == nullptr ? nullptr : this->_interfaces[old->id()].get();
             });
         }
@@ -75,7 +82,7 @@ namespace aalwines {
         return _names.back();
     }
 
-    std::pair<bool,Interface*> Router::insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces) {
+    std::pair<bool,Interface*> Router::insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces, bool make_table) {
         auto res = _interface_map.insert(interface_name);
         if (!res.first) {
             return std::make_pair(false, _interface_map.get_data(res.second));
@@ -86,6 +93,9 @@ namespace aalwines {
         auto interface = _interfaces.back().get();
         all_interfaces.emplace_back(interface);
         _interface_map.get_data(res.second) = interface;
+        if (make_table) {
+            interface->set_table(this->emplace_table());
+        }
         return std::make_pair(true, interface);
     }
 
@@ -134,8 +144,7 @@ namespace aalwines {
         for(auto& i : _interfaces) {
             auto name = interface_name(i->id());
             s << "\tinterface: \"" << name << "\"\n";
-            const RoutingTable& table = i->table();
-            for(auto& e : table.entries()) {
+            for(auto& e : i->table()->entries()) {
                 s << "\t\t[" << e._top_label << "] {\n";
                 for(auto& fwd : e._rules) {
                     s << "\t\t\t" << fwd._priority << " |-[";
@@ -168,9 +177,7 @@ namespace aalwines {
         for(auto& i : _interfaces) {
             if_name = interface_name(i->id());
             auto& label_set = interfaces.try_emplace(if_name).first->second;
-
-            const RoutingTable& table = i->table();
-            for(auto& e : table.entries()) {
+            for(auto& e : i->table()->entries()) {
                 label_set.emplace(e._top_label);
                 for(auto& fwd : e._rules) {
                     auto via = fwd._via;
@@ -199,8 +206,75 @@ namespace aalwines {
         }
         json_output.end_object();
     }
+    size_t Router::count_rules() const {
+        return std::transform_reduce(_tables.begin(), _tables.end(), 0, std::plus<>(), [](const auto& table){ return table->count_rules(); });
+    }
+    size_t Router::count_entries() const {
+        return std::transform_reduce(_tables.begin(), _tables.end(), 0, std::plus<>(), [](const auto& table){ return table->entries().size(); });
+    }
 
     void Router::set_latitude_longitude(const std::string& latitude, const std::string& longitude) {
         _coordinate.emplace(std::stod(latitude), std::stod(longitude));
     }
+
+    bool Router::check_sanity(std::ostream& error_stream) const {
+        if (_names.empty()) {
+            error_stream << "Router with index " << index() << " does not have a name." << std::endl;
+            return false;
+        }
+        if (_interfaces.size() != _interface_map.size()) {
+            error_stream << "In router " << name() << " _interfaces.size() != _interface_map.size()." << std::endl;
+            return false;
+        }
+        size_t interface_i = 0;
+        for (const auto& interface : _interfaces) {
+            if (interface->id() != interface_i) {
+                error_stream << "Interface in router " << name() << " with id() " << interface->id() << " is in position " << interface_i << " of _interfaces. This is incorrect." << std::endl;
+                return false;
+            }
+            if (interface->source() != this) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has source() != this." << std::endl;
+                return false;
+            }
+            if (interface->match() == nullptr) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has match() == nullptr." << std::endl;
+                return false;
+            }
+            if (interface->target() == nullptr) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has target() == nullptr." << std::endl;
+                return false;
+            }
+            if (interface->match()->source() != interface->target()) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has match()->source() != target()." << std::endl;
+                return false;
+            }
+            if (interface->table() == nullptr) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has match()->source() != target()." << std::endl;
+                return false;
+            }
+            if (std::find_if(_tables.begin(), _tables.end(), [&interface](const auto& t){ return t.get() == interface->table(); }) == _tables.end()) {
+                error_stream << "Interface " << interface->get_name() << " in router " << name() << " has table() which is not in _tables." << std::endl;
+                return false;
+            }
+            interface_i++;
+        }
+        for (const auto& table : _tables) {
+            for (const auto& entry : table->entries()) {
+                for (const auto& forward : entry._rules) {
+                    if (std::find_if(_interfaces.begin(), _interfaces.end(), [&forward](const auto& i){ return i.get() == forward._via;}) == _interfaces.end()) {
+                        error_stream << "Forwarding rule on router " << name() << " uses _via interface that is not in _interfaces." << std::endl;
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    void Router::pre_process(std::ostream& log) {
+        for (const auto& table : _tables) {
+            table->pre_process_rules(log);
+        }
+    }
+
 }

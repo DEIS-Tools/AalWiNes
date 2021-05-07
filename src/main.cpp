@@ -32,9 +32,6 @@
 #include <aalwines/model/NetworkWeight.h>
 
 #include <aalwines/query/parsererrors.h>
-#include <pdaaal/PDAFactory.h>
-#include <pdaaal/SolverAdapter.h>
-#include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
 #include <aalwines/Verifier.h>
@@ -73,6 +70,7 @@ int main(int argc, const char** argv)
     bool print_dot = false;
     bool print_dot_topo = false;
     bool print_net = false;
+    bool print_info = false;
     bool no_parser_warnings = false;
     bool silent = false;
     bool no_timing = false;
@@ -82,6 +80,7 @@ int main(int argc, const char** argv)
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
             ("dot-topo", po::bool_switch(&print_dot_topo), "A dot output of the topology will be printed to cout when set.")
             ("net", po::bool_switch(&print_net), "A json output of the network will be printed to cout when set.")
+            ("info", po::bool_switch(&print_info), "Print info/stats about the network.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
@@ -127,6 +126,9 @@ int main(int argc, const char** argv)
     }
     if (print_dot_topo) {
         network.print_dot_topo(std::cout);
+    }
+    if (print_info) {
+        network.print_info(std::cout);
     }
 
     if (!json_destination.empty()) {

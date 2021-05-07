@@ -41,10 +41,10 @@ BOOST_AUTO_TEST_CASE(NetworkCopy) {
     auto i2 = network.insert_interface_to("i2", router2).second;
     auto i3 = network.insert_interface_to("i3", router2).second;
     i1->make_pairing(i2);
-    i0->table().add_rule(RoutingTable::label_t("s10"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s11")), i1);
-    i1->table().add_rule(RoutingTable::label_t("s21"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s22")), i0);
-    i2->table().add_rule(RoutingTable::label_t("s11"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s12")), i3);
-    i3->table().add_rule(RoutingTable::label_t("s20"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s21")), i2);
+    i0->table()->add_rule(RoutingTable::label_t("s10"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s11")), i1);
+    i1->table()->add_rule(RoutingTable::label_t("s21"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s22")), i0);
+    i2->table()->add_rule(RoutingTable::label_t("s11"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s12")), i3);
+    i3->table()->add_rule(RoutingTable::label_t("s20"), RoutingTable::action_t(RoutingTable::op_t::SWAP, RoutingTable::label_t("s21")), i2);
 
     Network new_network(network); // Do copy.
 
@@ -77,15 +77,15 @@ BOOST_AUTO_TEST_CASE(NetworkCopy) {
     BOOST_CHECK_EQUAL(i3->get_name(), new_i3->get_name());
 
     // Are router tables copied correctly
-    BOOST_CHECK_EQUAL_COLLECTIONS(i0->table().entries().begin(), i0->table().entries().end(), new_i0->table().entries().begin(), new_i0->table().entries().end());
-    BOOST_CHECK_EQUAL_COLLECTIONS(i1->table().entries().begin(), i1->table().entries().end(), new_i1->table().entries().begin(), new_i1->table().entries().end());
-    BOOST_CHECK_EQUAL_COLLECTIONS(i2->table().entries().begin(), i2->table().entries().end(), new_i2->table().entries().begin(), new_i2->table().entries().end());
-    BOOST_CHECK_EQUAL_COLLECTIONS(i3->table().entries().begin(), i3->table().entries().end(), new_i3->table().entries().begin(), new_i3->table().entries().end());
+    BOOST_CHECK_EQUAL_COLLECTIONS(i0->table()->entries().begin(), i0->table()->entries().end(), new_i0->table()->entries().begin(), new_i0->table()->entries().end());
+    BOOST_CHECK_EQUAL_COLLECTIONS(i1->table()->entries().begin(), i1->table()->entries().end(), new_i1->table()->entries().begin(), new_i1->table()->entries().end());
+    BOOST_CHECK_EQUAL_COLLECTIONS(i2->table()->entries().begin(), i2->table()->entries().end(), new_i2->table()->entries().begin(), new_i2->table()->entries().end());
+    BOOST_CHECK_EQUAL_COLLECTIONS(i3->table()->entries().begin(), i3->table()->entries().end(), new_i3->table()->entries().begin(), new_i3->table()->entries().end());
 
-    BOOST_CHECK_EQUAL(new_i0->table().entries()[0]._rules[0]._via, new_i1);
-    BOOST_CHECK_EQUAL(new_i1->table().entries()[0]._rules[0]._via, new_i0);
-    BOOST_CHECK_EQUAL(new_i2->table().entries()[0]._rules[0]._via, new_i3);
-    BOOST_CHECK_EQUAL(new_i3->table().entries()[0]._rules[0]._via, new_i2);
+    BOOST_CHECK_EQUAL(new_i0->table()->entries()[0]._rules[0]._via, new_i1);
+    BOOST_CHECK_EQUAL(new_i1->table()->entries()[0]._rules[0]._via, new_i0);
+    BOOST_CHECK_EQUAL(new_i2->table()->entries()[0]._rules[0]._via, new_i3);
+    BOOST_CHECK_EQUAL(new_i3->table()->entries()[0]._rules[0]._via, new_i2);
 
     // Check pairings of interfaces.
     BOOST_CHECK_EQUAL(new_i0->source(), new_router1);

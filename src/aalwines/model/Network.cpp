@@ -82,7 +82,7 @@ namespace aalwines {
         return *this;
     }
 
-    Router* Network::find_router(const std::string& router_name) {
+    Router* Network::find_router(const std::string& router_name) const {
         auto from_res = _mapping.exists(router_name);
         return from_res.first ? _mapping.get_data(from_res.second) : nullptr;
     }
@@ -91,28 +91,36 @@ namespace aalwines {
         return id < _routers.size() ? _routers[id].get() : nullptr;
     }
 
-    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, Router* router) {
-        return router->insert_interface(interface_name, _all_interfaces);
+    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, Router* router, bool make_table) {
+        return router->insert_interface(interface_name, _all_interfaces, make_table);
     }
-    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, const std::string& router_name) {
+    std::pair<bool, Interface*> Network::insert_interface_to(const std::string& interface_name, const std::string& router_name, bool make_table) {
         auto router = find_router(router_name);
-        return router == nullptr ? std::make_pair(false, nullptr) : insert_interface_to(interface_name, router);
+        return router == nullptr ? std::make_pair(false, nullptr) : insert_interface_to(interface_name, router, make_table);
     }
 
     void Network::add_null_router() {
+        bool used = false;
         auto null_router = add_router("NULL", true);
+        auto table = null_router->emplace_table();
         for(const auto& r : routers()) {
             for(const auto& inf : r->interfaces()) {
                 if(inf->match() == nullptr) {
+                    used = true;
                     std::stringstream interface_name;
                     interface_name << "i" << inf->global_id();
-                    insert_interface_to(interface_name.str(), null_router).second->make_pairing(inf.get());
+                    auto new_inf = insert_interface_to(interface_name.str(), null_router, false).second;
+                    new_inf->make_pairing(inf.get());
+                    new_inf->set_table(table);
                 }
             }
         }
+        table->sort();
+        if (!used) {
+            _routers.pop_back();
+            _mapping.erase("NULL");
+        }
     }
-
-    const char* empty_string = "";
 
     std::unordered_set<size_t> Network::interfaces(filter_t& filter) {
         std::unordered_set<size_t> res;
@@ -182,10 +190,10 @@ namespace aalwines {
         move_network(std::move(nested_network));
 
         // Add push and pop rules.
-        for (auto&& interface : link->source()->interfaces()) {
-            interface->table().add_to_outgoing(link, {RoutingTable::op_t::PUSH, pre_label});
+        for (auto&& table : link->source()->tables()) {
+            table->add_to_outgoing(link, {RoutingTable::op_t::PUSH, pre_label});
         }
-        virtual_guard->table().add_rule(post_label, RoutingTable::action_t(RoutingTable::op_t::POP), nested_end_link);
+        virtual_guard->table()->add_rule(post_label, RoutingTable::action_t(RoutingTable::op_t::POP), nested_end_link);
     }
 
     void Network::concat_network(Interface* link, Network&& nested_network, Interface* nested_ingoing, RoutingTable::label_t post_label) {
@@ -242,6 +250,13 @@ namespace aalwines {
         json_output.end_object();
     }
 
+    void Network::print_info(std::ostream& s) const {
+        s << "Network: " << name << std::endl;
+        s << "Routers: " << std::count_if(_routers.begin(), _routers.end(), [](const auto& r){ return !r->is_null(); }) << std::endl;
+        s << "Entries: " << std::transform_reduce(_routers.begin(), _routers.end(), 0, std::plus<>(), [](const auto& r){ return r->count_entries(); }) << std::endl;
+        s << "Rules: " << std::transform_reduce(_routers.begin(), _routers.end(), 0, std::plus<>(), [](const auto& r){ return r->count_rules(); }) << std::endl;
+    }
+
 
     Network Network::make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
@@ -268,7 +283,7 @@ namespace aalwines {
     }
     Network Network::make_network(const std::vector<std::pair<std::string,std::optional<Coordinate>>>& names, const std::vector<std::vector<std::string>>& links) {
         Network network;
-        std::map<std::string, std::string> _interface_map;
+        std::map<std::pair<std::string,std::string>, std::string> _interface_map;
         for (size_t i = 0; i < names.size(); ++i) {
             auto name = names[i].first;
             auto coordinate = names[i].second;
@@ -277,7 +292,7 @@ namespace aalwines {
             size_t interface_count = 0;
             for (const auto& other : links[i]) {
                 network.insert_interface_to("in" + std::to_string(interface_count), router);
-                _interface_map.insert({name + other, ("in" + std::to_string(interface_count))});
+                _interface_map.insert({std::make_pair(name,other), ("in" + std::to_string(interface_count))});
                 ++interface_count;
             }
         }
@@ -288,11 +303,92 @@ namespace aalwines {
                 assert(router1 != nullptr);
                 auto router2 = network.find_router(other);
                 if(router2 == nullptr) continue;
-                router1->find_interface(_interface_map[name + other])->make_pairing(router2->find_interface(_interface_map[other + name]));
+                router1->find_interface(_interface_map[std::make_pair(name,other)])->make_pairing(router2->find_interface(_interface_map[std::make_pair(other,name)]));
             }
         }
         network.add_null_router();
         return network;
+    }
+
+    bool Network::check_sanity(std::ostream& error_stream) const {
+        size_t router_i = 0;
+        for (const auto& router : _routers) {
+            if (router->index() != router_i) {
+                error_stream << "Router with index() " << router->index() << " are in position " << router_i << " of _routers. This is incorrect." << std::endl;
+                return false;
+            }
+            if (!router->check_sanity(error_stream)) {
+                error_stream << "When checking router with index " << router_i << " in the network." << std::endl;
+                return false;
+            }
+            for (const auto& router_name : router->names()) {
+                if (find_router(router_name) != router.get()) {
+                    error_stream << "Router name " << router_name << " is not mapped to router with index " << router->index() << "." << std::endl;
+                    return false;
+                }
+            }
+            for (const auto& interface : router->interfaces()) {
+                if (std::find_if(_all_interfaces.begin(), _all_interfaces.end(), [&interface](const auto& i){ return i == interface.get(); }) == _all_interfaces.end()) {
+                    error_stream << "Interface " << interface->get_name() << " in router " << router->name() << " is not in _all_interfaces." << std::endl;
+                    return false;
+                }
+            }
+            router_i++;
+        }
+        size_t interface_i = 0;
+        for (const Interface* interface : _all_interfaces) {
+            if (interface == nullptr) {
+                error_stream << "Network contains nullptr in _all_interfaces." << std::endl;
+                return false;
+            }
+            if (interface->source() == nullptr) {
+                error_stream << "Interface in _all_interfaces has source() == nullptr." << std::endl;
+                return false;
+            }
+            auto r = std::find_if(_routers.begin(), _routers.end(), [interface](const auto& r){ return r.get() == interface->source(); });
+            if (r == _routers.end()) {
+                error_stream << "Interface in _all_interfaces has source() that is not in _routers." << std::endl;
+                return false;
+            }
+            auto t = std::find_if(_routers.begin(), _routers.end(), [interface](const auto& r){ return r.get() == interface->target(); });
+            if (t == _routers.end()) {
+                error_stream << "Interface in _all_interfaces has target() that is not in _routers." << std::endl;
+                return false;
+            }
+            auto i = std::find_if(r->get()->interfaces().begin(), r->get()->interfaces().end(), [interface](const auto& i){ return i.get() == interface; });
+            if (i == r->get()->interfaces().end()) {
+                error_stream << "Interface in _all_interfaces was not found in its source()->interfaces()." << std::endl;
+                return false;
+            }
+            if (interface->global_id() != interface_i) {
+                error_stream << "Interface with global_id() " << interface_i << " is in position " << interface_i << " of _all_interfaces. This is incorrect." << std::endl;
+                return false;
+            }
+            interface_i++;
+        }
+        return true;
+    }
+
+    void Network::prepare_tables() {
+        for (const auto& router : _routers) {
+            for (const auto& table : router->tables()) {
+                std::unordered_set<const Interface*> out_interfaces;
+                for (const auto& entry : table->entries()) {
+                    for (const auto& rule : entry._rules) {
+                        out_interfaces.emplace(rule._via);
+                    }
+                }
+                table->set_out_interfaces(out_interfaces);
+                table->sort();
+                table->sort_rules();
+            }
+        }
+    }
+
+    void Network::pre_process(std::ostream& log) {
+        for (const auto& router : _routers) {
+            router->pre_process(log);
+        }
     }
 
 }

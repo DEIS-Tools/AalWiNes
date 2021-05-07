@@ -62,12 +62,16 @@ namespace aalwines {
             return _parent;
         }
 
-        RoutingTable& table() {
+        RoutingTable* table() {
             return _table;
         }
 
-        [[nodiscard]] const RoutingTable& table() const {
+        [[nodiscard]] const RoutingTable* table() const {
             return _table;
+        }
+        void set_table(RoutingTable* table) {
+            _table = table;
+            _table->add_my_interface(this);
         }
 
         [[nodiscard]] bool is_virtual() const {
@@ -92,7 +96,7 @@ namespace aalwines {
         Router* _target = nullptr;
         Router* _parent = nullptr;
         Interface* _matching = nullptr;
-        RoutingTable _table;
+        RoutingTable* _table = nullptr;
     };
 
     class Router {
@@ -128,15 +132,20 @@ namespace aalwines {
         [[nodiscard]] const std::string& name() const;
         [[nodiscard]] const std::vector<std::string>& names() const { return _names; }
 
-        void print_dot(std::ostream& out) const;
         [[nodiscard]] const std::vector<std::unique_ptr<Interface>>& interfaces() const { return _interfaces; }
-        std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
+        std::pair<bool,Interface*> insert_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces, bool make_table = true);
         Interface* get_interface(const std::string& interface_name, std::vector<const Interface*>& all_interfaces);
         Interface* find_interface(const std::string& interface_name);
         [[nodiscard]] std::string interface_name(size_t i) const;
 
+        RoutingTable* emplace_table() { return _tables.emplace_back(std::make_unique<RoutingTable>()).get(); }
+        [[nodiscard]] const std::vector<std::unique_ptr<RoutingTable>>& tables() const { return _tables; }
+
+        void print_dot(std::ostream& out) const;
         void print_simple(std::ostream& s) const;
         void print_json(json_stream& json_output) const;
+        [[nodiscard]] size_t count_rules() const;
+        [[nodiscard]] size_t count_entries() const;
 
         void set_latitude_longitude(const std::string& latitude, const std::string& longitude);
         [[nodiscard]] std::string latitude() const {return _coordinate ? std::to_string(_coordinate->latitude()) : ""; };
@@ -144,12 +153,18 @@ namespace aalwines {
         [[nodiscard]] std::optional<Coordinate> coordinate() const { return _coordinate; }
         void set_coordinate(Coordinate coordinate) { _coordinate.emplace(coordinate); }
 
+        // Check sanity of network data structure
+        bool check_sanity(std::ostream& error_stream = std::cerr) const;
+        // Remove redundant rules.
+        void pre_process(std::ostream& log = std::cerr);
+
     private:
         size_t _index = std::numeric_limits<size_t>::max();
         std::vector<std::string> _names;
         std::optional<Coordinate> _coordinate = std::nullopt;
         bool _is_null = false;
         std::vector<std::unique_ptr<Interface>> _interfaces;
+        std::vector<std::unique_ptr<RoutingTable>> _tables;
         string_map<Interface*> _interface_map;
     };
 }

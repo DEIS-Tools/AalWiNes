@@ -101,6 +101,9 @@ namespace aalwines {
                     } else if (key == "Longitude") {
                         longitude = std::stod(str.substr(pos+1));
                     } else if (key == "]") {
+                        if (router_name.empty()) {
+                            router_name = std::to_string(id);
+                        }
                         if (std::find_if(_all_routers.begin(), _all_routers.end(), // We may have duplicate names, so we find a suffix to make it unique.
                                          [&](const auto& item){ return item.first == router_name; }) != _all_routers.end()) {
                             size_t suffix = 2;
@@ -108,6 +111,7 @@ namespace aalwines {
                             while (std::find_if(_all_routers.begin(), _all_routers.end(),
                                                 [&](const auto& item){ return item.first == new_router_name; }) != _all_routers.end()) {
                                 suffix++;
+                                new_router_name = router_name + std::to_string(suffix);
                             }
                             router_name = new_router_name;
                         }
@@ -145,7 +149,12 @@ namespace aalwines {
                 _return_links[to_id].emplace_back(_all_routers[from_id].first);
             }
         }
-        return Network::make_network(_all_routers, _return_links);
+        auto network = Network::make_network(_all_routers, _return_links);
+        // Use filename (without file-extension) is network name.
+        auto pos = gml.find_last_of('/');
+        auto file_name = gml.substr((pos == std::string::npos) ? 0 : pos + 1);
+        network.name = file_name.substr(0, file_name.find('.'));
+        return network;
     }
 
     inline json to_json_no_routing(const Router& router) {
@@ -158,11 +167,11 @@ namespace aalwines {
             }
         }
         j["interfaces"] = json::array();
+        j["interfaces"].emplace_back();
+        j["interfaces"].back()["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
+        j["interfaces"].back()["names"] = json::array();
         for (const auto& interface : router.interfaces()) {
-            auto j_i = json::object();
-            j_i["name"] = interface->get_name();
-            j_i["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
-            j["interfaces"].push_back(j_i);
+            j["interfaces"].back()["names"].push_back(interface->get_name());
         }
         if (router.coordinate()) {
             j["location"] = router.coordinate().value();

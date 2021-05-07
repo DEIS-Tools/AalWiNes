@@ -117,7 +117,8 @@ namespace aalwines {
 
         // Interface
         std::vector<Interface*> current_interfaces;
-        RoutingTable current_table;
+        RoutingTable* current_table;
+        std::unordered_set<const Interface*> current_table_out_interfaces;
         std::unordered_set<std::string> forward_constructed_interfaces;
 
         // Entry
