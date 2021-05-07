@@ -31,9 +31,13 @@
 #include <vector>
 #include <map>
 
+#include <json.hpp>
 #include <ptrie/ptrie_map.h>
 
 #include "Query.h"
+#include <pdaaal/PDA.h>
+
+using json = nlohmann::json;
 
 namespace aalwines {
     class Interface;
@@ -61,28 +65,33 @@ namespace aalwines {
                 assert(op == op_t::PUSH || op == op_t::SWAP);
                 _op_label = static_cast<size_t>(std::stoul(op_label));
             };
-            void print_json(std::ostream& s, bool quote = true, bool use_hex = true, const Network* network = nullptr) const;
+            void print_json(std::ostream& s, bool quote = true, bool use_hex = true) const;
+            [[nodiscard]] json to_json() const;
             bool operator==(const action_t& other) const;
             bool operator!=(const action_t& other) const;
+            [[nodiscard]] std::pair<pdaaal::op_t,label_t> convert_to_pda_op() const;
+            std::pair<pdaaal::op_t,size_t> convert_to_pda_op(const std::function<std::pair<bool,size_t>(const label_t&)>& label_abstraction) const;
         };
 
         struct forward_t {
             std::vector<action_t> _ops;
             Interface* _via = nullptr;
-            size_t _priority = 0;
+            size_t _priority = 0; // Initially this is the order of priority, but after RoutingTable::pre_process_rules(), this is the size of the set of failed links needed for this rule to be active.
             uint32_t _weight = 0;
             forward_t() = default;
             forward_t(std::vector<action_t> ops, Interface* via, size_t priority, uint32_t weight = 0)
                 : _ops(std::move(ops)), _via(via), _priority(priority), _weight(weight) {};
-            void print_json(std::ostream&, bool use_hex = true, const Network* network = nullptr) const;
+            void print_json(std::ostream&, bool use_hex = true) const;
+            [[nodiscard]] json to_json() const;
             friend std::ostream& operator<<(std::ostream& s, const forward_t& fwd);
             bool operator==(const forward_t& other) const;
             bool operator!=(const forward_t& other) const;
             void add_action(action_t action);
+            [[nodiscard]] std::pair<pdaaal::op_t,label_t> first_action() const;
+            std::pair<pdaaal::op_t,size_t> first_action(const std::function<std::pair<bool,size_t>(const label_t&)>& label_abstraction) const;
         };
-
         struct entry_t {
-            size_t _top_label = std::numeric_limits<size_t>::max();
+            size_t _top_label = Query::wildcard_label();
             std::vector<forward_t> _rules;
 
             entry_t() = default;
@@ -101,8 +110,14 @@ namespace aalwines {
             friend std::ostream& operator<<(std::ostream& s, const entry_t& entry);
             void add_to_outgoing(const Interface* outgoing, action_t action);
             [[nodiscard]] bool ignores_label() const {
-                return _top_label == std::numeric_limits<size_t>::max();
+                return _top_label == Query::wildcard_label();
             }
+        };
+        struct CompEntryLabel {
+            bool operator()(const entry_t& a, const label_t& b) const { return a._top_label < b; }
+            bool operator()(const label_t& a, const entry_t& b) const { return a < b._top_label; }
+            bool operator()(const entry_t& a, const entry_t& b) const { return a._top_label < b._top_label; }
+            bool operator()(const label_t& a, const label_t& b) const { return a < b; }
         };
 
     public:
@@ -112,6 +127,7 @@ namespace aalwines {
         [[nodiscard]] const std::vector<entry_t>& entries() const;
         
         void sort();
+        void sort_rules();
         template <typename... Args>
         entry_t& emplace_entry(Args... args) { return _entries.emplace_back(std::forward<Args>(args)...); }
         void pop_entry() { _entries.pop_back(); }
@@ -126,11 +142,30 @@ namespace aalwines {
         void merge(const RoutingTable& other);
 
         void update_interfaces(const std::function<Interface*(const Interface*)>& update_fn);
+
+        void pre_process_rules(std::ostream& log);
+        [[nodiscard]] size_t count_rules() const;
+
+        void add_my_interface(const Interface* inf) {
+            assert(std::find(_my_interfaces.begin(), _my_interfaces.end(), inf) == _my_interfaces.end());
+            _my_interfaces.emplace_back(inf);
+        }
+        [[nodiscard]] const std::vector<const Interface*>& interfaces() const {
+            return _my_interfaces;
+        }
+        void set_out_interfaces(const std::unordered_set<const Interface*>& out_interfaces) {
+            _out_interfaces = std::vector<const Interface*>(out_interfaces.begin(), out_interfaces.end());
+        }
+        [[nodiscard]] const std::vector<const Interface*>& out_interfaces() const {
+            return _out_interfaces;
+        }
         
     private:
         std::vector<entry_t>::iterator insert_entry(label_t top_label);
 
         std::vector<entry_t> _entries;
+        std::vector<const Interface*> _my_interfaces; // The interfaces inf for which inf->table() == this
+        std::vector<const Interface*> _out_interfaces; // The interfaces inf for which there exists eid,rid such that entries()[eid]._rules[rid]._via == inf
     };
 }
 #endif /* ROUTINGTABLE_H */

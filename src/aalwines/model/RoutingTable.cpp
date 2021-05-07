@@ -175,7 +175,59 @@ namespace aalwines
         return !(*this == other);
     }
 
-    void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex, const Network* network) const
+    std::pair<pdaaal::op_t,size_t> RoutingTable::forward_t::first_action(const std::function<std::pair<bool,size_t>(const label_t&)>& label_abstraction) const {
+        if (_ops.empty()) {
+            return std::make_pair(pdaaal::NOOP, std::numeric_limits<uint32_t>::max());
+        } else {
+            return _ops[0].convert_to_pda_op(label_abstraction);
+        }
+    }
+    std::pair<pdaaal::op_t,size_t> RoutingTable::action_t::convert_to_pda_op(const std::function<std::pair<bool,size_t>(const label_t&)>& label_abstraction) const {
+        pdaaal::op_t op = pdaaal::POP;
+        size_t op_label = std::numeric_limits<uint32_t>::max();
+        switch (_op) {
+            case RoutingTable::op_t::PUSH:
+                op = pdaaal::PUSH;
+                assert(label_abstraction(_op_label).first);
+                op_label = label_abstraction(_op_label).second;
+                break;
+            case RoutingTable::op_t::SWAP:
+                op = pdaaal::SWAP;
+                assert(label_abstraction(_op_label).first);
+                op_label = label_abstraction(_op_label).second;
+                break;
+            case op_t::POP:
+                break;
+        }
+        return std::make_pair(op, op_label);
+    }
+    std::pair<pdaaal::op_t,Query::label_t> RoutingTable::forward_t::first_action() const {
+        if (_ops.empty()) {
+            return std::make_pair(pdaaal::NOOP, Query::label_t());
+        } else {
+            return _ops[0].convert_to_pda_op();
+        }
+    }
+    std::pair<pdaaal::op_t,Query::label_t> RoutingTable::action_t::convert_to_pda_op() const {
+        pdaaal::op_t op = pdaaal::POP;
+        Query::label_t op_label = Query::unused_label(); // Just needs to be initialized to something.
+        switch (_op) {
+            case RoutingTable::op_t::PUSH:
+                op = pdaaal::PUSH;
+                op_label = _op_label;
+                break;
+            case RoutingTable::op_t::SWAP:
+                op = pdaaal::SWAP;
+                op_label = _op_label;
+                break;
+            case RoutingTable::op_t::POP:
+            default:
+                break;
+        }
+        return std::make_pair(op, op_label);
+    }
+
+    void RoutingTable::action_t::print_json(std::ostream& s, bool quote, bool use_hex) const
     {
         switch (_op) {
         case op_t::SWAP:
@@ -215,9 +267,30 @@ namespace aalwines
             break;
         }
     }
+    json RoutingTable::action_t::to_json() const {
+        json result;
+        switch (_op) {
+            case op_t::SWAP: {
+                std::stringstream s;
+                s << _op_label;
+                result["swap"] = s.str();
+                return result;
+            }
+            case op_t::PUSH: {
+                std::stringstream s;
+                s << _op_label;
+                result["push"] = s.str();
+                break;
+            }
+            case op_t::POP: {
+                result = "pop";
+                break;
+            }
+        }
+        return result;
+    }
 
-    void RoutingTable::entry_t::print_json(std::ostream& s) const
-    {
+    void RoutingTable::entry_t::print_json(std::ostream& s) const {
         if (ignores_label()) {
             s << "\"null\"";
         } else {
@@ -234,15 +307,13 @@ namespace aalwines
         s << "\n\t]";
     }
 
-    void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote)
-    {
+    void RoutingTable::entry_t::print_label(label_t label, std::ostream& s, bool quote) {
         if (quote) s << "\"";
         s << label;
         if (quote) s << "\"";
     }
 
-    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex, const Network* network) const
-    {
+    void RoutingTable::forward_t::print_json(std::ostream& s, bool use_hex) const {
         s << "{";
         s << "\"weight\":" << _priority;
         if (_via) {
@@ -260,15 +331,28 @@ namespace aalwines
             for (size_t i = 0; i < _ops.size(); ++i) {
                 if (i != 0)
                     s << ", ";
-                _ops[i].print_json(s, true, use_hex, network);
+                _ops[i].print_json(s, true, use_hex);
             }
             s << "]";
         }
         s << "}";
     }
 
-    void RoutingTable::print_json(std::ostream& s) const
-    {
+    json RoutingTable::forward_t::to_json() const {
+        json rule = json::object();
+        rule["weight"] = _priority;
+        assert(_via);
+        rule["via"] = _via->get_name();
+        if (!_ops.empty()) {
+            rule["ops"] = json::array();
+            for (const auto& op : _ops) {
+                rule["ops"].push_back(op.to_json());
+            }
+        }
+        return rule;
+    }
+
+    void RoutingTable::print_json(std::ostream& s) const {
         s << "\t{\n";
         for (size_t i = 0; i < _entries.size(); ++i) {
             if (i != 0)
@@ -279,29 +363,31 @@ namespace aalwines
         s << "\n\t}";
     }
 
-    void RoutingTable::sort()
-    {
+    void RoutingTable::sort() {
         std::sort(std::begin(_entries), std::end(_entries));
+        std::sort(std::begin(_my_interfaces), std::end(_my_interfaces));
+        std::sort(std::begin(_out_interfaces), std::end(_out_interfaces));
+    }
+    void RoutingTable::sort_rules() {
+        for (auto& entry : _entries) {
+            std::sort(entry._rules.begin(), entry._rules.end(), [](const auto& a, const auto& b){ return a._priority < b._priority; });
+        }
     }
 
-    bool RoutingTable::empty() const
-    {
+    bool RoutingTable::empty() const {
         return _entries.empty();
     }
 
-    const std::vector<RoutingTable::entry_t>& RoutingTable::entries() const
-    {
+    const std::vector<RoutingTable::entry_t>& RoutingTable::entries() const {
         return _entries;
     }
 
-    std::ostream& operator<<(std::ostream& s, const RoutingTable::forward_t& fwd)
-    {
+    std::ostream& operator<<(std::ostream& s, const RoutingTable::forward_t& fwd) {
         fwd.print_json(s);
         return s;
     }
 
-    std::ostream& operator<<(std::ostream& s, const RoutingTable::entry_t& entry)
-    {
+    std::ostream& operator<<(std::ostream& s, const RoutingTable::entry_t& entry) {
         s << entry._top_label << " ";
         entry.print_json(s);
         return s;
@@ -313,6 +399,60 @@ namespace aalwines
                 rule._via = update_fn(rule._via);
             }
         }
+    }
+
+    void RoutingTable::pre_process_rules(std::ostream& log) {
+        // If a rule uses a link that it (due to its priority) also assumes to be disabled, then we can remove that rule.
+        // Update the _priority of the rule to be the size of the set of failed links needed for that rule to be active.
+        for (auto& entry : _entries) {
+            if (entry._rules.empty()) continue;
+
+            auto log_removal = [&entry,&log](const forward_t& forward){
+                log << "Removing rule: \"";
+                (entry.ignores_label() ? (log << "null") : (log << entry._top_label)) << "\" : ";
+                forward.print_json(log, false);
+                log << std::endl;
+            };
+
+            std::unordered_set<const Interface*> higher_priority_interfaces;
+            std::unordered_set<const Interface*> temp;
+            size_t last_priority = 0;
+            // This is like std::remove_if, but for stateful predicate.
+            auto first = entry._rules.begin();
+            auto last = entry._rules.end();
+            for (; first != last; ++first) {
+                assert(first->_priority >= last_priority);
+                if (first->_priority > last_priority) {
+                    higher_priority_interfaces = temp;
+                    last_priority = first->_priority;
+                }
+                first->_priority = higher_priority_interfaces.size(); // Set priority to the size of the smallest set of failed links that makes this rule (*first) be active.
+                temp.emplace(first->_via);
+                if (higher_priority_interfaces.count(first->_via) > 0) { // Remove *first
+                    log_removal(*first);
+                    for(auto i = first; ++i != last; ) {
+                        assert(i->_priority >= last_priority);
+                        if (i->_priority > last_priority) {
+                            higher_priority_interfaces = temp;
+                            last_priority = i->_priority;
+                        }
+                        i->_priority = higher_priority_interfaces.size();
+                        temp.emplace(i->_via);
+                        if (higher_priority_interfaces.count(i->_via) == 0) {
+                            *first++ = std::move(*i);
+                        } else {
+                            log_removal(*i);
+                        }
+                    }
+                    break;
+                }
+            }
+            entry._rules.erase(first, last);
+        }
+    }
+
+    size_t RoutingTable::count_rules() const {
+        return std::transform_reduce(_entries.begin(), _entries.end(), 0, std::plus<>(), [](const auto& entry){ return entry._rules.size(); });
     }
 
 }

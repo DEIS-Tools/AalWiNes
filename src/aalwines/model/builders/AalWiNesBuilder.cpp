@@ -70,7 +70,7 @@ namespace aalwines {
                     throw base_error(es.str());
                 }
                 for (const auto& interface_name : interface_names) {
-                    auto [was_inserted, _] = network.insert_interface_to(interface_name, router);
+                    auto [was_inserted, _] = network.insert_interface_to(interface_name, router, false);
                     if (!was_inserted) {
                         es << "error: Duplicate interface name \"" << interface_name << "\" on router \"" << names.back() << "\"." << std::endl;
                         throw base_error(es.str());
@@ -88,26 +88,29 @@ namespace aalwines {
                     es << "error: routing table field for interface \"" << interface_names[0] << "\" of router \"" << names.back() << "\" is not an object." << std::endl;
                     throw base_error(es.str());
                 }
+                RoutingTable* table = router->emplace_table();
+                std::unordered_set<const Interface*> table_out_interfaces;
+                for (const auto& [label_string, json_routing_entries] : json_routing_table.items()) {
+                    auto& entry = table->emplace_entry(label_string);
 
-                for (const auto& interface_name : interface_names) {
-                    auto interface = router->find_interface(interface_name);
-                    // TODO: This construction can be optimized. Currently we copy shared routing tables onto each interface.
-                    for (const auto& [label_string, json_routing_entries] : json_routing_table.items()) {
-                        auto& entry = interface->table().emplace_entry(label_string);
-
-                        if (!json_routing_entries.is_array()) {
-                            es << "error: Value of routing table entry \"" << label_string << "\" is not an array. In interface \"" << interface_name << "\" of router \"" << names.back() << "\"." << std::endl;
-                            throw base_error(es.str());
-                        }
-                        for (const auto& json_routing_entry : json_routing_entries) {
-                            auto via = router->find_interface(json_routing_entry.at("out").get<std::string>());
-                            auto ops = json_routing_entry.at("ops").get<std::vector<RoutingTable::action_t>>();
-                            auto priority = json_routing_entry.at("priority").get<size_t>();
-                            auto weight = json_routing_entry.contains("weight") ? json_routing_entry.at("weight").get<uint32_t>() : 0;
-                            entry._rules.emplace_back(std::move(ops), via, priority, weight);
-                        }
+                    if (!json_routing_entries.is_array()) {
+                        es << "error: Value of routing table entry \"" << label_string << "\" is not an array. In interface \"" << interface_names[0] << "\" of router \"" << names.back() << "\"." << std::endl;
+                        throw base_error(es.str());
+                    }
+                    for (const auto& json_routing_entry : json_routing_entries) {
+                        auto via = router->find_interface(json_routing_entry.at("out").get<std::string>());
+                        auto ops = json_routing_entry.at("ops").get<std::vector<RoutingTable::action_t>>();
+                        auto priority = json_routing_entry.at("priority").get<size_t>();
+                        auto weight = json_routing_entry.contains("weight") ? json_routing_entry.at("weight").get<uint32_t>() : 0;
+                        entry._rules.emplace_back(std::move(ops), via, priority, weight);
+                        table_out_interfaces.emplace(via);
                     }
                 }
+                table->set_out_interfaces(table_out_interfaces);
+                for (const auto& interface_name : interface_names) {
+                    router->find_interface(interface_name)->set_table(table);
+                }
+                table->sort(); table->sort_rules();
             }
         }
 

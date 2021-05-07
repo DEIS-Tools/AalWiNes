@@ -156,16 +156,14 @@ namespace aalwines {
     inline void to_json(json & j, const RoutingTable& table) {
         j = json::object();
         for (const auto& entry : table.entries()) {
-            std::stringstream label;
-            label << entry._top_label;
-            j[label.str()] = entry._rules;
+            if (entry.ignores_label()) {
+                j["null"] = entry._rules;
+            } else {
+                std::stringstream label;
+                label << entry._top_label;
+                j[label.str()] = entry._rules;
+            }
         }
-    }
-
-    inline void to_json(json & j, const Interface& interface) {
-        j = json::object();
-        j["name"] = interface.get_name();
-        j["routing_table"] = interface.table();
     }
 
     inline void to_json(json & j, const Router& router) {
@@ -177,7 +175,26 @@ namespace aalwines {
                 j["alias"].emplace_back(router.names()[i]);
             }
         }
-        j["interfaces"] = router.interfaces();
+        j["interfaces"] = json::array();
+        for (const auto& table : router.tables()) {
+            j["interfaces"].emplace_back();
+            json& j_inf = j["interfaces"].back();
+            j_inf["routing_table"] = table;
+            std::vector<Interface*> interfaces; // Find interfaces matching current table
+            for (const auto& interface : router.interfaces()) {
+                if (interface->table() == table.get()) {
+                    interfaces.push_back(interface.get());
+                }
+            }
+            if (interfaces.size() == 1) { // Output name or names of interface(s).
+                j_inf["name"] = interfaces[0]->get_name();
+            } else {
+                j_inf["names"] = json::array();
+                for (const auto& interface : interfaces) {
+                    j_inf["names"].push_back(interface->get_name());
+                }
+            }
+        }
         if (router.coordinate()) {
             j["location"] = router.coordinate().value();
         }
@@ -203,9 +220,9 @@ namespace nlohmann {
             for (const auto& interface : network.all_interfaces()){
                 if (interface->match() == nullptr) continue; // Not connected
                 if (interface->source()->is_null() || interface->target()->is_null()) continue; // Skip the NULL router
-                if (interface->match()->table().empty()) continue; // Not this direction
+                if (interface->match()->table() == nullptr || interface->match()->table()->empty()) continue; // Not this direction
                 assert(interface->match()->match() == interface);
-                bool bidirectional = !interface->table().empty();
+                bool bidirectional = interface->table() != nullptr && !interface->table()->empty();
                 if (interface->global_id() > interface->match()->global_id() && bidirectional) continue; // Already covered by bidirectional link the other way.
 
                 auto link_j = json::object();

@@ -52,18 +52,26 @@ namespace aalwines {
     Network aalwines::TopologyBuilder::parse(const std::string &gml, std::ostream& warnings) {
         std::ifstream file(gml);
 
-        if(not file){
+        if(!file){
             std::cerr << "Error file not found." << std::endl;
         }
 
-        std::vector<std::pair<size_t, size_t >> _all_links;
-        std::vector<std::pair<std::string, Coordinate>> _all_routers;
-        std::map<const size_t, std::string> _router_map;
+        std::vector<std::pair<size_t, size_t>> _parsed_links;
+        std::vector<std::pair<std::string, std::optional<Coordinate>>> _all_routers;
+        std::unordered_map<size_t, size_t> _index_map; // From 'id' attribute to its index in _all_routers vector.
         std::vector<std::vector<std::string>> _return_links;
+        bool directed = false;
 
         std::string str;
-        while (std::getline(file, str, ' ')) {
-            if(str =="node") {
+        while (std::getline(file >> std::ws, str, ' ')) {
+            trim(str);
+            if (str == "directed") {
+                char next;
+                file >> next;
+                if (next == '1') {
+                    directed = true;
+                }
+            } else if (str =="node") {
                 size_t id;
                 std::string router_name;
                 double latitude = 0;
@@ -73,44 +81,52 @@ namespace aalwines {
                     auto pos = str.find(' ');
                     if (pos == str.size()) continue;
                     std::string key = str.substr(0, pos);
-                    if(key == "id"){
+                    if (key == "id") {
                         id = std::stoul(str.substr(pos+1));
-                    }
-                    else if(key == "label"){
+                    } else if (key == "label") {
                         router_name = str.substr(pos+2, str.size() - pos - 3);
                         trim(router_name);
                         //Get_interface dont handle ' ' very well
                         std::replace(router_name.begin(), router_name.end(), ' ', '_');
                         router_name.erase(std::remove_if(router_name.begin(), router_name.end(),
                                 [](auto const& c) -> bool { return !std::isalnum(c) && c != '_' && c != '-'; }), router_name.end());
-                    }
-                    else if(key == "Latitude"){
+                    } else if (key == "name" && router_name.empty()) { // In some cases we have a 'name' attribute instead of a 'label' attribute.
+                        router_name = str.substr(pos+1);
+                        trim(router_name);
+                        std::replace(router_name.begin(), router_name.end(), ' ', '_');
+                        router_name.erase(std::remove_if(router_name.begin(), router_name.end(),
+                                [](auto const& c) -> bool { return !std::isalnum(c) && c != '_' && c != '-'; }), router_name.end());
+                    } else if (key == "Latitude") {
                         latitude = std::stod(str.substr(pos+1));
-                    }
-                    else if(key == "Longitude"){
+                    } else if (key == "Longitude") {
                         longitude = std::stod(str.substr(pos+1));
-                    }
-                    else if(key == "]"){
-                        bool indexer_active = false;
-                        while (std::find_if( _all_routers.begin(), _all_routers.end(),
-                                [&]( std::pair<std::string,Coordinate> &item ) { return item.first == router_name; } )
-                                != _all_routers.end()) {
-                            if (indexer_active){
-                                if ((int) router_name[router_name.size()-1]++ - 48 > 5) assert(false);
-                            } else {
-                                router_name += "2";
-                                indexer_active = true;
-                            }
+                    } else if (key == "]") {
+                        if (router_name.empty()) {
+                            router_name = std::to_string(id);
                         }
-                        assert(latitude != 0 or longitude != 0);
-                        _all_routers.emplace_back(router_name, Coordinate{latitude, longitude});
-                        _router_map.insert({id, router_name});
+                        if (std::find_if(_all_routers.begin(), _all_routers.end(), // We may have duplicate names, so we find a suffix to make it unique.
+                                         [&](const auto& item){ return item.first == router_name; }) != _all_routers.end()) {
+                            size_t suffix = 2;
+                            std::string new_router_name = router_name + std::to_string(suffix);
+                            while (std::find_if(_all_routers.begin(), _all_routers.end(),
+                                                [&](const auto& item){ return item.first == new_router_name; }) != _all_routers.end()) {
+                                suffix++;
+                                new_router_name = router_name + std::to_string(suffix);
+                            }
+                            router_name = new_router_name;
+                        }
+                        auto index = _all_routers.size();
+                        if(latitude == 0 && longitude == 0) {
+                            _all_routers.emplace_back(router_name, std::nullopt);
+                        } else {
+                            _all_routers.emplace_back(router_name, Coordinate{latitude, longitude});
+                        }
+                        _index_map.emplace(id, index);
                         _return_links.emplace_back();
                         break;
                     }
                 }
-            }
-            else if(str == "edge"){
+            } else if (str == "edge") {
                 size_t source;
                 size_t target;
                 while (std::getline(file, str, ' ')) {
@@ -118,33 +134,44 @@ namespace aalwines {
                         file >> source;
                     } else if (str == "target") {
                         file >> target;
-                        _all_links.emplace_back(source, target);
+                        _parsed_links.emplace_back(source, target);
                         break;
                     }
                 }
             }
         }
 
-        for(size_t i = 0; i < _all_routers.size(); i++){
-            for(auto& link : _all_links){
-                if(link.first == i){
-                    _return_links[i].emplace_back(_router_map[link.second]);
-                    _return_links[link.second].emplace_back(_router_map[link.first]);
-                }
+        for(const auto& link : _parsed_links){
+            auto from_id = _index_map[link.first];
+            auto to_id = _index_map[link.second];
+            _return_links[from_id].emplace_back(_all_routers[to_id].first);
+            if (!directed) {
+                _return_links[to_id].emplace_back(_all_routers[from_id].first);
             }
         }
-        return Network::make_network(_all_routers, _return_links);
+        auto network = Network::make_network(_all_routers, _return_links);
+        // Use filename (without file-extension) is network name.
+        auto pos = gml.find_last_of('/');
+        auto file_name = gml.substr((pos == std::string::npos) ? 0 : pos + 1);
+        network.name = file_name.substr(0, file_name.find('.'));
+        return network;
     }
 
     inline json to_json_no_routing(const Router& router) {
         auto j = json::object();
-        j["names"] = router.names();
+        j["name"] = router.names().back();
+        if (router.names().size() > 1) {
+            j["alias"] = json::array();
+            for (size_t i = 0; i < router.names().size() - 1; ++i) {
+                j["alias"].emplace_back(router.names()[i]);
+            }
+        }
         j["interfaces"] = json::array();
+        j["interfaces"].emplace_back();
+        j["interfaces"].back()["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
+        j["interfaces"].back()["names"] = json::array();
         for (const auto& interface : router.interfaces()) {
-            auto j_i = json::object();
-            j_i["name"] = interface->get_name();
-            j_i["routing_table"] = json::object(); // Only topology, so empty routing_table in this mode.
-            j["interfaces"].push_back(j_i);
+            j["interfaces"].back()["names"].push_back(interface->get_name());
         }
         if (router.coordinate()) {
             j["location"] = router.coordinate().value();

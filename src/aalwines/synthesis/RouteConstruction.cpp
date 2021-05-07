@@ -97,23 +97,21 @@ namespace aalwines {
         auto p = elem.back_pointer;
         assert(p != nullptr);
         // Copy routing table to incoming failover interface.
-        elem.edge->match()->table().merge(failed_inf->match()->table());
+        elem.edge->match()->table()->merge(*failed_inf->match()->table());
         // POP at last hop of re-route
         auto label = next_label();
-        p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::POP), elem.edge);
+        p->edge->match()->table()->add_rule(label, RoutingTable::action_t(RoutingTable::op_t::POP), elem.edge);
         // SWAP for each intermediate hop during re-route
         auto via = p->edge;
         for (p = p->back_pointer; p != nullptr; via = p->edge, p = p->back_pointer) {
             auto old_label = label;
             label = next_label();
-            p->edge->match()->table().add_rule(label, RoutingTable::action_t(RoutingTable::op_t::SWAP, old_label), via);
+            p->edge->match()->table()->add_rule(label, RoutingTable::action_t(RoutingTable::op_t::SWAP, old_label), via);
         }
         assert(p == nullptr);
         // PUSH at first hop of re-route
-        for (const auto& i : via->source()->interfaces()) {
-            auto interface = i.get();
-            if (interface == failed_inf) continue;
-            interface->table().add_failover_entries(failed_inf, via, label);
+        for (const auto& table : via->source()->tables()) {
+            table->add_failover_entries(failed_inf, via, label);
         }
         return true;
     }
@@ -168,7 +166,7 @@ namespace aalwines {
         for (auto via : path) {
             if (from->source() != via->source()) return false;
             auto swap_label = next_label();
-            from->table().add_rule(pre_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, swap_label), via);
+            from->table()->add_rule(pre_label, RoutingTable::action_t(RoutingTable::op_t::SWAP, swap_label), via);
             from = via->match();
             pre_label = swap_label;
         }

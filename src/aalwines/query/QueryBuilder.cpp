@@ -123,8 +123,8 @@ namespace aalwines
             res.insert(Query::unused_label()); // This label will 'match' any label in the query that is not present in the network.
             res.insert(Query::bottom_of_stack()); // This label is used in the PDA construction to represent the bottom of the stack.
             for (const auto& r : _network.routers()) {
-                for (const auto& inf : r->interfaces()) {
-                    for (const auto& e : inf->table().entries()) {
+                for (const auto& table : r->tables()) {
+                    for (const auto& e : table->entries()) {
                         if (!e.ignores_label()) res.insert(e._top_label);
                         for (const auto& f : e._rules) {
                             for (const auto& o : f._ops) {

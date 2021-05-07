@@ -80,26 +80,34 @@ namespace aalwines {
             return router;
         }
         Router* get_router(size_t id);
-        Router* find_router(const std::string& router_name);
+        [[nodiscard]] Router* find_router(const std::string& router_name) const;
         [[nodiscard]] const std::vector<std::unique_ptr<Router>>& routers() const { return _routers; }
         [[nodiscard]] size_t size() const { return _routers.size(); }
 
-        std::pair<bool, Interface*> insert_interface_to(const std::string& interface_name, Router* router);
-        std::pair<bool, Interface*> insert_interface_to(const std::string& interface_name, const std::string& router_name);
+        std::pair<bool, Interface*> insert_interface_to(const std::string& interface_name, Router* router, bool make_table = true);
+        std::pair<bool, Interface*> insert_interface_to(const std::string& interface_name, const std::string& router_name, bool make_table = true);
         [[nodiscard]] const std::vector<const Interface*>& all_interfaces() const { return _all_interfaces; }
         std::unordered_set<Query::label_t> interfaces(filter_t& filter);
 
         void add_null_router();
+
+        // Check sanity of network data structure
+        bool check_sanity(std::ostream& error_stream = std::cerr) const;
+        // Remove redundant rules.
+        void pre_process(std::ostream& log = std::cerr);
+        void prepare_tables(); // Sets up data structures in tables. Use if tables were modified. Use before pre_process.
 
         void inject_network(Interface* link, Network&& nested_network, Interface* nested_ingoing,
                             Interface* nested_outgoing, RoutingTable::label_t pre_label, RoutingTable::label_t post_label);
         void concat_network(Interface *link, Network &&nested_network, Interface *nested_ingoing, RoutingTable::label_t post_label);
 
         static Network make_network(const std::vector<std::string>& names, const std::vector<std::vector<std::string>>& links);
-        static Network make_network(const std::vector<std::pair<std::string,Coordinate>>& names, const std::vector<std::vector<std::string>>& links);
+        static Network make_network(const std::vector<std::pair<std::string,std::optional<Coordinate>>>& names, const std::vector<std::vector<std::string>>& links);
         void print_dot(std::ostream& s) const;
+        void print_dot_topo(std::ostream& s) const;
         void print_simple(std::ostream& s) const;
         void print_json(json_stream& json_output) const;
+        void print_info(std::ostream& s) const;
 
         std::string name;
 

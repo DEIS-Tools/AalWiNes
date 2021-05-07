@@ -32,9 +32,6 @@
 #include <aalwines/model/NetworkWeight.h>
 
 #include <aalwines/query/parsererrors.h>
-#include <pdaaal/PDAFactory.h>
-#include <pdaaal/SolverAdapter.h>
-#include <pdaaal/Reducer.h>
 #include <aalwines/utils/stopwatch.h>
 #include <aalwines/utils/outcome.h>
 #include <aalwines/Verifier.h>
@@ -47,6 +44,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include "git_hash.h" // Generated at build time. Defines AALWINES_GIT_HASH and AALWINES_GIT_HASH_STR 
 
 namespace po = boost::program_options;
 using namespace aalwines;
@@ -62,14 +60,17 @@ int main(int argc, const char** argv)
 {
     po::options_description opts;
     opts.add_options()
-            ("help,h", "produce help message");
+            ("help,h", "produce help message")
+            ("version,v", "print version");
 
     NetworkParsing parser("Input Options");
     po::options_description output("Output Options");
     Verifier verifier("Verification Options");
     
     bool print_dot = false;
+    bool print_dot_topo = false;
     bool print_net = false;
+    bool print_info = false;
     bool no_parser_warnings = false;
     bool silent = false;
     bool no_timing = false;
@@ -77,7 +78,9 @@ int main(int argc, const char** argv)
 
     output.add_options()
             ("dot", po::bool_switch(&print_dot), "A dot output will be printed to cout when set.")
+            ("dot-topo", po::bool_switch(&print_dot_topo), "A dot output of the topology will be printed to cout when set.")
             ("net", po::bool_switch(&print_net), "A json output of the network will be printed to cout when set.")
+            ("info", po::bool_switch(&print_info), "Print info/stats about the network.")
             ("disable-parser-warnings,W", po::bool_switch(&no_parser_warnings), "Disable warnings from parser.")
             ("silent,s", po::bool_switch(&silent), "Disables non-essential output (implies -W).")
             ("no-timing", po::bool_switch(&no_timing), "Disables timing output")
@@ -101,7 +104,15 @@ int main(int argc, const char** argv)
     po::notify(vm);
 
     if (vm.count("help")) {
-        std::cout << opts << "\n";
+        std::cout << opts << std::endl;
+        return 1;
+    }
+    if (vm.count("version")) {
+        std::cout << "AalWiNes v1.0.0 - git hash: " AALWINES_GIT_HASH_STR << std::endl
+                  << "Copyright (C) 2021  Peter G. Jensen, Morten K. Schou, Dan Kristiansen, Bernhard C. Schrenk, Kenneth Yrke Jørgensen" << std::endl
+                  << "License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>." << std::endl
+                  << "This is free software: you are free to change and redistribute it." << std::endl
+                  << "There is NO WARRANTY, to the extent permitted by law." << std::endl;
         return 1;
     }
     verifier.check_settings();
@@ -112,6 +123,12 @@ int main(int argc, const char** argv)
 
     if (print_dot) {
         network.print_dot(std::cout);
+    }
+    if (print_dot_topo) {
+        network.print_dot_topo(std::cout);
+    }
+    if (print_info) {
+        network.print_info(std::cout);
     }
 
     if (!json_destination.empty()) {

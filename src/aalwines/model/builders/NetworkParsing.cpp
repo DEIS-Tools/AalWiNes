@@ -53,6 +53,8 @@ namespace aalwines {
                         : FastJsonBuilder::parse(json_file, warnings, format));
         parsing_stopwatch.stop();
 
+        assert(network.check_sanity());
+        network.pre_process(std::clog);
         return network;
     }
 
