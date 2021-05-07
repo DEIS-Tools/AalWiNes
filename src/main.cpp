@@ -44,6 +44,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include "git_hash.h" // Generated at build time. Defines AALWINES_GIT_HASH and AALWINES_GIT_HASH_STR 
 
 namespace po = boost::program_options;
 using namespace aalwines;
@@ -59,7 +60,8 @@ int main(int argc, const char** argv)
 {
     po::options_description opts;
     opts.add_options()
-            ("help,h", "produce help message");
+            ("help,h", "produce help message")
+            ("version,v", "print version");
 
     NetworkParsing parser("Input Options");
     po::options_description output("Output Options");
@@ -102,7 +104,15 @@ int main(int argc, const char** argv)
     po::notify(vm);
 
     if (vm.count("help")) {
-        std::cout << opts << "\n";
+        std::cout << opts << std::endl;
+        return 1;
+    }
+    if (vm.count("version")) {
+        std::cout << "AalWiNes v1.0.0 - git hash: " AALWINES_GIT_HASH_STR << std::endl
+                  << "Copyright (C) 2021  Peter G. Jensen, Morten K. Schou, Dan Kristiansen, Bernhard C. Schrenk, Kenneth Yrke Jørgensen" << std::endl
+                  << "License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>." << std::endl
+                  << "This is free software: you are free to change and redistribute it." << std::endl
+                  << "There is NO WARRANTY, to the extent permitted by law." << std::endl;
         return 1;
     }
     verifier.check_settings();
