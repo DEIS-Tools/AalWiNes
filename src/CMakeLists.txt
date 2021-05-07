@@ -28,8 +28,8 @@ if(DEFINED ENV{GITHUB_SHA}) # Workaround for Github CI workflow, where the curre
 			COMMAND ${CMAKE_COMMAND} -E echo_append "#define AALWINES_GIT_HASH " > git_hash.h
 			COMMAND ${CMAKE_COMMAND} -E echo "$ENV{GITHUB_SHA}" >> git_hash.h
 			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY(x) #x" >> git_hash.h
-			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIGY_MACRO(x) STRINGIFY(x) " >> git_hash.h
-			COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIGY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY_MACRO(x) STRINGIFY(x) " >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIFY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
 			DEPENDS aalwines main.cpp
 			VERBATIM)
 else()
@@ -38,8 +38,8 @@ else()
 			COMMAND ${CMAKE_COMMAND} -E echo_append "#define AALWINES_GIT_HASH " > git_hash.h
 			COMMAND ${GIT_EXECUTABLE} rev-parse HEAD >> git_hash.h
 			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY(x) #x" >> git_hash.h
-			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIGY_MACRO(x) STRINGIFY(x) " >> git_hash.h
-			COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIGY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define STRINGIFY_MACRO(x) STRINGIFY(x) " >> git_hash.h
+			COMMAND ${CMAKE_COMMAND} -E echo "#define AALWINES_GIT_HASH_STR STRINGIFY_MACRO(AALWINES_GIT_HASH) " >> git_hash.h
 			DEPENDS aalwines main.cpp
 			VERBATIM)
 endif()
