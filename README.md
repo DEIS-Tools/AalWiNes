@@ -120,12 +120,12 @@ A query file contains one or more queries. They can be separated by space or new
 | `path`         | regex-list | path through the network |
 | `postCondition`| regex-list | labels after last router |
 | `linkFailures` | number     | maximum failed links |
-| `mode`         | enum       | simulation mode: one out of OVER, UNDER, DUAL, EXACT |
+| `mode`         | enum       | simulation mode: one out of OVER, EXACT |
 
 The type regex-list is a space separated list of regular expressions (syntax see below).
 For `preCondition` and `postCondition` it defines the labels on the stack of the packet. Packets must have at least 1 label when entering or leaving the network. For `path` it defines the interfaces(routers) the packet must, can or must not follow.
 
-The `mode` can be OVER or UNDER. DUAL is a combination of OVER and UNDER. EXACT is not supported yet.
+The `mode` can currently only be OVER. EXACT is not supported yet.
 
 ## Weight Syntax
  
