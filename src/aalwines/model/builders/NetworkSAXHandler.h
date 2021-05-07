@@ -172,23 +172,23 @@ namespace aalwines {
 
     class FastJsonBuilder {
     public:
-        static Network parse(std::istream& stream, std::ostream& warnings) {
+        static Network parse(std::istream& stream, std::ostream& warnings, json::input_format_t format = json::input_format_t::json) {
             std::stringstream es; // For errors;
             NetworkSAXHandler my_sax(es);
-            if (!json::sax_parse(stream, &my_sax)) {
+            if (!json::sax_parse(stream, &my_sax, format)) {
                 throw base_error(es.str());
             }
             return my_sax.get_network();
         }
 
-        static Network parse(const std::string& network_file, std::ostream& warnings) {
+        static Network parse(const std::string& network_file, std::ostream& warnings, json::input_format_t format = json::input_format_t::json) {
             std::ifstream stream(network_file);
             if (!stream.is_open()) {
                 std::stringstream es;
                 es << "error: Could not open file : " << network_file << std::endl;
                 throw base_error(es.str());
             }
-            return parse(stream, warnings);
+            return parse(stream, warnings, format);
         }
     };
 

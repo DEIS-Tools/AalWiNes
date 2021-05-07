@@ -43,9 +43,9 @@ namespace aalwines {
     public:
         explicit NetworkParsing(const std::string& caption = "Input Options") : input{caption} {
             input.add_options()
-                ("input", po::value<std::string>(&json_file),
-                 "An json-file defining the network in the AalWiNes MPLS Network format")
-                 ("gml", po::value<std::string>(&topo_zoo),"A gml-file defining the topology in the format from topology zoo")
+                ("input", po::value<std::string>(&json_file), "An json-file defining the network in the AalWiNes MPLS Network format. To read from std input specify '--input -'.")
+                ("msgpack", po::bool_switch(&msgpack), "Use the binary MessagePack input format")
+                ("gml", po::value<std::string>(&topo_zoo),"A gml-file defining the topology in the format from topology zoo")
                 ;
         }
 
@@ -55,6 +55,7 @@ namespace aalwines {
 
     private:
         std::string json_file, topo_zoo;
+        bool msgpack = false;
         po::options_description input;
         stopwatch parsing_stopwatch{false};
     };
