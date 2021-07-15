@@ -101,7 +101,7 @@ namespace aalwines {
 
         template<typename W_FN = std::function<void(void)>>
         json run_once(Builder& builder, Query& q, bool print_timing = true, const W_FN& weight_fn = [](){}){
-            constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
+            constexpr static bool is_weighted = pdaaal::is_weighted<pdaaal::weight<typename W_FN::result_type>>;
 
             json output; // Store output information in this JSON object.
             static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "DualSearch", "Post* (no ET)", "Pre* (no ET)", "CEGAR_Dual"};
@@ -190,16 +190,15 @@ namespace aalwines {
                         case 1: {
                             constexpr pdaaal::Trace_Type trace_type = is_weighted ? pdaaal::Trace_Type::Shortest
                                                                                   : pdaaal::Trace_Type::Any;
-                            engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(problem_instance);
+                            engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> pda_trace;
+                                std::vector<typename decltype(factory)::trace_state_t> pda_trace;
                                 if constexpr (is_weighted) {
-                                    std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(
-                                            problem_instance);
+                                    std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(*problem_instance);
                                 } else {
-                                    pda_trace = pdaaal::Solver::get_trace<trace_type>(problem_instance);
+                                    pda_trace = pdaaal::Solver::get_trace<trace_type>(*problem_instance);
                                 }
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
@@ -208,11 +207,11 @@ namespace aalwines {
                             break;
                         }
                         case 2: {
-                            engine_outcome = pdaaal::Solver::pre_star_accepts(problem_instance);
+                            engine_outcome = pdaaal::Solver::pre_star_accepts(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
@@ -220,11 +219,11 @@ namespace aalwines {
                             break;
                         }
                         case 6: {
-                            engine_outcome = pdaaal::Solver::dual_search_accepts(problem_instance);
+                            engine_outcome = pdaaal::Solver::dual_search_accepts(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace_dual_search(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace_dual_search(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
@@ -232,11 +231,11 @@ namespace aalwines {
                             break;
                         }
                         case 7: {
-                            engine_outcome = pdaaal::Solver::post_star_accepts_no_ET(problem_instance);
+                            engine_outcome = pdaaal::Solver::post_star_accepts_no_ET(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
@@ -244,11 +243,11 @@ namespace aalwines {
                             break;
                         }
                         case 8: {
-                            engine_outcome = pdaaal::Solver::pre_star_accepts_no_ET(problem_instance);
+                            engine_outcome = pdaaal::Solver::pre_star_accepts_no_ET(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
