@@ -27,7 +27,7 @@
 #define AALWINES_AALWINESBUILDER_H
 
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 #include <aalwines/model/Router.h>

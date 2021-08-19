@@ -27,7 +27,7 @@
 #ifndef AALWINES_NETWORKSAXHANDLER_H
 #define AALWINES_NETWORKSAXHANDLER_H
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <aalwines/model/Network.h>
 #include <iostream>
 #include <fstream>
