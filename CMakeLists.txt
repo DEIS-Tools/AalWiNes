@@ -42,7 +42,7 @@ if (AALWINES_GetDependencies)
         #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.3.0.zip
         #URL_HASH SHA512=81eb135be9fd2687a48f526fb303c8a7cdc03a59ec0309717fa5af40c5807ed0eecf07f326692fe9f0cb11214b7d3488fd2e2ef5853d245e328509b02b20cbd7
         GIT_REPOSITORY https://github.com/MortenSchou/PDAAAL.git
-        GIT_TAG 12e9323e89f74b4bfdfb9876ec7f0930ca196715
+        GIT_TAG 5f79667e60fadf700db81eeb2175ef6b8dfaf6f0
     )
     FetchContent_MakeAvailable(pdaaal)
 

@@ -209,7 +209,7 @@ namespace aalwines {
 
         void initialize() {
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+                    absl::Hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
             std::vector<std::tuple<const Interface*, const nfa_state_t*, size_t>> waiting;
 
             _translation.make_initial_states([&seen,&waiting,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
@@ -233,7 +233,7 @@ namespace aalwines {
             // This is useful for keeping _spurious_rules consistent.
 
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+                    absl::Hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
             std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
 
             // The refinement might make some old _initial states stop being initial.
@@ -319,7 +319,7 @@ namespace aalwines {
         }
 
         template<bool first_time = false>
-        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, boost::hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
+        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, absl::Hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
                         std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>>&& waiting,
                         const std::function<bool(size_t)>& is_new = [](const auto&){return true;}) {
             auto add = [&seen, &waiting, &is_new, this](const nfa_state_t* n, const Interface* inf, size_t a_inf) {
