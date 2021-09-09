@@ -31,7 +31,7 @@
 #include <vector>
 #include <map>
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <ptrie/ptrie_map.h>
 
 #include "Query.h"

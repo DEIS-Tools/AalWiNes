@@ -34,16 +34,18 @@
 
 namespace aalwines {
 
-    template<typename W_FN = std::function<void(void)>, typename W = void>
+    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<void>>
     class NetworkPDAFactory : public pdaaal::TypedPDAFactory<Query::label_t, W> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
-        using weight_type = typename W_FN::result_type;
+        using weight_type = pdaaal::weight<typename W_FN::result_type>;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
         using PDAFactory = pdaaal::TypedPDAFactory<label_t, weight_type>;
-        using PDA = pdaaal::TypedPDA<label_t>;
+        using PDA = pdaaal::TypedPDA<label_t,weight_type>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
+    public:
+        using trace_state_t = typename PDA::tracestate_t;
     private:
         using Translation = NetworkTranslationW<W_FN>;
         using edge_variant = typename Translation::edge_variant;
@@ -57,7 +59,7 @@ namespace aalwines {
         NetworkPDAFactory(const Query& query, const Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
         : PDAFactory(std::move(all_labels)), _translation(query, network, weight_f), _query(query), _weight_f(weight_f) { };
 
-        json get_json_trace(const std::vector<PDA::tracestate_t>& trace) {
+        json get_json_trace(const std::vector<trace_state_t>& trace) {
             auto result_trace = json::array();
 
             std::unordered_set<const Interface *> disabled, active;
@@ -278,7 +280,7 @@ namespace aalwines {
     };
 
     template<typename W_FN>
-    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
+    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>>;
 
 }
 

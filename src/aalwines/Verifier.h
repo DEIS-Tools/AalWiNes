@@ -39,6 +39,45 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+namespace pdaaal {
+    std::istream& operator>>(std::istream& in, Trace_Type& trace_type) {
+        std::string token;
+        in >> token;
+        if (token == "0") {
+            trace_type = Trace_Type::None;
+        } else if (token == "1") {
+            trace_type = Trace_Type::Any;
+        } else if (token == "2") {
+            trace_type = Trace_Type::Shortest;
+        } else if (token == "3") {
+            trace_type = Trace_Type::Longest;
+        } else {
+            in.setstate(std::ios_base::failbit);
+        }
+        return in;
+    }
+    constexpr std::ostream& operator<<(std::ostream& s, const Trace_Type& trace_type) {
+        switch (trace_type) {
+            case Trace_Type::None:
+                s << "0";
+                break;
+            case Trace_Type::Any:
+                s << "1";
+                break;
+            case Trace_Type::Shortest:
+                s << "2";
+                break;
+            case Trace_Type::Longest:
+                s << "3";
+                break;
+            case Trace_Type::ShortestFixedPoint:
+                s << "4";
+                break;
+        }
+        return s;
+    }
+}
+
 namespace aalwines {
 
     inline void to_json(json & j, const Query::mode_t& mode) {
@@ -58,8 +97,8 @@ namespace aalwines {
         explicit Verifier(const std::string& caption = "Verification Options") : verification(caption) {
             verification.add_options()
                     ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*,3=post*CEGAR,4=post*CEGARwithSimpleRefinement,5=post*NoAbstraction,6=dual*,9=dual*CEGAR")
-                    ("tos-reduction,r", po::value<size_t>(&_reduction), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
-                    ("trace,t", po::bool_switch(&_print_trace), "Get a trace when possible")
+//                    ("tos-reduction,r", po::value<size_t>(&_reduction), "0=none,1=simple,2=dual-stack,3=simple+backup,4=dual-stack+backup")
+                    ("trace,t", po::value<pdaaal::Trace_Type>(&_trace_type)->default_value(pdaaal::Trace_Type::None), "Trace type. 0=no trace, 1=any trace, 2=shortest trace, 3=longest trace")
                     ;
         }
 
@@ -67,22 +106,23 @@ namespace aalwines {
         auto add_options() { return verification.add_options(); }
 
         void check_settings() const {
-            if(_reduction > 4) {
-                std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
-                exit(-1);
-            }
+//            if(_reduction > 4) {
+//                std::cerr << "Unknown value for --tos-reduction : " << _reduction << std::endl;
+//                exit(-1);
+//            }
             if(_engine > 9) {
                 std::cerr << "Unknown value for --engine : " << _engine << std::endl;
                 exit(-1);
             }
         }
         void check_supports_weight() const {
-            if (_engine != 1) {
-                std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*). Not for --engine " << _engine << std::endl;
+            if (!((_engine == 1 && _trace_type == pdaaal::Trace_Type::Shortest) ||
+                  (_engine == 2 && _trace_type == pdaaal::Trace_Type::Longest))) {
+                std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*), or longest trace (--trace 3) for --engine 2 (pre*). Not for --engine " << _engine << std::endl;
                 exit(-1);
             }
         }
-        void set_print_trace() { _print_trace = true; }
+        void set_trace_type(pdaaal::Trace_Type trace_type) { _trace_type = trace_type; }
 
         template<typename W_FN = std::function<void(void)>>
         void run(Builder& builder, const std::vector<std::string>& query_strings, json_stream& json_output, bool print_timing = true, const W_FN& weight_fn = [](){}) {
@@ -101,7 +141,8 @@ namespace aalwines {
 
         template<typename W_FN = std::function<void(void)>>
         json run_once(Builder& builder, Query& q, bool print_timing = true, const W_FN& weight_fn = [](){}){
-            constexpr static bool is_weighted = pdaaal::is_weighted<typename W_FN::result_type>;
+            using weight_type = pdaaal::weight<typename W_FN::result_type>;
+            constexpr static bool is_weighted = pdaaal::is_weighted<weight_type>;
 
             json output; // Store output information in this JSON object.
             static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "DualSearch", "Post* (no ET)", "Pre* (no ET)", "CEGAR_Dual"};
@@ -163,7 +204,7 @@ namespace aalwines {
                 }
             } else {
                 stopwatch compilation_time(false);
-                stopwatch reduction_time(false);
+//                stopwatch reduction_time(false);
                 stopwatch reachability_time(false);
                 stopwatch trace_making_time(false);
                 full_time.start();
@@ -179,9 +220,9 @@ namespace aalwines {
                     compilation_time.stop();
 
                     // Reduce PDA
-                    reduction_time.start(); // TODO: Implement reduction for solver instance. (Generalised version with multiple initial and final states)
+                    //reduction_time.start(); // TODO: Implement reduction for solver instance. (Generalised version with multiple initial and final states)
                     //output["reduction"] = pdaaal::Reducer::reduce(pda, _reduction, pda.initial(), pda.terminal());
-                    reduction_time.stop();
+                    //reduction_time.stop();
 
                     // Choose engine, run verification, and (if relevant) get the trace.
                     reachability_time.start();
@@ -190,16 +231,15 @@ namespace aalwines {
                         case 1: {
                             constexpr pdaaal::Trace_Type trace_type = is_weighted ? pdaaal::Trace_Type::Shortest
                                                                                   : pdaaal::Trace_Type::Any;
-                            engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(problem_instance);
+                            engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                std::vector<pdaaal::TypedPDA<Query::label_t>::tracestate_t> pda_trace;
+                                std::vector<typename decltype(factory)::trace_state_t> pda_trace;
                                 if constexpr (is_weighted) {
-                                    std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(
-                                            problem_instance);
+                                    std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(*problem_instance);
                                 } else {
-                                    pda_trace = pdaaal::Solver::get_trace<trace_type>(problem_instance);
+                                    pda_trace = pdaaal::Solver::get_trace<trace_type>(*problem_instance);
                                 }
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
@@ -208,23 +248,44 @@ namespace aalwines {
                             break;
                         }
                         case 2: {
-                            engine_outcome = pdaaal::Solver::pre_star_accepts(problem_instance);
-                            reachability_time.stop();
-                            trace_making_time.start();
-                            if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
-                                json_trace = factory.get_json_trace(pda_trace);
-                                if (!json_trace.is_null()) result = utils::outcome_t::YES;
+                            if (_trace_type == pdaaal::Trace_Type::Longest) {
+                                if constexpr(is_weighted) {
+                                    engine_outcome = pdaaal::Solver::pre_star_fixed_point_accepts<pdaaal::Trace_Type::Longest>(*problem_instance);
+                                    reachability_time.stop();
+                                    trace_making_time.start();
+                                    if (engine_outcome) {
+                                        std::vector<typename decltype(factory)::trace_state_t> pda_trace;
+                                        std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<pdaaal::Trace_Type::Longest>(*problem_instance);
+                                        if (trace_weight == pdaaal::max_weight<typename weight_type::type>::bottom()) {
+                                            result = utils::outcome_t::YES; // TODO: This might not be correct. We need a trace to validate!!
+                                        } else {
+                                            json_trace = factory.get_json_trace(pda_trace);
+                                            if (!json_trace.is_null()) result = utils::outcome_t::YES;
+                                        }
+                                    }
+                                    trace_making_time.stop();
+                                } else {
+                                    throw base_error("error: Longest trace option requires weight to be specified.");
+                                }
+                            } else {
+                                engine_outcome = pdaaal::Solver::pre_star_accepts(*problem_instance);
+                                reachability_time.stop();
+                                trace_making_time.start();
+                                if (engine_outcome) {
+                                    auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
+                                    json_trace = factory.get_json_trace(pda_trace);
+                                    if (!json_trace.is_null()) result = utils::outcome_t::YES;
+                                }
+                                trace_making_time.stop();
                             }
-                            trace_making_time.stop();
                             break;
                         }
                         case 6: {
-                            engine_outcome = pdaaal::Solver::dual_search_accepts(problem_instance);
+                            engine_outcome = pdaaal::Solver::dual_search_accepts(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace_dual_search(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace_dual_search(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
@@ -232,11 +293,11 @@ namespace aalwines {
                             break;
                         }
                         case 7: {
-                            engine_outcome = pdaaal::Solver::post_star_accepts_no_ET(problem_instance);
+                            engine_outcome = pdaaal::Solver::post_star_accepts_no_ET(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
@@ -244,11 +305,11 @@ namespace aalwines {
                             break;
                         }
                         case 8: {
-                            engine_outcome = pdaaal::Solver::pre_star_accepts_no_ET(problem_instance);
+                            engine_outcome = pdaaal::Solver::pre_star_accepts_no_ET(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
                             if (engine_outcome) {
-                                auto pda_trace = pdaaal::Solver::get_trace(problem_instance);
+                                auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
                             }
@@ -274,7 +335,7 @@ namespace aalwines {
                 full_time.stop();
                 if (print_timing) {
                     output["compilation-time"] = compilation_time.duration();
-                    output["reduction-time"] = reduction_time.duration();
+                    //output["reduction-time"] = reduction_time.duration();
                     output["reachability-time"] = reachability_time.duration();
                     output["trace-making-time"] = trace_making_time.duration();
                 }
@@ -282,9 +343,13 @@ namespace aalwines {
 
             output["result"] = result;
 
-            if (_print_trace && result == utils::outcome_t::YES) {
+            if (_trace_type != pdaaal::Trace_Type::None && result == utils::outcome_t::YES) {
                 if constexpr (is_weighted) {
-                    output["trace-weight"] = trace_weight;
+                    if (trace_weight == pdaaal::max_weight<typename weight_type::type>::bottom()) {
+                        output["trace-weight"] = "infinite";
+                    } else {
+                        output["trace-weight"] = trace_weight;
+                    }
                 }
                 output["trace"] = json_trace;
             }
@@ -300,8 +365,9 @@ namespace aalwines {
 
         // Settings
         size_t _engine = 1;
-        size_t _reduction = 0;
-        bool _print_trace = false;
+        // size_t _reduction = 0;
+        // bool _print_trace = false;
+        pdaaal::Trace_Type _trace_type = pdaaal::Trace_Type::None;
     };
 
 }

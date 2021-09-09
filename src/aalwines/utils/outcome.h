@@ -28,7 +28,7 @@
 #define OUTCOME_H
 
 #include <ostream>
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 
 namespace aalwines::utils {
     enum class outcome_t { YES, NO, MAYBE };

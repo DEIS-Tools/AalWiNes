@@ -38,17 +38,17 @@
 
 #include <utility>
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 namespace aalwines {
 
-    template <pdaaal::refinement_option_t refinement_option, typename W_FN, typename W, typename C, typename A> class CegarNetworkPdaReconstruction;
+    template <pdaaal::refinement_option_t refinement_option, typename W_FN, typename W> class CegarNetworkPdaReconstruction;
 
     // FIXME: For now simple unweighted version.
-    template<typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
-    class CegarNetworkPdaFactory : public pdaaal::CegarPdaFactory<Query::label_t, W, C, A> {
-        template <pdaaal::refinement_option_t refinement_option, typename W_FN_, typename W_, typename C_, typename A_>
+    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<typename W_FN::result_type>>
+    class CegarNetworkPdaFactory : public pdaaal::CegarPdaFactory<Query::label_t, W> {
+        template <pdaaal::refinement_option_t refinement_option, typename W_FN_, typename W_>
         friend class CegarNetworkPdaReconstruction;
     public:
         using label_t = Query::label_t;
@@ -60,7 +60,7 @@ namespace aalwines {
         using a_ops_t = std::vector<a_op_t>;
         using table_t = pdaaal::ptrie_set<std::tuple<size_t, size_t, a_op_t, a_ops_t>>; // a(label), a(to), a(first_op), a(remaining_ops)
         using abstract_state_t = std::tuple<size_t, const nfa_state_t*, a_ops_t>;
-        using parent_t = pdaaal::CegarPdaFactory<label_t, W, C, A>;
+        using parent_t = pdaaal::CegarPdaFactory<label_t, W>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         static constexpr uint32_t abstract_wildcard_label() noexcept { return std::numeric_limits<uint32_t>::max(); }
     public:
@@ -209,7 +209,7 @@ namespace aalwines {
 
         void initialize() {
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+                    absl::Hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
             std::vector<std::tuple<const Interface*, const nfa_state_t*, size_t>> waiting;
 
             _translation.make_initial_states([&seen,&waiting,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
@@ -233,7 +233,7 @@ namespace aalwines {
             // This is useful for keeping _spurious_rules consistent.
 
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+                    absl::Hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
             std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
 
             // The refinement might make some old _initial states stop being initial.
@@ -319,7 +319,7 @@ namespace aalwines {
         }
 
         template<bool first_time = false>
-        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, boost::hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
+        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, absl::Hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
                         std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>>&& waiting,
                         const std::function<bool(size_t)>& is_new = [](const auto&){return true;}) {
             auto add = [&seen, &waiting, &is_new, this](const nfa_state_t* n, const Interface* inf, size_t a_inf) {
@@ -419,15 +419,15 @@ namespace aalwines {
     };
 
     // For now simple unweighted version.
-    template<pdaaal::refinement_option_t refinement_option, typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
+    template<pdaaal::refinement_option_t refinement_option, typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<typename W_FN::result_type>>
     class CegarNetworkPdaReconstruction : public pdaaal::CegarPdaReconstruction<
             Query::label_t, // label_t
             const Interface*, // state_t
             ConfigurationRange,
             json_wrapper , // concrete_trace_t
-            W, C, A> {
-        friend class CegarNetworkPdaFactory<W_FN,W,C,A>;
-        using factory_t = CegarNetworkPdaFactory<W_FN,W,C,A>;
+            W> {
+        friend class CegarNetworkPdaFactory<W_FN,W>;
+        using factory_t = CegarNetworkPdaFactory<W_FN,W>;
     public:
         using label_t = typename factory_t::label_t;
         using concrete_trace_t = json_wrapper;
@@ -438,16 +438,16 @@ namespace aalwines {
         using header_t = pdaaal::Header<Query::label_t>;
         using configuration_range_t = ConfigurationRange;
         using configuration_t = typename configuration_range_t::value_type; // = cegar_configuration_t;
-        using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W, C, A>;
+        using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         using NFA = pdaaal::NFA<Query::label_t>;
         using nfa_state_t = NFA::state_t;
-        using solver_instance_t = typename parent_t::solver_instance_t;
+        using product_t = typename parent_t::product_t;
     public:
         using refinement_t = typename parent_t::refinement_t;
         using header_refinement_t = typename parent_t::header_refinement_t;
 
-        explicit CegarNetworkPdaReconstruction(const factory_t& factory, const solver_instance_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
+        explicit CegarNetworkPdaReconstruction(const factory_t& factory, const product_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
         : parent_t(instance, initial_headers, final_headers), _factory(factory) {};
 
     protected:

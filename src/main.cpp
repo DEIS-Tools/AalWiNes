@@ -44,7 +44,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include "git_hash.h" // Generated at build time. Defines AALWINES_GIT_HASH and AALWINES_GIT_HASH_STR 
+#include "version.h" // Generated at build time. Defines AALWINES_GIT_HASH, AALWINES_GIT_HASH_STR, AALWINES_VERSION and AALWINES_VERSION_STR
 
 namespace po = boost::program_options;
 using namespace aalwines;
@@ -108,7 +108,7 @@ int main(int argc, const char** argv)
         return 1;
     }
     if (vm.count("version")) {
-        std::cout << "AalWiNes v1.0.0 - git hash: " AALWINES_GIT_HASH_STR << std::endl
+        std::cout << "AalWiNes v" AALWINES_VERSION_STR " - git hash: " AALWINES_GIT_HASH_STR << std::endl
                   << "Copyright (C) 2021  Peter G. Jensen, Morten K. Schou, Dan Kristiansen, Bernhard C. Schrenk, Kenneth Yrke Jørgensen" << std::endl
                   << "License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>." << std::endl
                   << "This is free software: you are free to change and redistribute it." << std::endl
