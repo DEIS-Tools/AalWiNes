@@ -127,7 +127,6 @@ namespace aalwines {
         for (const auto& r : _routers) {
             if (filter._from(r->name())) {
                 for (const auto& i : r->interfaces()) {
-                    if (i->is_virtual()) continue;
                     if (filter._link(r->interface_name(i->id()), i->match()->get_name(), i->target()->name())) {
                         res.insert(i->global_id());
                     }
