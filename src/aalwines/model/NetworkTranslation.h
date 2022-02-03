@@ -29,6 +29,7 @@
 
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
+#include <aalwines/utils/more_algorithms.h>
 
 namespace aalwines {
 
@@ -91,14 +92,10 @@ namespace aalwines {
                     return edge_variant(std::in_place_index<1>, interface);
                 }
             } else {
-                std::vector<const Interface*> out_infs, temp;
-                for (const auto& table : interface->target()->tables()) {
-                    auto lb = std::lower_bound(table->out_interfaces().begin(), table->out_interfaces().end(), interface->match());
-                    if (lb != table->out_interfaces().end() && *lb == interface->match()) {
-                        std::set_union(out_infs.begin(), out_infs.end(), table->out_interfaces().begin(), table->out_interfaces().end(), std::back_inserter(temp));
-                        std::swap(temp, out_infs);
-                    }
-                }
+                auto out_infs = utils::flat_union_if(interface->target()->tables(),
+                    [](const auto& table){ return table->out_interfaces(); },
+                    [match=interface->match()](const auto& table){ return utils::sorted_contains(table->out_interfaces(), match); }
+                );
                 auto intersection = interface_intersection(out_infs, interface->table());
                 if (intersection.size() == 1) {
                     assert(intersection[0] == interface);
