@@ -201,7 +201,7 @@ namespace aalwines {
                 if constexpr (initial) {
                     _initial.push_back(abstract_id);
                 }
-                if (nfa_state->_accepting && !inf->is_virtual()) { // We assume that the interface abstraction always distinguishes virtual and non-virtual interfaces.
+                if (nfa_state->_accepting) {
                     _accepting.push_back(abstract_id);
                 }
             }
@@ -344,16 +344,11 @@ namespace aalwines {
                 for (const Interface* out_inf : inf->table()->out_interfaces()) {
                     auto to_inf = out_inf->match();
                     auto a_to_inf = _interface_abstraction.exists(to_inf).second;
-                    if (out_inf->is_virtual()) {
-                        _edges.emplace(std::make_tuple(a_inf,nfa_state,a_to_inf), nfa_state);
-                        add(nfa_state, to_inf, a_to_inf);
-                    } else {
-                        for (const auto& e : nfa_state->_edges) {
-                            for (const auto& n : e.follow_epsilon()) {
-                                if (!e.contains(out_inf->global_id())) continue;
-                                _edges.emplace(std::make_tuple(a_inf,nfa_state,a_to_inf), n);
-                                add(n, to_inf, a_to_inf);
-                            }
+                    for (const auto& e : nfa_state->_edges) {
+                        for (const auto& n : e.follow_epsilon()) {
+                            if (!e.contains(out_inf->global_id())) continue;
+                            _edges.emplace(std::make_tuple(a_inf,nfa_state,a_to_inf), n);
+                            add(n, to_inf, a_to_inf);
                         }
                     }
                 }
@@ -462,7 +457,7 @@ namespace aalwines {
             return utils::VectorRange<utils::FilterRange<typename pdaaal::RefinementMapping<const Interface*>::concrete_value_range>, configuration_t>(
                 utils::FilterRange(
                     _factory._interface_abstraction.get_concrete_values_range(a_inf), // Inner range of interfaces
-                    [this,nfa_state=nfa_state](const auto& inf){ return !inf->match()->is_virtual() && NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
+                    [this,nfa_state=nfa_state](const auto& inf){ return NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
                 [this, header=this->initial_header(), &abstract_rule, nfa_state=nfa_state, &to_state, ops_size](const auto& inf){
                     return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size, // Transform interface to vector of configurations.
                                                EdgeStatus(std::vector<const Interface*>(), std::vector<const Interface*>{inf}));
@@ -473,7 +468,7 @@ namespace aalwines {
             auto [a_inf, nfa_state, ops] = _factory._abstract_states.at(abstract_rule._from);
             auto labels = this->pre_labels(this->initial_header());
             for (const auto& inf : _factory._interface_abstraction.get_concrete_values_range(a_inf)) {
-                if (inf->match()->is_virtual() || !NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state)) continue; // concrete state is initial
+                if (!NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state)) continue; // concrete state is initial
                 for (const auto& label : labels) {
                     if (this->label_maps_to(label, abstract_rule._pre)) {
                         X.emplace_back(inf, label);
