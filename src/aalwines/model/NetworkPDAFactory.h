@@ -34,14 +34,14 @@
 
 namespace aalwines {
 
-    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<void>>
-    class NetworkPDAFactory : public pdaaal::TypedPDAFactory<Query::label_t, W> {
+    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<void>, pdaaal::TraceInfoType trace_info_type = pdaaal::TraceInfoType::Single>
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W, trace_info_type> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
         using weight_type = pdaaal::weight<typename W_FN::result_type>;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::TypedPDAFactory<label_t, weight_type>;
-        using PDA = pdaaal::TypedPDA<label_t,weight_type>;
+        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type, trace_info_type>;
+        using PDA = pdaaal::PDA<label_t,weight_type>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
     public:
@@ -267,6 +267,12 @@ namespace aalwines {
 
     template<typename W_FN>
     NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>>;
+
+    // Add make function that allows specifying template parameter trace_info_type.
+    template<pdaaal::TraceInfoType trace_info_type, typename W_FN>
+    auto makeNetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) {
+        return NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>,trace_info_type>(query, network, std::move(all_labels), weight_f);
+    }
 
 }
 

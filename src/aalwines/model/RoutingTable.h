@@ -35,7 +35,7 @@
 #include <ptrie/ptrie_map.h>
 
 #include "Query.h"
-#include <pdaaal/PDA.h>
+#include <pdaaal/internal/PDA.h>
 
 using json = nlohmann::json;
 
