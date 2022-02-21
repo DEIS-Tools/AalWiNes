@@ -97,11 +97,10 @@ namespace aalwines {
                                 return (it == label_map.end() ? 2 : it->second + 3);
                         }
                     },
-                    [&inf_map](const Interface* inf) -> std::tuple<bool, std::vector<edge_t>> {
+                    [&inf_map](const Interface* inf) -> std::vector<edge_t> {
+                        // Use the NFA edges that explicitly mentions inf as the 'abstract state', i.e. group together interfaces that are mentioned similarly.
                         auto it = inf_map.find(inf);
-                        return std::make_tuple(
-                                inf->is_virtual(), // Distinguishing virtual interfaces from non-virtual simplifies the abstraction construction.
-                             (it == inf_map.end()) ? std::vector<edge_t>() : it->second); // Use the NFA edges that explicitly mentions inf as the 'abstract state', i.e. group together interfaces that are mentioned similarly.
+                        return (it == inf_map.end()) ? std::vector<edge_t>() : it->second;
                     }
                 );
                 pdaaal::CEGAR<CegarNetworkPdaFactory<>,CegarNetworkPdaReconstruction<refinement_option>> cegar;

@@ -55,20 +55,16 @@ namespace aalwines {
                     auto next = e.follow_epsilon();
                     if (e.wildcard(_network.all_interfaces().size())) {
                         for (const auto& inf : _network.all_interfaces()) {
-                            if (!inf->is_virtual()) {
-                                add(inf->match(), next);
-                            }
+                            add(inf->match(), next);
                         }
                     } else if (!e._negated) {
                         for (const auto& s : e._symbols) {
                             auto inf = _network.all_interfaces()[s];
-                            if (!inf->is_virtual()) {
-                                add(inf->match(), next);
-                            }
+                            add(inf->match(), next);
                         }
                     } else {
                         for (const auto& inf : _network.all_interfaces()) {
-                            if (e.contains(inf->global_id()) && !inf->is_virtual()) {
+                            if (e.contains(inf->global_id())) {
                                 add(inf->match(), next);
                             }
                         }
@@ -77,10 +73,7 @@ namespace aalwines {
             }
         }
 
-        using edge_variant = std::variant<const RoutingTable*, const Interface*, const Interface*>;
-        static edge_variant special_interface(const Interface* interface) {
-            return edge_variant(std::in_place_index<2>, interface);
-        }
+        using edge_variant = std::variant<const RoutingTable*, const Interface*>;
         template<bool initial=false>
         static edge_variant get_edge_pointer(const Interface* interface) {
             if constexpr (initial) { // Special case for initial states, where we don't have a table from previous state.
@@ -88,7 +81,7 @@ namespace aalwines {
                     assert(interface->table()->interfaces()[0] == interface);
                     return interface->table();
                 } else {
-                    return edge_variant(std::in_place_index<1>, interface);
+                    return interface;
                 }
             } else {
                 std::vector<const Interface*> out_infs, temp;
@@ -105,7 +98,7 @@ namespace aalwines {
                     return interface->table(); // interface is uniquely identified by interface->table() and any table t with interface->match() in t->out_interfaces() (t being part of previous state in PDA.)
                 } else {
                     assert(intersection.size() > 1);
-                    return edge_variant(std::in_place_index<1>, interface); // Multiple edges (inf,inf->match()) pairs correspond to the same pair of tables, so we need interface to identify edge.
+                    return interface; // Multiple edges (inf,inf->match()) pairs correspond to the same pair of tables, so we need interface to identify edge.
                 }
             }
         }
@@ -130,10 +123,8 @@ namespace aalwines {
                 case 0:
                     return std::get<0>(variant);
                 case 1:
-                    return std::get<1>(variant)->table();
-                case 2:
                 default:
-                    return std::get<2>(variant)->table();
+                    return std::get<1>(variant)->table();
             }
         }
         static const Interface* get_interface(const edge_variant& variant, const RoutingTable* from = nullptr) {
@@ -141,10 +132,8 @@ namespace aalwines {
                 case 0:
                     return get_interface(from, std::get<0>(variant));
                 case 1:
-                    return std::get<1>(variant);
-                case 2:
                 default:
-                    return std::get<2>(variant);
+                    return std::get<1>(variant);
             }
         }
         static const Interface* get_interface(const RoutingTable* from, const RoutingTable* to) {

@@ -141,7 +141,8 @@ namespace aalwines {
                     this->add_wildcard_rule(rule);
                 } else {
                     if (ops.empty()) {
-                        const auto& table = variant.index() == 0 ? std::get<0>(variant) : std::get<2>(variant)->table();
+                        assert(variant.index() == 0);
+                        const auto& table = std::get<0>(variant);
                         for (const auto& entry : table->entries()) {
                             for (const auto& forward : entry._rules) {
                                 if (forward._priority > _query.number_of_failures()) continue;
@@ -158,21 +159,14 @@ namespace aalwines {
                                 if constexpr (is_weighted) {
                                     rule._weight = _weight_f(forward, entry);
                                 }
-                                auto apply_per_nfastate = [&rule,&forward,&entry,&other_ops,this](const nfa_state_t* nfa_state) {
-                                    rule._to = add_state(forward._via->match(), nfa_state, other_ops);
-                                    if (rule._pre == Query::wildcard_label()) {
-                                        this->add_wildcard_rule(rule);
-                                    } else {
-                                        this->add_rule(rule);
-                                    }
-                                };
-                                if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
-                                    apply_per_nfastate(nfa_state);
-                                } else { // Follow NFA edges matching forward._via
-                                    for (const auto& e : nfa_state->_edges) {
-                                        if (!e.contains(forward._via->global_id())) continue;
-                                        for (const auto& n : e.follow_epsilon()) {
-                                            apply_per_nfastate(n);
+                                for (const auto& e : nfa_state->_edges) { // Follow NFA edges matching forward._via
+                                    if (!e.contains(forward._via->global_id())) continue;
+                                    for (const auto& n : e.follow_epsilon()) {
+                                        rule._to = add_state(forward._via->match(), n, other_ops);
+                                        if (rule._pre == Query::wildcard_label()) {
+                                            this->add_wildcard_rule(rule);
+                                        } else {
+                                            this->add_rule(rule);
                                         }
                                     }
                                 }
@@ -195,18 +189,10 @@ namespace aalwines {
     private:
         // Construction (factory)
         size_t add_initial_state(const Interface* inf, const nfa_state_t* nfa_state) {
-            if (nfa_state->_accepting && inf->is_virtual()) { // Use 2nd variant of const Interface* to indicate that the state is not accepting.
-                return add_state<true>(state_t(Translation::special_interface(inf), nfa_state, ops_t()));
-            } else {
-                return add_state<true>(state_t(Translation::template get_edge_pointer<true>(inf), nfa_state, ops_t()));
-            }
+            return add_state<true>(state_t(Translation::template get_edge_pointer<true>(inf), nfa_state, ops_t()));
         }
         size_t add_state(const Interface* inf, const nfa_state_t* nfa_state, const ops_t& ops) {
-            if (nfa_state->_accepting && inf->is_virtual()) { // This state should not be accepting, so we need to separate it from non-virtual interfaces.
-                return add_state({Translation::special_interface(inf), nfa_state, ops});
-            } else {
-                return add_state({Translation::get_edge_pointer(inf), nfa_state, ops});
-            }
+            return add_state({Translation::get_edge_pointer(inf), nfa_state, ops});
         }
         template<bool initial = false>
         size_t add_state(const state_t& state) {
