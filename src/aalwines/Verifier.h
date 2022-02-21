@@ -152,43 +152,29 @@ namespace aalwines {
             stopwatch full_time(false);
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
-            if (_engine == 5) {
-                output["no_abstraction"] = json::object();
+            if (_engine == 3 || _engine == 4 || _engine == 5 || _engine == 9) {
+                std::optional<json> res;
                 full_time.start();
-                auto res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), output["no_abstraction"]);
-                full_time.stop();
-                if (res) {
-                    result = utils::outcome_t::YES;
-                    json_trace = res.value();
-                } else {
-                    result = utils::outcome_t::NO;
+                switch (_engine) {
+                    case 3: // CEGAR_Post*
+                        output["abstraction"] = json::object();
+                        res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
+                        break;
+                    case 4: // CEGAR_Post*_SimpleRefinement
+                        output["abstraction"] = json::object();
+                        res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
+                        break;
+                    case 5: // CEGAR_NoAbstraction_Post*
+                        output["no_abstraction"] = json::object();
+                        res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), output["no_abstraction"]);
+                        break;
+                    case 9: // CEGAR_Dual
+                        output["abstraction"] = json::object();
+                        res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement,true>(builder._network, q, builder.all_labels(), output["abstraction"]);
+                        break;
+                    default:
+                        throw std::logic_error("Impossible case in Verifier. This should not happen.");
                 }
-            } else if (_engine == 4) {
-                output["abstraction"] = json::object();
-                full_time.start();
-                auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
-                full_time.stop();
-                if (res) {
-                    result = utils::outcome_t::YES;
-                    json_trace = res.value();
-                } else {
-                    result = utils::outcome_t::NO;
-                }
-            } else if (_engine == 3) {
-                output["abstraction"] = json::object();
-                full_time.start();
-                auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
-                full_time.stop();
-                if (res) {
-                    result = utils::outcome_t::YES;
-                    json_trace = res.value();
-                } else {
-                    result = utils::outcome_t::NO;
-                }
-            } else if (_engine == 9) {
-                output["abstraction"] = json::object();
-                full_time.start();
-                auto res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement,true>(builder._network, q, builder.all_labels(), output["abstraction"]);
                 full_time.stop();
                 if (res) {
                     result = utils::outcome_t::YES;
