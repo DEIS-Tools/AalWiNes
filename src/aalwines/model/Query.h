@@ -27,7 +27,7 @@
 #ifndef QUERY_H
 #define QUERY_H
 #include <pdaaal/NFA.h>
-#include <pdaaal/ptrie_interface.h>
+#include <pdaaal/utils/ptrie_interface.h>
 #include "aalwines/utils/errors.h"
 
 #include <functional>

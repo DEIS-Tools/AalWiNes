@@ -29,21 +29,23 @@
 
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
-#include <pdaaal/PDAFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
+#include <pdaaal/PDAFactory.h>
 
 namespace aalwines {
 
-    template<typename W_FN = std::function<void(void)>, typename W = void>
-    class NetworkPDAFactory : public pdaaal::TypedPDAFactory<Query::label_t, W> {
+    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<void>, pdaaal::TraceInfoType trace_info_type = pdaaal::TraceInfoType::Single>
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W, trace_info_type> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
-        using weight_type = typename W_FN::result_type;
+        using weight_type = pdaaal::weight<typename W_FN::result_type>;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::TypedPDAFactory<label_t, weight_type>;
-        using PDA = pdaaal::TypedPDA<label_t>;
+        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type, trace_info_type>;
+        using PDA = pdaaal::PDA<label_t,weight_type>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
+    public:
+        using trace_state_t = typename PDA::tracestate_t;
     private:
         using Translation = NetworkTranslationW<W_FN>;
         using edge_variant = typename Translation::edge_variant;
@@ -57,7 +59,7 @@ namespace aalwines {
         NetworkPDAFactory(const Query& query, const Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
         : PDAFactory(std::move(all_labels)), _translation(query, network, weight_f), _query(query), _weight_f(weight_f) { };
 
-        json get_json_trace(const std::vector<PDA::tracestate_t>& trace) {
+        json get_json_trace(const std::vector<trace_state_t>& trace) {
             auto result_trace = json::array();
 
             std::unordered_set<const Interface *> disabled, active;
@@ -257,14 +259,20 @@ namespace aalwines {
 
         Translation _translation;
         const Query& _query;
-        pdaaal::ptrie_set<state_t> _states;
+        pdaaal::utils::ptrie_set<state_t> _states;
         std::vector<size_t> _initial;
         std::vector<size_t> _accepting;
         const W_FN& _weight_f;
     };
 
     template<typename W_FN>
-    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
+    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>>;
+
+    // Add make function that allows specifying template parameter trace_info_type.
+    template<pdaaal::TraceInfoType trace_info_type, typename W_FN>
+    auto makeNetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) {
+        return NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>,trace_info_type>(query, network, std::move(all_labels), weight_f);
+    }
 
 }
 

@@ -170,7 +170,7 @@ namespace aalwines {
 
     template<typename W_FN = std::function<void(void)>>
     class NetworkTranslationW : public NetworkTranslation {
-        using weight_type = typename W_FN::result_type;
+        using weight_type = pdaaal::weight<typename W_FN::result_type>;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
     public:
         NetworkTranslationW(const Query& query, const Network& network, const W_FN& weight_f)

@@ -28,7 +28,7 @@
 #define AALWINES_NETWORKWEIGHT_H
 
 #include <pdaaal/Weight.h>
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 
 #include <utility>
 #include <fstream>
