@@ -47,7 +47,7 @@ namespace aalwines {
      *   ], ...
      * ]
      * where
-     *  - ATOM = {"links", "hops", "distance", "local_failures", "tunnels", "custom", "latency", "zero"}
+     *  - ATOM = {"links", "hops", "distance", "local_failures", "tunnels", "custom_rule", "custom_link", "latency", "zero"}
      *  - NUM = {0,1,2,...}
      */
     class NetworkWeight {
@@ -65,7 +65,8 @@ namespace aalwines {
             local_failures,
             tunnels,
             push_ops,
-            custom,
+            custom_rule, // "weight" property on forwarding rules
+            custom_link, // "weight" property on links
             //latency,
         };
 
@@ -108,9 +109,13 @@ namespace aalwines {
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
                         return std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
                     };
-                case AtomicProperty::custom:
+                case AtomicProperty::custom_rule:
                     return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
                         return r._weight;
+                    };
+                case AtomicProperty::custom_link:
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                        return r._via->weight != std::numeric_limits<uint32_t>::max() ? r._via->weight : 0; // Default to 0, if no link weight specified.
                     };
 /*                case AtomicProperty::latency:
                     return [this](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
@@ -171,10 +176,12 @@ namespace aalwines {
                 p = AtomicProperty::local_failures;
             } else if (s == "tunnels") {
                 p = AtomicProperty::tunnels;
-            } else if (s == "custom") {
-                p = AtomicProperty::custom;
+            } else if (s == "custom_rule") {
+                p = AtomicProperty::custom_rule;
+            } else if (s == "custom_link") {
+                p = AtomicProperty::custom_link;
             } else if (s == "latency") {
-                p = AtomicProperty::custom; // Currently latency info is annotated as the custom weights.
+                p = AtomicProperty::custom_link; // Currently latency info is annotated as the custom weights.
             } else if (s == "zero") {
                 p = AtomicProperty::default_weight_function;
             } else {

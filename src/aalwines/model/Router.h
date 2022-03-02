@@ -97,6 +97,8 @@ namespace aalwines {
         Router* _parent = nullptr;
         Interface* _matching = nullptr;
         RoutingTable* _table = nullptr;
+    public:
+        uint32_t weight = std::numeric_limits<uint32_t>::max();
     };
 
     class Router {
