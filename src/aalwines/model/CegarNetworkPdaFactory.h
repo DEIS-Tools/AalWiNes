@@ -30,7 +30,7 @@
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
 #include <aalwines/query/QueryBuilder.h>
-#include <pdaaal/CegarPdaFactory.h>
+#include <pdaaal/cegar/CegarPdaFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
 #include <aalwines/utils/pointer_back_inserter.h>
 #include <aalwines/utils/ranges.h>

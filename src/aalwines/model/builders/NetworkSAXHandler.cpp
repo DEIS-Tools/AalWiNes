@@ -634,7 +634,12 @@ namespace aalwines {
                 break;
             case context::context_type::routing_table:
                 last_key = keys::table_label;
-                current_table->emplace_entry(key);
+                try {
+                    current_table->emplace_entry(key);
+                } catch (const std::invalid_argument& e) {
+                    errors << "Invalid key in routing table object: " << key << std::endl;
+                    return false;
+                }
                 break;
             case context::context_type::entry:
                 if (key == "out") {

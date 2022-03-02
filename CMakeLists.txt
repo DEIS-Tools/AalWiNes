@@ -34,22 +34,9 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lstdc++")
 option(AALWINES_GetDependencies "Fetch external dependencies from web." ON)
 if (AALWINES_GetDependencies)
     include(FetchContent)
-#    FetchContent_Declare(json
-#            URL https://github.com/nlohmann/json/releases/download/v3.10.5/json.tar.xz
-#            URL_HASH SHA512=feb7dbdd1f1b6318131821f55d1411f0435262601c65eca368ccf3418750fd6348a37a3cd9d0694b31ccacfc91d02fbbecf94af52429005f8898490a5233c37d
-#            )
-#    FetchContent_GetProperties(json)
-#    if(NOT json_POPULATED)
-#        FetchContent_Populate(json)
-#        set(JSON_Install ON)
-#        add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
-#    endif()
-
     FetchContent_Declare(pdaaal
-        #URL https://github.com/DEIS-Tools/PDAAAL/archive/v0.3.0.zip
-        #URL_HASH SHA512=81eb135be9fd2687a48f526fb303c8a7cdc03a59ec0309717fa5af40c5807ed0eecf07f326692fe9f0cb11214b7d3488fd2e2ef5853d245e328509b02b20cbd7
-        GIT_REPOSITORY https://github.com/MortenSchou/PDAAAL.git
-        GIT_TAG db583b46c8fd70e9ef29bf645f6f7715997f42e2
+        URL https://github.com/DEIS-Tools/PDAAAL/archive/v1.0.0.tar.gz
+        URL_HASH SHA512=843f5ff1906783d62b809406ebd32dcab08826dab9310adb4ca3326343381723230a83a6a13f83535318fd6f81cc86417547f14ce1d26d04010451e8c0a15249
     )
     FetchContent_MakeAvailable(pdaaal)
 
