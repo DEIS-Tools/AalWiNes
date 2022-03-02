@@ -29,8 +29,8 @@
 
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
-#include <pdaaal/PDAFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
+#include <pdaaal/PDAFactory.h>
 
 namespace aalwines {
 
@@ -259,7 +259,7 @@ namespace aalwines {
 
         Translation _translation;
         const Query& _query;
-        pdaaal::ptrie_set<state_t> _states;
+        pdaaal::utils::ptrie_set<state_t> _states;
         std::vector<size_t> _initial;
         std::vector<size_t> _accepting;
         const W_FN& _weight_f;
