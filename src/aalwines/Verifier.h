@@ -264,11 +264,11 @@ namespace aalwines {
                 if constexpr(!is_weighted) {
                     throw base_error("error: Longest trace option requires weight to be specified.");
                 } else {
-                    compilation_time.start();
                     auto factory = makeNetworkPDAFactory<pdaaal::TraceInfoType::Pair>(q, builder._network, builder.all_labels(), weight_fn);
                     auto problem_instance = factory.compile(q.construction(), q.destruction());
                     compilation_time.stop();
                     if (_engine == 2) {
+                        reachability_time.start();
                         engine_outcome = pdaaal::Solver::pre_star_fixed_point_accepts<trace_type>(*problem_instance);
                         reachability_time.stop();
                         trace_making_time.start();
@@ -276,7 +276,7 @@ namespace aalwines {
                             std::vector<typename decltype(factory)::trace_state_t> pda_trace;
                             std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(*problem_instance);
                             if (trace_weight == pdaaal::max_weight<typename weight_type::type>::bottom()) {
-                                result = utils::outcome_t::YES; // TODO: This might not be correct. We need a trace to validate!!
+                                // TODO: We need a trace (pattern) to validate here!
                             } else {
                                 json_trace = factory.get_json_trace(pda_trace);
                                 if (!json_trace.is_null()) result = utils::outcome_t::YES;
@@ -290,7 +290,6 @@ namespace aalwines {
             } else if constexpr (trace_type == pdaaal::Trace_Type::ShortestFixedPoint) {
                 throw base_error("Shortest trace using fixed point computation not yet supported."); // We could, but it is not a possible option, so this should not happen.
             } else {
-                compilation_time.start();
                 NetworkPDAFactory factory(q, builder._network, builder.all_labels(), weight_fn);
                 auto problem_instance = factory.compile(q.construction(), q.destruction());
                 compilation_time.stop();
@@ -299,6 +298,7 @@ namespace aalwines {
                         throw base_error("error: Shortest trace option requires weight to be specified.");
                     } else {
                         if (_engine == 1) {
+                            reachability_time.start();
                             engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(*problem_instance);
                             reachability_time.stop();
                             trace_making_time.start();
@@ -314,6 +314,7 @@ namespace aalwines {
                         }
                     }
                 } else {
+                    reachability_time.start();
                     switch (_engine) {
                         case 1:
                             engine_outcome = pdaaal::Solver::post_star_accepts<pdaaal::Trace_Type::Any>(*problem_instance);
