@@ -114,4 +114,8 @@ add_custom_target(generate_hash DEPENDS "version.h")
 add_executable(aalwines-bin main.cpp)
 target_link_libraries(aalwines-bin PRIVATE aalwines)
 add_dependencies(aalwines-bin generate_hash)
-set_target_properties(aalwines-bin PROPERTIES OUTPUT_NAME aalwines)
+set_target_properties(aalwines-bin PROPERTIES
+        OUTPUT_NAME aalwines
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
