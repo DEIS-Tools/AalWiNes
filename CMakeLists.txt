@@ -39,6 +39,9 @@ if (AALWINES_GetDependencies)
         URL_HASH SHA512=843f5ff1906783d62b809406ebd32dcab08826dab9310adb4ca3326343381723230a83a6a13f83535318fd6f81cc86417547f14ce1d26d04010451e8c0a15249
     )
     FetchContent_MakeAvailable(pdaaal)
+    if(IS_DIRECTORY "${pdaaal_SOURCE_DIR}")
+        set_property(DIRECTORY ${pdaaal_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+    endif()
 
 endif (AALWINES_GetDependencies)
 
