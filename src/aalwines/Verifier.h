@@ -118,6 +118,7 @@ namespace aalwines {
             }
         }
         void set_trace_type(pdaaal::Trace_Type trace_type) { _trace_type = trace_type; }
+        void set_engine(size_t engine) { _engine = engine; }
 
         template<typename W_FN = std::function<void(void)>>
         void run(Builder& builder, const std::vector<std::string>& query_strings, json_stream& json_output, bool print_timing = true, const W_FN& weight_fn = [](){}) {
