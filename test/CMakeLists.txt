@@ -1,20 +1,23 @@
 find_package (Boost COMPONENTS unit_test_framework REQUIRED)
-include_directories (${TEST_SOURCE_DIR}/src
-        ${Boost_INCLUDE_DIRS}
-        ${AALWINES_SOURCE_DIR}
-        )
 add_definitions (-DBOOST_TEST_DYN_LINK)
 
-add_executable (NetworkTest Network_test.cpp)
-add_executable (SyntheticNetwork SyntheticNetwork_test.cpp)
-add_executable (RouteConstruction RouteConstruction_test.cpp)
-add_executable (QueryTest Query_test.cpp)
-add_executable (JSONFormatTest JSONFormat_test.cpp)
-add_executable (MoreAlgorithmsTest more_algorithms_test.cpp)
+if (MSVC)
+    add_compile_options(/W4)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-target_link_libraries(NetworkTest Boost::unit_test_framework aalwines)
-target_link_libraries(SyntheticNetwork Boost::unit_test_framework aalwines)
-target_link_libraries(RouteConstruction Boost::unit_test_framework aalwines)
-target_link_libraries(QueryTest Boost::unit_test_framework aalwines)
-target_link_libraries(JSONFormatTest Boost::unit_test_framework aalwines)
-target_link_libraries(MoreAlgorithmsTest Boost::unit_test_framework aalwines)
+set(AALWINES_test_sources
+    Network_test.cpp
+    SyntheticNetwork_test.cpp
+    RouteConstruction_test.cpp
+    Query_test.cpp
+    JSONFormat_test.cpp
+    more_algorithms_test.cpp
+)
+
+foreach(test_source_file ${AALWINES_test_sources})
+    get_filename_component(exename ${test_source_file} NAME_WE)
+    add_executable(${exename} ${test_source_file})
+    target_link_libraries(${exename} PRIVATE Boost::unit_test_framework aalwines)
+endforeach()
