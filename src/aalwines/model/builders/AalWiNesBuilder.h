@@ -27,7 +27,7 @@
 #define AALWINES_AALWINESBUILDER_H
 
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 #include <aalwines/model/Router.h>
@@ -222,7 +222,7 @@ namespace nlohmann {
                 if (interface->source()->is_null() || interface->target()->is_null()) continue; // Skip the NULL router
                 if (interface->match()->table() == nullptr || interface->match()->table()->empty()) continue; // Not this direction
                 assert(interface->match()->match() == interface);
-                bool bidirectional = interface->table() != nullptr && !interface->table()->empty();
+                bool bidirectional = interface->table() != nullptr && !interface->table()->empty() && interface->weight == interface->match()->weight;
                 if (interface->global_id() > interface->match()->global_id() && bidirectional) continue; // Already covered by bidirectional link the other way.
 
                 auto link_j = json::object();
@@ -232,6 +232,9 @@ namespace nlohmann {
                 link_j["to_router"] = interface->target()->name();
                 if (bidirectional) {
                     link_j["bidirectional"] = true;
+                }
+                if (interface->weight != std::numeric_limits<uint32_t>::max()) {
+                    link_j["weight"] = interface->weight;
                 }
                 links_j.push_back(link_j);
             }

@@ -27,7 +27,7 @@
 #ifndef AALWINES_JSON_STREAM_H
 #define AALWINES_JSON_STREAM_H
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <iostream>
 

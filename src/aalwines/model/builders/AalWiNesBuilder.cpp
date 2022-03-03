@@ -119,9 +119,6 @@ namespace aalwines {
             throw base_error("error: links field is not an array.");
         }
         for (const auto& json_link : json_links) {
-            // auto temp_it = json_link.find("bidirectional");
-            // bool bidirectional = temp_it != json_link.end() && temp_it->get<bool>();
-
             auto from_interface_name = json_link.at("from_interface").get<std::string>();
             auto from_router_name = json_link.at("from_router").get<std::string>();
             auto to_interface_name = json_link.at("to_interface").get<std::string>();
@@ -152,6 +149,15 @@ namespace aalwines {
                 throw base_error(es.str());
             }
             from_interface->make_pairing(to_interface);
+
+            auto temp_it = json_link.find("bidirectional");
+            bool bidirectional = temp_it != json_link.end() && temp_it->get<bool>();
+            temp_it = json_link.find("weight");
+            uint32_t link_weight = temp_it != json_link.end() ? temp_it->get<uint32_t>() : std::numeric_limits<uint32_t>::max();
+            from_interface->weight = link_weight;
+            if (bidirectional) {
+                to_interface->weight = link_weight;
+            }
         }
 
         network.add_null_router();

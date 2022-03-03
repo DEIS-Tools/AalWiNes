@@ -29,21 +29,23 @@
 
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
-#include <pdaaal/PDAFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
+#include <pdaaal/PDAFactory.h>
 
 namespace aalwines {
 
-    template<typename W_FN = std::function<void(void)>, typename W = void>
-    class NetworkPDAFactory : public pdaaal::TypedPDAFactory<Query::label_t, W> {
+    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<void>, pdaaal::TraceInfoType trace_info_type = pdaaal::TraceInfoType::Single>
+    class NetworkPDAFactory : public pdaaal::PDAFactory<Query::label_t, W, trace_info_type> {
         using label_t = Query::label_t;
         using NFA = pdaaal::NFA<label_t>;
-        using weight_type = typename W_FN::result_type;
+        using weight_type = pdaaal::weight<typename W_FN::result_type>;
         static constexpr bool is_weighted = pdaaal::is_weighted<weight_type>;
-        using PDAFactory = pdaaal::TypedPDAFactory<label_t, weight_type>;
-        using PDA = pdaaal::TypedPDA<label_t>;
+        using PDAFactory = pdaaal::PDAFactory<label_t, weight_type, trace_info_type>;
+        using PDA = pdaaal::PDA<label_t,weight_type>;
         using rule_t = typename PDAFactory::rule_t;
         using nfa_state_t = NFA::state_t;
+    public:
+        using trace_state_t = typename PDA::tracestate_t;
     private:
         using Translation = NetworkTranslationW<W_FN>;
         using edge_variant = typename Translation::edge_variant;
@@ -57,7 +59,7 @@ namespace aalwines {
         NetworkPDAFactory(const Query& query, const Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f)
         : PDAFactory(std::move(all_labels)), _translation(query, network, weight_f), _query(query), _weight_f(weight_f) { };
 
-        json get_json_trace(const std::vector<PDA::tracestate_t>& trace) {
+        json get_json_trace(const std::vector<trace_state_t>& trace) {
             auto result_trace = json::array();
 
             std::unordered_set<const Interface *> disabled, active;
@@ -141,7 +143,8 @@ namespace aalwines {
                     this->add_wildcard_rule(rule);
                 } else {
                     if (ops.empty()) {
-                        const auto& table = variant.index() == 0 ? std::get<0>(variant) : std::get<2>(variant)->table();
+                        assert(variant.index() == 0);
+                        const auto& table = std::get<0>(variant);
                         for (const auto& entry : table->entries()) {
                             for (const auto& forward : entry._rules) {
                                 if (forward._priority > _query.number_of_failures()) continue;
@@ -158,21 +161,14 @@ namespace aalwines {
                                 if constexpr (is_weighted) {
                                     rule._weight = _weight_f(forward, entry);
                                 }
-                                auto apply_per_nfastate = [&rule,&forward,&entry,&other_ops,this](const nfa_state_t* nfa_state) {
-                                    rule._to = add_state(forward._via->match(), nfa_state, other_ops);
-                                    if (rule._pre == Query::wildcard_label()) {
-                                        this->add_wildcard_rule(rule);
-                                    } else {
-                                        this->add_rule(rule);
-                                    }
-                                };
-                                if (forward._via->is_virtual()) { // Virtual interface does not use a link, so keep same NFA state.
-                                    apply_per_nfastate(nfa_state);
-                                } else { // Follow NFA edges matching forward._via
-                                    for (const auto& e : nfa_state->_edges) {
-                                        if (!e.contains(forward._via->global_id())) continue;
-                                        for (const auto& n : e.follow_epsilon()) {
-                                            apply_per_nfastate(n);
+                                for (const auto& e : nfa_state->_edges) { // Follow NFA edges matching forward._via
+                                    if (!e.contains(forward._via->global_id())) continue;
+                                    for (const auto& n : e.follow_epsilon()) {
+                                        rule._to = add_state(forward._via->match(), n, other_ops);
+                                        if (rule._pre == Query::wildcard_label()) {
+                                            this->add_wildcard_rule(rule);
+                                        } else {
+                                            this->add_rule(rule);
                                         }
                                     }
                                 }
@@ -195,18 +191,10 @@ namespace aalwines {
     private:
         // Construction (factory)
         size_t add_initial_state(const Interface* inf, const nfa_state_t* nfa_state) {
-            if (nfa_state->_accepting && inf->is_virtual()) { // Use 2nd variant of const Interface* to indicate that the state is not accepting.
-                return add_state<true>(state_t(Translation::special_interface(inf), nfa_state, ops_t()));
-            } else {
-                return add_state<true>(state_t(Translation::template get_edge_pointer<true>(inf), nfa_state, ops_t()));
-            }
+            return add_state<true>(state_t(Translation::template get_edge_pointer<true>(inf), nfa_state, ops_t()));
         }
         size_t add_state(const Interface* inf, const nfa_state_t* nfa_state, const ops_t& ops) {
-            if (nfa_state->_accepting && inf->is_virtual()) { // This state should not be accepting, so we need to separate it from non-virtual interfaces.
-                return add_state({Translation::special_interface(inf), nfa_state, ops});
-            } else {
-                return add_state({Translation::get_edge_pointer(inf), nfa_state, ops});
-            }
+            return add_state({Translation::get_edge_pointer(inf), nfa_state, ops});
         }
         template<bool initial = false>
         size_t add_state(const state_t& state) {
@@ -271,14 +259,20 @@ namespace aalwines {
 
         Translation _translation;
         const Query& _query;
-        pdaaal::ptrie_set<state_t> _states;
+        pdaaal::utils::ptrie_set<state_t> _states;
         std::vector<size_t> _initial;
         std::vector<size_t> _accepting;
         const W_FN& _weight_f;
     };
 
     template<typename W_FN>
-    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, typename W_FN::result_type>;
+    NetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) -> NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>>;
+
+    // Add make function that allows specifying template parameter trace_info_type.
+    template<pdaaal::TraceInfoType trace_info_type, typename W_FN>
+    auto makeNetworkPDAFactory(Query& query, Network& network, Builder::labelset_t&& all_labels, const W_FN& weight_f) {
+        return NetworkPDAFactory<W_FN, pdaaal::weight<typename W_FN::result_type>,trace_info_type>(query, network, std::move(all_labels), weight_f);
+    }
 
 }
 

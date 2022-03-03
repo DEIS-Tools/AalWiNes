@@ -113,6 +113,9 @@ namespace aalwines {
             case NetworkSAXHandler::keys::bidirectional:
                 s << "bidirectional";
                 break;
+            case NetworkSAXHandler::keys::link_weight:
+                s << "weight";
+                break;
         }
         return s;
     }
@@ -261,7 +264,8 @@ namespace aalwines {
     }
 
     bool NetworkSAXHandler::pair_link(const std::string &from_router_name, const std::string &from_interface_name,
-                                      const std::string &to_router_name, const std::string &to_interface_name) {
+                                      const std::string &to_router_name, const std::string &to_interface_name,
+                                      bool bidirectional, uint32_t link_weight) {
         auto [from_exists, from_id] = router_map.exists(from_router_name);
         if(!from_exists) {
             errors << "error: No router with name \"" << from_router_name << "\" was defined." << std::endl;
@@ -292,6 +296,10 @@ namespace aalwines {
             return false;
         }
         from_interface->make_pairing(to_interface);
+        from_interface->weight = link_weight;
+        if (bidirectional) {
+            to_interface->weight = link_weight;
+        }
         return true;
     }
 
@@ -309,6 +317,8 @@ namespace aalwines {
     bool NetworkSAXHandler::boolean(bool value) {
         switch (last_key) {
             case keys::bidirectional:
+                current_link_bidirectional = value;
+                break;
             case keys::unknown:
                 break;
             default:
@@ -354,6 +364,9 @@ namespace aalwines {
                 break;
             case keys::push:
                 ops.emplace_back(RoutingTable::op_t::PUSH, value);
+                break;
+            case keys::link_weight:
+                current_link_weight = value;
                 break;
             case keys::unknown:
                 break;
@@ -587,6 +600,8 @@ namespace aalwines {
                     if (!handle_key<context::context_type::link,context::FLAG_4,keys::to_router>()) return false;
                 } else if (key == "bidirectional") {
                     last_key = keys::bidirectional;
+                } else if (key == "weight") {
+                    last_key = keys::link_weight;
                 } else { // "additionalProperties": true
                     last_key = keys::unknown;
                 }
@@ -619,7 +634,12 @@ namespace aalwines {
                 break;
             case context::context_type::routing_table:
                 last_key = keys::table_label;
-                current_table->emplace_entry(key);
+                try {
+                    current_table->emplace_entry(key);
+                } catch (const std::invalid_argument& e) {
+                    errors << "Invalid key in routing table object: " << key << std::endl;
+                    return false;
+                }
                 break;
             case context::context_type::entry:
                 if (key == "out") {
@@ -692,11 +712,14 @@ namespace aalwines {
         switch (context_stack.top().type) {
             case context::context_type::link:{
                 if (routers_parsed) {
-                    auto success = pair_link(current_from_router_name, current_from_interface_name, current_to_router_name, current_to_interface_name);
+                    auto success = pair_link(current_from_router_name, current_from_interface_name, current_to_router_name, current_to_interface_name, current_link_bidirectional, current_link_weight);
                     if (!success) return false;
                 } else {
-                    links.emplace_back(current_from_router_name, current_from_interface_name, current_to_router_name, current_to_interface_name);
+                    links.emplace_back(current_from_router_name, current_from_interface_name, current_to_router_name, current_to_interface_name, current_link_bidirectional, current_link_weight);
                 }
+                // reset
+                current_link_bidirectional = false;
+                current_link_weight = std::numeric_limits<uint32_t>::max();
                 break;
             }
             case context::context_type::router:
@@ -776,8 +799,8 @@ namespace aalwines {
         switch (context_stack.top().type) {
             case context::context_type::router_array:
                 routers_parsed = true;
-                for (const auto &[from_router, from_interface, to_router, to_interface] : links) {
-                    pair_link(from_router, from_interface, to_router, to_interface);
+                for (const auto &[from_router, from_interface, to_router, to_interface, bidirectional, link_weight] : links) {
+                    pair_link(from_router, from_interface, to_router, to_interface, bidirectional, link_weight);
                 }
                 break;
             default:

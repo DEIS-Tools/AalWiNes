@@ -132,9 +132,9 @@ void performance_query(const std::string& query, Network& synthetic_network, Bui
     trace_stream << std::endl << "Post*: " <<std::endl;
 
     verification_time_post.start();
-    auto solver_result1 = pdaaal::Solver::post_star_accepts<pdaaal::Trace_Type::Any>(problem_instance);
+    auto solver_result1 = pdaaal::Solver::post_star_accepts<pdaaal::Trace_Type::Any>(*problem_instance);
     BOOST_CHECK(solver_result1);
-    auto pda_trace = pdaaal::Solver::get_trace<pdaaal::Trace_Type::Any>(problem_instance);
+    auto pda_trace = pdaaal::Solver::get_trace<pdaaal::Trace_Type::Any>(*problem_instance);
     verification_time_post.stop();
     auto json_trace = factory.get_json_trace(pda_trace);
     trace_stream << json_trace.dump();

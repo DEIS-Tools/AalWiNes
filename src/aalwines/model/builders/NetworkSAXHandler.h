@@ -27,7 +27,7 @@
 #ifndef AALWINES_NETWORKSAXHANDLER_H
 #define AALWINES_NETWORKSAXHANDLER_H
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <aalwines/model/Network.h>
 #include <iostream>
 #include <fstream>
@@ -41,7 +41,7 @@ namespace aalwines {
         enum class keys : uint32_t { none, unknown, network, network_name, routers, links, router_name, router_alias,
             location, latitude, longitude, interfaces, interface_name, interface_names, routing_table,
             table_label, entry_out, priority, ops, weight, pop, swap, push,
-            from_router, from_interface, to_router, to_interface, bidirectional };
+            from_router, from_interface, to_router, to_interface, bidirectional, link_weight };
         friend constexpr std::ostream& operator<<( std::ostream&, keys key );
 
     public:
@@ -117,7 +117,7 @@ namespace aalwines {
 
         // Interface
         std::vector<Interface*> current_interfaces;
-        RoutingTable* current_table;
+        RoutingTable* current_table = nullptr;
         std::unordered_set<const Interface*> current_table_out_interfaces;
         std::unordered_set<std::string> forward_constructed_interfaces;
 
@@ -132,10 +132,13 @@ namespace aalwines {
         std::string current_from_interface_name;
         std::string current_to_router_name;
         std::string current_to_interface_name;
-        // bool bidirectional = false; // Not used
+        bool current_link_bidirectional = false;
+        uint32_t current_link_weight = std::numeric_limits<uint32_t>::max();
 
-        std::vector<std::tuple<std::string,std::string,std::string,std::string>> links; // Used if links are parsed before routers.
-        bool pair_link(const std::string& from_router_name, const std::string& from_interface_name, const std::string& to_router_name, const std::string& to_interface_name);
+        std::vector<std::tuple<std::string,std::string,std::string,std::string,bool,uint32_t>> links; // Used if links are parsed before routers.
+        bool pair_link(const std::string& from_router_name, const std::string& from_interface_name,
+                       const std::string& to_router_name, const std::string& to_interface_name,
+                       bool bidirectional, uint32_t link_weight);
         bool add_router_name(const std::string& value);
         bool add_interface_name(const std::string& value);
         template <context::context_type type, context::key_flag flag, keys key, keys... alternatives> bool handle_key();

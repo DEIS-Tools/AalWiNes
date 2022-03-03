@@ -30,7 +30,7 @@
 #include <aalwines/model/Query.h>
 #include <aalwines/model/Network.h>
 #include <aalwines/query/QueryBuilder.h>
-#include <pdaaal/CegarPdaFactory.h>
+#include <pdaaal/cegar/CegarPdaFactory.h>
 #include <aalwines/model/NetworkTranslation.h>
 #include <aalwines/utils/pointer_back_inserter.h>
 #include <aalwines/utils/ranges.h>
@@ -38,17 +38,17 @@
 
 #include <utility>
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 namespace aalwines {
 
-    template <pdaaal::refinement_option_t refinement_option, typename W_FN, typename W, typename C, typename A> class CegarNetworkPdaReconstruction;
+    template <pdaaal::refinement_option_t refinement_option, typename W_FN, typename W> class CegarNetworkPdaReconstruction;
 
     // FIXME: For now simple unweighted version.
-    template<typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
-    class CegarNetworkPdaFactory : public pdaaal::CegarPdaFactory<Query::label_t, W, C, A> {
-        template <pdaaal::refinement_option_t refinement_option, typename W_FN_, typename W_, typename C_, typename A_>
+    template<typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<typename W_FN::result_type>>
+    class CegarNetworkPdaFactory : public pdaaal::CegarPdaFactory<Query::label_t, W> {
+        template <pdaaal::refinement_option_t refinement_option, typename W_FN_, typename W_>
         friend class CegarNetworkPdaReconstruction;
     public:
         using label_t = Query::label_t;
@@ -60,7 +60,7 @@ namespace aalwines {
         using a_ops_t = std::vector<a_op_t>;
         using table_t = pdaaal::ptrie_set<std::tuple<size_t, size_t, a_op_t, a_ops_t>>; // a(label), a(to), a(first_op), a(remaining_ops)
         using abstract_state_t = std::tuple<size_t, const nfa_state_t*, a_ops_t>;
-        using parent_t = pdaaal::CegarPdaFactory<label_t, W, C, A>;
+        using parent_t = pdaaal::CegarPdaFactory<label_t, W>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         static constexpr uint32_t abstract_wildcard_label() noexcept { return std::numeric_limits<uint32_t>::max(); }
     public:
@@ -201,7 +201,7 @@ namespace aalwines {
                 if constexpr (initial) {
                     _initial.push_back(abstract_id);
                 }
-                if (nfa_state->_accepting && !inf->is_virtual()) { // We assume that the interface abstraction always distinguishes virtual and non-virtual interfaces.
+                if (nfa_state->_accepting) {
                     _accepting.push_back(abstract_id);
                 }
             }
@@ -209,7 +209,7 @@ namespace aalwines {
 
         void initialize() {
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+                    absl::Hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
             std::vector<std::tuple<const Interface*, const nfa_state_t*, size_t>> waiting;
 
             _translation.make_initial_states([&seen,&waiting,this](const Interface* inf, const std::vector<nfa_state_t*>& next) {
@@ -233,7 +233,7 @@ namespace aalwines {
             // This is useful for keeping _spurious_rules consistent.
 
             std::unordered_set<std::pair<const Interface*, const nfa_state_t*>,
-                    boost::hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
+                    absl::Hash<std::pair<const Interface*, const nfa_state_t*>>> seen;
             std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>> waiting;
 
             // The refinement might make some old _initial states stop being initial.
@@ -319,7 +319,7 @@ namespace aalwines {
         }
 
         template<bool first_time = false>
-        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, boost::hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
+        void make_edges(std::unordered_set<std::pair<const Interface*, const nfa_state_t*>, absl::Hash<std::pair<const Interface*, const nfa_state_t*>>>&& seen,
                         std::vector<std::tuple<const Interface*, const nfa_state_t*,size_t>>&& waiting,
                         const std::function<bool(size_t)>& is_new = [](const auto&){return true;}) {
             auto add = [&seen, &waiting, &is_new, this](const nfa_state_t* n, const Interface* inf, size_t a_inf) {
@@ -344,16 +344,11 @@ namespace aalwines {
                 for (const Interface* out_inf : inf->table()->out_interfaces()) {
                     auto to_inf = out_inf->match();
                     auto a_to_inf = _interface_abstraction.exists(to_inf).second;
-                    if (out_inf->is_virtual()) {
-                        _edges.emplace(std::make_tuple(a_inf,nfa_state,a_to_inf), nfa_state);
-                        add(nfa_state, to_inf, a_to_inf);
-                    } else {
-                        for (const auto& e : nfa_state->_edges) {
-                            for (const auto& n : e.follow_epsilon()) {
-                                if (!e.contains(out_inf->global_id())) continue;
-                                _edges.emplace(std::make_tuple(a_inf,nfa_state,a_to_inf), n);
-                                add(n, to_inf, a_to_inf);
-                            }
+                    for (const auto& e : nfa_state->_edges) {
+                        for (const auto& n : e.follow_epsilon()) {
+                            if (!e.contains(out_inf->global_id())) continue;
+                            _edges.emplace(std::make_tuple(a_inf,nfa_state,a_to_inf), n);
+                            add(n, to_inf, a_to_inf);
                         }
                     }
                 }
@@ -419,15 +414,15 @@ namespace aalwines {
     };
 
     // For now simple unweighted version.
-    template<pdaaal::refinement_option_t refinement_option, typename W_FN = std::function<void(void)>, typename W = typename W_FN::result_type, typename C = std::less<W>, typename A = pdaaal::add<W>>
+    template<pdaaal::refinement_option_t refinement_option, typename W_FN = std::function<void(void)>, typename W = pdaaal::weight<typename W_FN::result_type>>
     class CegarNetworkPdaReconstruction : public pdaaal::CegarPdaReconstruction<
             Query::label_t, // label_t
             const Interface*, // state_t
             ConfigurationRange,
             json_wrapper , // concrete_trace_t
-            W, C, A> {
-        friend class CegarNetworkPdaFactory<W_FN,W,C,A>;
-        using factory_t = CegarNetworkPdaFactory<W_FN,W,C,A>;
+            W> {
+        friend class CegarNetworkPdaFactory<W_FN,W>;
+        using factory_t = CegarNetworkPdaFactory<W_FN,W>;
     public:
         using label_t = typename factory_t::label_t;
         using concrete_trace_t = json_wrapper;
@@ -438,16 +433,16 @@ namespace aalwines {
         using header_t = pdaaal::Header<Query::label_t>;
         using configuration_range_t = ConfigurationRange;
         using configuration_t = typename configuration_range_t::value_type; // = cegar_configuration_t;
-        using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W, C, A>;
+        using parent_t = pdaaal::CegarPdaReconstruction<label_t, state_t, configuration_range_t, concrete_trace_t, W>;
         using abstract_rule_t = typename parent_t::abstract_rule_t;
         using NFA = pdaaal::NFA<Query::label_t>;
         using nfa_state_t = NFA::state_t;
-        using solver_instance_t = typename parent_t::solver_instance_t;
+        using product_t = typename parent_t::product_t;
     public:
         using refinement_t = typename parent_t::refinement_t;
         using header_refinement_t = typename parent_t::header_refinement_t;
 
-        explicit CegarNetworkPdaReconstruction(const factory_t& factory, const solver_instance_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
+        explicit CegarNetworkPdaReconstruction(const factory_t& factory, const product_t& instance, const pdaaal::NFA<label_t>& initial_headers, const pdaaal::NFA<label_t>& final_headers)
         : parent_t(instance, initial_headers, final_headers), _factory(factory) {};
 
     protected:
@@ -462,7 +457,7 @@ namespace aalwines {
             return utils::VectorRange<utils::FilterRange<typename pdaaal::RefinementMapping<const Interface*>::concrete_value_range>, configuration_t>(
                 utils::FilterRange(
                     _factory._interface_abstraction.get_concrete_values_range(a_inf), // Inner range of interfaces
-                    [this,nfa_state=nfa_state](const auto& inf){ return !inf->match()->is_virtual() && NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
+                    [this,nfa_state=nfa_state](const auto& inf){ return NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state); }), // Filter predicate
                 [this, header=this->initial_header(), &abstract_rule, nfa_state=nfa_state, &to_state, ops_size](const auto& inf){
                     return make_configurations(header, abstract_rule, inf, nfa_state, to_state, ops_size, // Transform interface to vector of configurations.
                                                EdgeStatus(std::vector<const Interface*>(), std::vector<const Interface*>{inf}));
@@ -473,7 +468,7 @@ namespace aalwines {
             auto [a_inf, nfa_state, ops] = _factory._abstract_states.at(abstract_rule._from);
             auto labels = this->pre_labels(this->initial_header());
             for (const auto& inf : _factory._interface_abstraction.get_concrete_values_range(a_inf)) {
-                if (inf->match()->is_virtual() || !NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state)) continue; // concrete state is initial
+                if (!NFA::has_as_successor(_factory._query.path().initial(), inf->match()->global_id(), nfa_state)) continue; // concrete state is initial
                 for (const auto& label : labels) {
                     if (this->label_maps_to(label, abstract_rule._pre)) {
                         X.emplace_back(inf, label);
