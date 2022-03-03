@@ -184,10 +184,9 @@ int main(int argc, const char** argv)
                     str.erase(std::remove(str.begin(), str.end(), '\r'), str.end());
                     query_strings.emplace_back(str);
                 }
-                qstream.close();
-                std::ifstream qstream(query_file);
+                qstream.clear();
+                qstream.seekg(0);
                 builder.do_parse(qstream);
-                qstream.close();
             }
             catch(base_parser_error& error)
             {
@@ -209,7 +208,6 @@ int main(int argc, const char** argv)
                 }
                 try {
                     weight_fn.emplace(network_weight.parse(wstream));
-                    wstream.close();
                 } catch (base_error& error) {
                     std::cerr << "Error while parsing weight function:" << error << std::endl;
                     exit(-1);
@@ -227,13 +225,11 @@ int main(int argc, const char** argv)
             json_output.entry("query-parsing-time", queryparsingwatch.duration());
         }
 
-        json_output.begin_object("answers");
         if (weight_fn) {
             verifier.run(builder, query_strings, json_output, !no_timing, weight_fn.value());
         } else {
             verifier.run(builder, query_strings, json_output, !no_timing);
         }
-        json_output.end_object();
     }
 
     return 0;

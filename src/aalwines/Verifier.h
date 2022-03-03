@@ -110,7 +110,8 @@ namespace aalwines {
             }
         }
         void check_supports_weight() const {
-            if (!((_engine == 1 && _trace_type == pdaaal::Trace_Type::Shortest) ||
+            if (!(_engine == 0 ||
+                  (_engine == 1 && _trace_type == pdaaal::Trace_Type::Shortest) ||
                   (_engine == 2 && _trace_type == pdaaal::Trace_Type::Longest))) {
                 std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*), or longest trace (--trace 3) for --engine 2 (pre*). Not for --engine " << _engine << std::endl;
                 exit(-1);
@@ -120,7 +121,9 @@ namespace aalwines {
 
         template<typename W_FN = std::function<void(void)>>
         void run(Builder& builder, const std::vector<std::string>& query_strings, json_stream& json_output, bool print_timing = true, const W_FN& weight_fn = [](){}) {
+            if (_engine == 0) return; // By default don't run verifier if not specified.
             size_t query_no = 0;
+            json_output.begin_object("answers");
             for (auto& q : builder._result) {
                 std::stringstream qn;
                 qn << "Q" << query_no+1;
@@ -131,6 +134,7 @@ namespace aalwines {
 
                 ++query_no;
             }
+            json_output.end_object();
         }
 
         template<typename W_FN = std::function<void(void)>>
@@ -337,7 +341,7 @@ namespace aalwines {
                     reachability_time.stop();
                     trace_making_time.start();
                     if (engine_outcome) {
-                        auto pda_trace = pdaaal::Solver::get_trace(*problem_instance);
+                        auto pda_trace = (_engine == 6) ? pdaaal::Solver::get_trace_dual_search(*problem_instance) : pdaaal::Solver::get_trace(*problem_instance);
                         json_trace = factory.get_json_trace(pda_trace);
                         if (!json_trace.is_null()) result = utils::outcome_t::YES;
                     }
@@ -351,7 +355,7 @@ namespace aalwines {
         po::options_description verification;
 
         // Settings
-        size_t _engine = 1;
+        size_t _engine = 0;
         // size_t _reduction = 0;
         // bool _print_trace = false;
         pdaaal::Trace_Type _trace_type = pdaaal::Trace_Type::None;
