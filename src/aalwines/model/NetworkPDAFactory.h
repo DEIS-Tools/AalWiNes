@@ -108,6 +108,7 @@ namespace aalwines {
                                     break;
                                 case RoutingTable::op_t::PUSH:
                                     expected_next_stack_size++;
+                                    [[fallthrough]];
                                 case RoutingTable::op_t::SWAP:
                                     top_label_ok = forward._ops[0]._op_label == next_stack.front();
                                     break;

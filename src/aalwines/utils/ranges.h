@@ -73,7 +73,7 @@ namespace aalwines::utils {
                 _end = true;
                 return *this;
             }
-            bool operator==(const sentinel& rhs) const noexcept { return _end; }
+            bool operator==(const sentinel&) const noexcept { return _end; }
             bool operator!=(const sentinel& rhs) const noexcept { return !(*this == rhs); }
 
         private:
@@ -136,7 +136,7 @@ namespace aalwines::utils {
                 return *this;
             }
 
-            bool operator==(const sentinel& rhs) const noexcept { return is_end(); }
+            bool operator==(const sentinel&) const noexcept { return is_end(); }
             bool operator!=(const sentinel& rhs) const noexcept { return !(*this == rhs); }
 
         private:
@@ -207,7 +207,7 @@ namespace aalwines::utils {
                 return *this;
             }
 
-            bool operator==(const sentinel& rhs) const noexcept { return is_end(); }
+            bool operator==(const sentinel&) const noexcept { return is_end(); }
             bool operator!=(const sentinel& rhs) const noexcept { return !(*this == rhs); }
 
         private:
@@ -343,7 +343,7 @@ namespace aalwines::utils {
                 }
                 return *this;
             }
-            bool operator==(const sentinel& rhs) const noexcept {
+            bool operator==(const sentinel&) const noexcept {
                 // std::visit is slow, so optimize for current/standard use case.
                 assert(_inner.index() == _end.index());
                 if constexpr (variant_size == 1) {

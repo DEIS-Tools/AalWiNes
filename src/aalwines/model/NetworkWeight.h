@@ -76,15 +76,15 @@ namespace aalwines {
         [[nodiscard]] atomic_property_function get_atom(AtomicProperty atom) const {
             switch (atom) {
                 case AtomicProperty::number_of_links:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t&, const RoutingTable::entry_t&) -> uint32_t {
                         return 1;
                     };
                 case AtomicProperty::number_of_hops: // Does not count links that are self-loops.
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         return !r._via->is_virtual() ? 1 : 0;
                     };
                 case AtomicProperty::distance:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         return r._via->source()->coordinate() && r._via->target()->coordinate()
                                ? r._via->source()->coordinate()->distance_to(r._via->target()->coordinate().value())
                                : 20038; //(km). If coordinates are missing, use half circumference of earth, i.e. worst case distance.
@@ -100,32 +100,32 @@ namespace aalwines {
                         return edges.size();
                     };
                 case AtomicProperty::tunnels:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         auto push_ops = std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
                         auto pop_ops = std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::POP; });
                         return push_ops > pop_ops ? push_ops - pop_ops : 0;
                     };
                 case AtomicProperty::push_ops:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         return std::count_if(r._ops.begin(), r._ops.end(), [](RoutingTable::action_t act) -> bool { return act._op == RoutingTable::op_t::PUSH; });
                     };
                 case AtomicProperty::custom_rule:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         return r._weight;
                     };
                 case AtomicProperty::custom_link:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         return r._via->weight != std::numeric_limits<uint32_t>::max() ? r._via->weight : 0; // Default to 0, if no link weight specified.
                     };
 /*                case AtomicProperty::latency:
-                    return [this](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [this](const RoutingTable::forward_t& r, const RoutingTable::entry_t&) -> uint32_t {
                         auto it = this->_latency_map.find(r._via);
                         return it != this->_latency_map.end() ? it->second : 0;
                         // (r._via->source()->index(), r._via->target()->index())
                     };*/
                 case AtomicProperty::default_weight_function:
                 default:
-                    return [](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+                    return [](const RoutingTable::forward_t&, const RoutingTable::entry_t&) -> uint32_t {
                         return 0;
                     };
             }
@@ -150,7 +150,7 @@ namespace aalwines {
         }
 
         static auto default_weight_fn() {
-            return pdaaal::ordered_weight_function(std::vector<linear_weight_function>{linear_weight_function{[](const RoutingTable::forward_t& r, const RoutingTable::entry_t& _) -> uint32_t {
+            return pdaaal::ordered_weight_function(std::vector<linear_weight_function>{linear_weight_function{[](const RoutingTable::forward_t&, const RoutingTable::entry_t&) -> uint32_t {
                 return 0;
             }}});
         }
