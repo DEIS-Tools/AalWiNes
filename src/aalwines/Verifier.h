@@ -109,14 +109,6 @@ namespace aalwines {
                 exit(-1);
             }
         }
-        void check_supports_weight() const {
-            if (!(_engine == 0 ||
-                  (_engine <=3 && _trace_type == pdaaal::Trace_Type::Shortest) ||
-                  (_engine <= 3 && _trace_type == pdaaal::Trace_Type::Longest))) {
-                std::cerr << "Shortest and longest trace using weights is only implemented for post*, pre* and dual* (--engine 1 2 or 3). Not for --engine " << _engine << std::endl;
-                exit(-1);
-            }
-        }
         void set_trace_type(pdaaal::Trace_Type trace_type) { _trace_type = trace_type; }
         void set_engine(size_t engine) { _engine = engine; }
 
@@ -339,7 +331,7 @@ namespace aalwines {
                                 engine_outcome = pdaaal::Solver::dual_search_accepts<trace_type>(*problem_instance);
                                 break;
                             default:
-                                throw base_error("Shortest trace option only supported for post*, pre* and dual* (--engine 1, 2 or 6).");
+                                throw base_error("Shortest trace option only supported for post*, pre* and dual* (--engine 1, 2 or 3).");
                         }
                         reachability_time.stop();
                         trace_making_time.start();
