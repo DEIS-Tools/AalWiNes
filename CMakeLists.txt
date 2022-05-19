@@ -32,8 +32,8 @@ option(AALWINES_GetDependencies "Fetch external dependencies from web." ON)
 if (AALWINES_GetDependencies)
     include(FetchContent)
     FetchContent_Declare(pdaaal
-        URL https://github.com/DEIS-Tools/PDAAAL/archive/v1.0.0.tar.gz
-        URL_HASH SHA512=843f5ff1906783d62b809406ebd32dcab08826dab9310adb4ca3326343381723230a83a6a13f83535318fd6f81cc86417547f14ce1d26d04010451e8c0a15249
+        URL https://github.com/DEIS-Tools/PDAAAL/archive/v1.1.0.tar.gz
+        URL_HASH SHA512=68768d87c6bde7cc0ee5e6c503671eab75032ca59032a9b8645d42a4a2889e267e4175221226f8e50f36c787c1e779287a834ed2d3b4e3fcc7f09098957ae2c8
     )
     FetchContent_MakeAvailable(pdaaal)
     if(IS_DIRECTORY "${pdaaal_SOURCE_DIR}")

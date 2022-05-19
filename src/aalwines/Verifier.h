@@ -95,7 +95,7 @@ namespace aalwines {
 
         explicit Verifier(const std::string& caption = "Verification Options") : verification(caption) {
             verification.add_options()
-                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*,3=post*CEGAR,4=post*CEGARwithSimpleRefinement,5=post*NoAbstraction,6=dual*,9=dual*CEGAR")
+                    ("engine,e", po::value<size_t>(&_engine), "0=no verification,1=post*,2=pre*,3=dual*,4=post*CEGAR,5=post*CEGARwithSimpleRefinement,6=post*NoAbstraction,7=dual*CEGAR")
                     ("trace,t", po::value<pdaaal::Trace_Type>(&_trace_type)->default_value(pdaaal::Trace_Type::None), "Trace type. 0=no trace, 1=any trace, 2=shortest trace, 3=longest trace")
                     ;
         }
@@ -104,16 +104,16 @@ namespace aalwines {
         auto add_options() { return verification.add_options(); }
 
         void check_settings() const {
-            if(_engine > 9) {
+            if(_engine > 7) {
                 std::cerr << "Unknown value for --engine : " << _engine << std::endl;
                 exit(-1);
             }
         }
         void check_supports_weight() const {
             if (!(_engine == 0 ||
-                  (_engine == 1 && _trace_type == pdaaal::Trace_Type::Shortest) ||
-                  (_engine == 2 && _trace_type == pdaaal::Trace_Type::Longest))) {
-                std::cerr << "Shortest trace using weights is only implemented for --engine 1 (post*), or longest trace (--trace 3) for --engine 2 (pre*). Not for --engine " << _engine << std::endl;
+                  (_engine <=3 && _trace_type == pdaaal::Trace_Type::Shortest) ||
+                  (_engine <= 3 && _trace_type == pdaaal::Trace_Type::Longest))) {
+                std::cerr << "Shortest and longest trace using weights is only implemented for post*, pre* and dual* (--engine 1 2 or 3). Not for --engine " << _engine << std::endl;
                 exit(-1);
             }
         }
@@ -144,7 +144,7 @@ namespace aalwines {
             constexpr static bool is_weighted = pdaaal::is_weighted<weight_type>;
 
             json output; // Store output information in this JSON object.
-            static const char *engineTypes[] {"", "Post*", "Pre*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "DualSearch", "Post* (no ET)", "Pre* (no ET)", "CEGAR_Dual"};
+            static const char *engineTypes[] {"", "Post*", "Pre*", "Dual*", "CEGAR_Post*", "CEGAR_Post*_SimpleRefinement", "CEGAR_NoAbstraction_Post*", "CEGAR_Dual"};
             output["engine"] = engineTypes[_engine];
 
             // DUAL mode means first do OVER-approximation, then if that is inconclusive, do UNDER-approximation
@@ -157,23 +157,23 @@ namespace aalwines {
             stopwatch full_time(false);
 
             utils::outcome_t result = utils::outcome_t::MAYBE;
-            if (_engine == 3 || _engine == 4 || _engine == 5 || _engine == 9) {
+            if (_engine == 4 || _engine == 5 || _engine == 6 || _engine == 7) {
                 std::optional<json> res;
                 full_time.start();
                 switch (_engine) {
-                    case 3: // CEGAR_Post*
+                    case 4: // CEGAR_Post*
                         output["abstraction"] = json::object();
                         res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
                         break;
-                    case 4: // CEGAR_Post*_SimpleRefinement
+                    case 5: // CEGAR_Post*_SimpleRefinement
                         output["abstraction"] = json::object();
                         res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::fast_refinement>(builder._network, q, builder.all_labels(), output["abstraction"]);
                         break;
-                    case 5: // CEGAR_NoAbstraction_Post*
+                    case 6: // CEGAR_NoAbstraction_Post*
                         output["no_abstraction"] = json::object();
                         res = CegarVerifier::verify<true>(builder._network, q, builder.all_labels(), output["no_abstraction"]);
                         break;
-                    case 9: // CEGAR_Dual
+                    case 7: // CEGAR_Dual
                         output["abstraction"] = json::object();
                         res = CegarVerifier::verify<false,false,pdaaal::refinement_option_t::best_refinement,true>(builder._network, q, builder.all_labels(), output["abstraction"]);
                         break;
@@ -272,9 +272,36 @@ namespace aalwines {
                     auto factory = makeNetworkPDAFactory<pdaaal::TraceInfoType::Pair>(q, builder._network, builder.all_labels(), weight_fn);
                     auto problem_instance = factory.compile(q.construction(), q.destruction());
                     compilation_time.stop();
-                    if (_engine == 2) {
+                    if (_engine == 3) {
                         reachability_time.start();
-                        engine_outcome = pdaaal::Solver::pre_star_fixed_point_accepts<trace_type>(*problem_instance);
+                        bool used_pre_star;
+                        auto instance_copy = problem_instance->copy();
+                        std::tie(engine_outcome, used_pre_star) = pdaaal::Solver::interleaving_fixed_point_accepts<trace_type>(*problem_instance,instance_copy);
+                        reachability_time.stop();
+                        trace_making_time.start();
+                        if (engine_outcome) {
+                            std::vector<typename decltype(factory)::trace_state_t> pda_trace;
+                            std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(used_pre_star ? instance_copy : *problem_instance);
+                            if (trace_weight == pdaaal::max_weight<typename weight_type::type>::bottom()) {
+                                // TODO: We need a trace (pattern) to validate here!
+                            } else {
+                                json_trace = factory.get_json_trace(pda_trace);
+                                if (!json_trace.is_null()) result = utils::outcome_t::YES;
+                            }
+                        }
+                        trace_making_time.stop();
+                    } else {
+                        reachability_time.start();
+                        switch (_engine) {
+                            case 1:
+                                engine_outcome = pdaaal::Solver::post_star_fixed_point_accepts<trace_type>(*problem_instance);
+                                break;
+                            case 2:
+                                engine_outcome = pdaaal::Solver::pre_star_fixed_point_accepts<trace_type>(*problem_instance);
+                                break;
+                            default:
+                                throw base_error("Longest trace option only supported for post*, pre* and dual* (--engine 1, 2 or 6).");
+                        }
                         reachability_time.stop();
                         trace_making_time.start();
                         if (engine_outcome) {
@@ -288,8 +315,6 @@ namespace aalwines {
                             }
                         }
                         trace_making_time.stop();
-                    } else {
-                        throw base_error("Longest trace option only supported for pre* (--engine 2).");
                     }
                 }
             } else if constexpr (trace_type == pdaaal::Trace_Type::ShortestFixedPoint) {
@@ -302,21 +327,29 @@ namespace aalwines {
                     if constexpr(!is_weighted) {
                         throw base_error("error: Shortest trace option requires weight to be specified.");
                     } else {
-                        if (_engine == 1) {
-                            reachability_time.start();
-                            engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(*problem_instance);
-                            reachability_time.stop();
-                            trace_making_time.start();
-                            if (engine_outcome) {
-                                std::vector<typename decltype(factory)::trace_state_t> pda_trace;
-                                std::tie(pda_trace, trace_weight) = pdaaal::Solver::get_trace<trace_type>(*problem_instance);
-                                json_trace = factory.get_json_trace(pda_trace);
-                                if (!json_trace.is_null()) result = utils::outcome_t::YES;
-                            }
-                            trace_making_time.stop();
-                        } else {
-                            throw base_error("Shortest trace option only supported for post* (--engine 1).");
+                        reachability_time.start();
+                        switch (_engine) {
+                            case 1:
+                                engine_outcome = pdaaal::Solver::post_star_accepts<trace_type>(*problem_instance);
+                                break;
+                            case 2:
+                                engine_outcome = pdaaal::Solver::pre_star_accepts<trace_type>(*problem_instance);
+                                break;
+                            case 3:
+                                engine_outcome = pdaaal::Solver::dual_search_accepts<trace_type>(*problem_instance);
+                                break;
+                            default:
+                                throw base_error("Shortest trace option only supported for post*, pre* and dual* (--engine 1, 2 or 6).");
                         }
+                        reachability_time.stop();
+                        trace_making_time.start();
+                        if (engine_outcome) {
+                            std::vector<typename decltype(factory)::trace_state_t> pda_trace;
+                            std::tie(pda_trace, trace_weight) = (_engine == 3) ? pdaaal::Solver::get_trace_dual_search<trace_type>(*problem_instance) : pdaaal::Solver::get_trace<trace_type>(*problem_instance);
+                            json_trace = factory.get_json_trace(pda_trace);
+                            if (!json_trace.is_null()) result = utils::outcome_t::YES;
+                        }
+                        trace_making_time.stop();
                     }
                 } else {
                     reachability_time.start();
@@ -325,16 +358,10 @@ namespace aalwines {
                             engine_outcome = pdaaal::Solver::post_star_accepts<pdaaal::Trace_Type::Any>(*problem_instance);
                             break;
                         case 2:
-                            engine_outcome = pdaaal::Solver::pre_star_accepts(*problem_instance);
+                            engine_outcome = pdaaal::Solver::pre_star_accepts<pdaaal::Trace_Type::Any>(*problem_instance);
                             break;
-                        case 6:
-                            engine_outcome = pdaaal::Solver::dual_search_accepts(*problem_instance);
-                            break;
-                        case 7:
-                            engine_outcome = pdaaal::Solver::post_star_accepts_no_ET(*problem_instance);
-                            break;
-                        case 8:
-                            engine_outcome = pdaaal::Solver::pre_star_accepts_no_ET(*problem_instance);
+                        case 3:
+                            engine_outcome = pdaaal::Solver::dual_search_accepts<pdaaal::Trace_Type::Any>(*problem_instance);
                             break;
                         default:
                             throw base_error("Unsupported --engine value given");
@@ -342,7 +369,7 @@ namespace aalwines {
                     reachability_time.stop();
                     trace_making_time.start();
                     if (engine_outcome) {
-                        auto pda_trace = (_engine == 6) ? pdaaal::Solver::get_trace_dual_search(*problem_instance) : pdaaal::Solver::get_trace(*problem_instance);
+                        auto pda_trace = (_engine == 3) ? pdaaal::Solver::get_trace_dual_search(*problem_instance) : pdaaal::Solver::get_trace(*problem_instance);
                         json_trace = factory.get_json_trace(pda_trace);
                         if (!json_trace.is_null()) result = utils::outcome_t::YES;
                     }
