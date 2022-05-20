@@ -150,6 +150,7 @@ void build_query(const std::string& query, Network& synthetic_network, Builder b
     builder.do_parse(qstream);
 
     Verifier verifier;
+    verifier.set_engine(1);
     for(auto& q : builder._result) {
         auto output = verifier.run_once(builder, q);
         auto result = output["result"].get<utils::outcome_t>();

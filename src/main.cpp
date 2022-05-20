@@ -198,7 +198,6 @@ int main(int argc, const char** argv)
 
         std::optional<NetworkWeight::weight_function> weight_fn;
         if (!weight_file.empty()) {
-            verifier.check_supports_weight();
             NetworkWeight network_weight;
             {
                 std::ifstream wstream(weight_file);

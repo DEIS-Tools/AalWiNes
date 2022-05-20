@@ -36,7 +36,11 @@ target_sources(aalwines
 	PUBLIC  ${HEADER_FILES}
 )
 target_compile_features(aalwines PUBLIC cxx_std_17) # Require C++17 features.
-target_compile_definitions(aalwines PUBLIC $<$<CONFIG:Release>:NDEBUG>) # We can use "#ifndef NDEBUG\n <debug only code> \n#endif" to define code that is only used in debug mode.
+if (MSVC)
+	target_compile_options(aalwines PRIVATE /W4)
+else()
+	target_compile_options(aalwines PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 target_include_directories(aalwines PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -113,5 +117,14 @@ endif()
 add_custom_target(generate_hash DEPENDS "version.h")
 add_executable(aalwines-bin main.cpp)
 target_link_libraries(aalwines-bin PRIVATE aalwines)
+if (MSVC)
+	target_compile_options(aalwines-bin PRIVATE /W4)
+else()
+	target_compile_options(aalwines-bin PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 add_dependencies(aalwines-bin generate_hash)
-set_target_properties(aalwines-bin PROPERTIES OUTPUT_NAME aalwines)
+set_target_properties(aalwines-bin PROPERTIES
+        OUTPUT_NAME aalwines
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

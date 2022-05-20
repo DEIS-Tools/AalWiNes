@@ -50,6 +50,7 @@ BOOST_AUTO_TEST_CASE(QueryTest1) {
     builder.do_parse(qstream);
 
     Verifier verifier;
+    verifier.set_engine(1);
     verifier.set_trace_type(pdaaal::Trace_Type::Any);
     for (auto& q : builder._result) {
         auto output = verifier.run_once(builder, q);
@@ -76,6 +77,7 @@ BOOST_AUTO_TEST_CASE(QueryTest2) {
     builder.do_parse(qstream);
 
     Verifier verifier;
+    verifier.set_engine(1);
     verifier.set_trace_type(pdaaal::Trace_Type::Any);
     for (auto& q : builder._result) {
         auto output = verifier.run_once(builder, q);
@@ -103,6 +105,7 @@ BOOST_AUTO_TEST_CASE(QueryTest3) {
     builder.do_parse(qstream);
 
     Verifier verifier;
+    verifier.set_engine(1);
     verifier.set_trace_type(pdaaal::Trace_Type::Any);
     for (auto& q : builder._result) {
         auto output = verifier.run_once(builder, q);

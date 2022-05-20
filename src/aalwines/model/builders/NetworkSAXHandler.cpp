@@ -489,7 +489,7 @@ namespace aalwines {
         return true;
     }
 
-    bool NetworkSAXHandler::binary(binary_t& val) {
+    bool NetworkSAXHandler::binary(binary_t&) {
         if (last_key == keys::unknown){
             return true;
         }
