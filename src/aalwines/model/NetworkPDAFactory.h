@@ -151,8 +151,10 @@ namespace aalwines {
                                 if (forward._priority > _query.number_of_failures()) continue;
                                 auto first_op = forward.first_action();
                                 ops_t other_ops;
-                                for (auto action_it = forward._ops.begin() + 1; action_it != forward._ops.end(); ++action_it) {
-                                    other_ops.emplace_back(action_it->convert_to_pda_op());
+                                if (!forward._ops.empty()) {
+                                    for (auto action_it = forward._ops.begin() + 1; action_it != forward._ops.end(); ++action_it) {
+                                        other_ops.emplace_back(action_it->convert_to_pda_op());
+                                    }
                                 }
                                 rule_t rule;
                                 rule._from = from_state;
